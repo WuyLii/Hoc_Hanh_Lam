@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-editorial: #F9F7F2;
+    --ink-black: #1A1A1A;
+    --paper-white: #FFFFFF;
+    --paper-tint: #F3EFE6;
+    --border-editorial: #1A1A1A;
+  }
+
+  * {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  body {
+    background-color: #F9F7F2;
+    color: #1A1A1A;
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-serif, .font-display, .font-sans, p, span, button, input, textarea, select {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+  }
+
+  .font-mono {
+    font-family: 'Roboto Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  }
+}
+
+/* Custom Editorial borders and newspaper accents */
+.editorial-border {
+  border: 1px solid #1A1A1A;
+}
+
+.editorial-border-b {
+  border-bottom: 1px solid #1A1A1A;
+}
+
+.editorial-border-t {
+  border-top: 1px solid #1A1A1A;
+}
+
+.editorial-border-l {
+  border-left: 1px solid #1A1A1A;
+}
+
+.editorial-border-r {
+  border-right: 1px solid #1A1A1A;
+}
+
+.editorial-double-border {
+  border-bottom: 3px double #1A1A1A;
+}
+
+.editorial-shadow {
+  box-shadow: 4px 4px 0px 0px #1A1A1A;
+}
+
+.editorial-shadow-sm {
+  box-shadow: 2px 2px 0px 0px #1A1A1A;
+}
+
+.editorial-shadow-lg {
+  box-shadow: 6px 6px 0px 0px #1A1A1A;
+}
+
+/* Custom crisp scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F9F7F2;
+  border-left: 1px solid #1A1A1A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1A1A1A;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333333;
+}
