@@ -32,7 +32,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
   const currentLangInfo = LANGUAGES[currentLanguage];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imagesBase64, setImagesBase64] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [extractedWords, setExtractedWords] = useState<ExtractedWord[]>([]);
@@ -40,20 +40,31 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      setImageBase64(evt.target?.result as string);
-      setExtractedWords([]);
-      setScanError(null);
-    };
-    reader.readAsDataURL(file);
+    Array.from(files).forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const res = evt.target?.result as string;
+        if (res) {
+          setImagesBase64((prev) => [...prev, res]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setExtractedWords([]);
+    setScanError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setImagesBase64((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   const handleScanImage = async () => {
-    if (!imageBase64 || isScanning) return;
+    if (imagesBase64.length === 0 || isScanning) return;
 
     setIsScanning(true);
     setScanError(null);
@@ -64,7 +75,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           language: currentLanguage,
-          imageBase64: imageBase64,
+          images: imagesBase64,
         }),
       });
 
@@ -83,7 +94,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
           }))
         );
       } else {
-        setScanError('Không trích xuất được từ vựng rõ ràng. Vui lòng chụp lại ảnh với ánh sáng tốt và rõ nét hơn.');
+        setScanError('Không trích xuất được từ vựng rõ ràng từ các ảnh. Vui lòng thử lại với ảnh rõ nét hơn.');
       }
     } catch (err: any) {
       setScanError(err.message || 'Lỗi khi thực thi trích xuất OCR');
@@ -154,35 +165,55 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
               ref={fileInputRef}
               onChange={handleFileChange}
               accept="image/*"
+              multiple
               className="hidden"
             />
 
-            {!imageBase64 ? (
+            {imagesBase64.length === 0 ? (
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className="p-8 border-2 border-dashed border-[#1A1A1A] bg-white hover:bg-stone-50 cursor-pointer text-center space-y-3"
               >
                 <Upload className="w-8 h-8 text-stone-500 mx-auto" />
                 <h3 className="font-serif font-bold text-sm text-[#1A1A1A]">
-                  Tải lên ảnh trang sách giáo khoa / bài tập / tài liệu
+                  Tải lên một hoặc nhiều ảnh trang sách giáo khoa / bài tập / tài liệu
                 </h3>
                 <p className="text-[10px] font-mono text-stone-500 uppercase">
-                  PNG, JPG, WEBP • Tự động nhận diện từ vựng & giải nghĩa bằng AI
+                  PNG, JPG, WEBP (Chọn nhiều ảnh cùng lúc) • Nhận diện từ vựng bằng AI
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative border-2 border-[#1A1A1A] bg-white p-2 flex items-center justify-center max-h-60 overflow-hidden">
-                  <img src={imageBase64} alt="Xem trước ảnh OCR" className="max-h-56 object-contain" />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold uppercase text-[#1A1A1A]">
+                    Đã chọn {imagesBase64.length} hình ảnh:
+                  </span>
                   <button
-                    onClick={() => {
-                      setImageBase64(null);
-                      setExtractedWords([]);
-                    }}
-                    className="absolute top-3 right-3 px-2 py-1 bg-[#1A1A1A] text-white text-[10px] font-mono font-bold uppercase"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-mono underline text-[#1A1A1A] hover:font-bold"
                   >
-                    ĐỔI ẢNH KHÁC
+                    + Thêm ảnh khác
                   </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-56 overflow-y-auto p-2 border-2 border-[#1A1A1A] bg-white">
+                  {imagesBase64.map((imgSrc, idx) => (
+                    <div key={idx} className="relative border border-[#1A1A1A] bg-stone-100 group h-28 flex items-center justify-center overflow-hidden">
+                      <img src={imgSrc} alt={`Ảnh ${idx + 1}`} className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-none hover:bg-rose-700 shadow"
+                        title="Xóa ảnh này"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/70 text-white text-[9px] font-mono">
+                        #{idx + 1}
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
                 <button
@@ -191,7 +222,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
                   className="w-full py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 disabled:opacity-50 text-xs font-mono font-bold uppercase tracking-widest editorial-shadow-sm flex items-center justify-center gap-2"
                 >
                   <Sparkles className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-                  <span>{isScanning ? 'ĐANG TRÍCH XUẤT TỪ VỰNG...' : 'BẮT ĐẦU TRÍCH XUẤT OCR'}</span>
+                  <span>{isScanning ? 'ĐANG TRÍCH XUẤT TỪ VỰNG TỪ TẤT CẢ ẢNH...' : `BẮT ĐẦU TRÍCH XUẤT OCR (${imagesBase64.length} ẢNH)`}</span>
                 </button>
               </div>
             )}

@@ -214,9 +214,10 @@ Guidelines:
   });
 
   // 4. Learning Journal Grammar & Phrasing Review
-  app.post('/api/gemini/check-journal', async (req, res) => {
+  const handleJournalCheck = async (req: express.Request, res: express.Response) => {
     try {
-      const { text, language, promptTopic } = req.body;
+      const { text, content, language, promptTopic } = req.body;
+      const journalText = text || content;
       const ai = getGenAI();
 
       const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
@@ -225,7 +226,7 @@ Guidelines:
 Chủ đề (nếu có): ${promptTopic || 'Tự do'}
 Nội dung người học viết:
 """
-${text}
+${journalText}
 """
 
 Hãy đánh giá chi tiết và trả về kết quả định dạng JSON thuần tuý:
@@ -261,10 +262,13 @@ Hãy đánh giá chi tiết và trả về kết quả định dạng JSON thu�
       const jsonText = response.text || '{}';
       res.json(JSON.parse(jsonText));
     } catch (error: any) {
-      console.error('Error in /api/gemini/check-journal:', error);
+      console.error('Error in journal check endpoint:', error);
       res.status(500).json({ error: error?.message || 'Lỗi khi kiểm tra nhật ký' });
     }
-  });
+  };
+
+  app.post('/api/gemini/check-journal', handleJournalCheck);
+  app.post('/api/gemini/correct-journal', handleJournalCheck);
 
   // 5. Dynamic Standardized Mock Test Generator (TOEIC/IELTS, TOPIK, HSK)
   app.post('/api/gemini/generate-mock-test', async (req, res) => {
@@ -325,17 +329,17 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
     }
   });
 
-  // 6. OCR Photo Extractor to Vocabulary Deck
+  // 6. OCR Photo Extractor to Vocabulary Deck (Supports Multiple Images)
   app.post('/api/gemini/ocr-extract', async (req, res) => {
     try {
-      const { imageBase64, imageMime, language } = req.body;
+      const { imageBase64, images, language } = req.body;
       const ai = getGenAI();
 
       const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
 
-      const prompt = `Phân tích hình ảnh này (${langName}). Trả về danh sách JSON chứa các từ vựng trích xuất:
+      const prompt = `Phân tích toàn bộ các hình ảnh tài liệu/sách giáo khoa (${langName}) được cung cấp. Trả về danh sách JSON chứa các từ vựng trích xuất từ tất cả các ảnh:
 {
-  "extractedText": "Toàn bộ văn bản đọc được",
+  "extractedText": "Tóm tắt văn bản đọc được từ các ảnh",
   "summary": "Tóm tắt",
   "words": [
     {
@@ -351,32 +355,74 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
   ]
 }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                inlineData: {
-                  data: imageBase64.replace(/^data:image\/[a-z]+;base64,/, ''),
-                  mimeType: imageMime || 'image/jpeg',
-                },
-              },
-              { text: prompt },
-            ],
+      let imageList: string[] = [];
+      if (Array.isArray(images) && images.length > 0) {
+        imageList = images;
+      } else if (imageBase64) {
+        imageList = [imageBase64];
+      }
+
+      if (imageList.length === 0) {
+        return res.status(400).json({ error: 'Không tìm thấy hình ảnh nào được tải lên.' });
+      }
+
+      const parts: any[] = [];
+      imageList.forEach((img) => {
+        parts.push({
+          inlineData: {
+            data: img.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
+            mimeType: 'image/jpeg',
           },
-        ],
-        config: {
-          responseMimeType: 'application/json',
-        },
+        });
       });
+      parts.push({ text: prompt });
+
+      let response: any = null;
+      let attempts = 0;
+      const modelsToTry = ['gemini-3.7-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+      let lastError: any = null;
+
+      for (const model of modelsToTry) {
+        attempts = 0;
+        while (attempts < 2) {
+          try {
+            attempts++;
+            response = await ai.models.generateContent({
+              model,
+              contents: [
+                {
+                  role: 'user',
+                  parts,
+                },
+              ],
+              config: {
+                responseMimeType: 'application/json',
+              },
+            });
+            break;
+          } catch (apiErr: any) {
+            lastError = apiErr;
+            const is503 = apiErr?.message?.includes('503') || apiErr?.message?.includes('Deadline expired') || apiErr?.message?.includes('high demand') || apiErr?.status === 503;
+            if (!is503 && attempts >= 2) break;
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+          }
+        }
+        if (response && response.text) break;
+      }
+
+      if (!response || !response.text) {
+        throw lastError || new Error('Không thể nhận phản hồi từ AI sau nhiều lần thử.');
+      }
 
       const jsonText = response.text || '{}';
       res.json(JSON.parse(jsonText));
     } catch (error: any) {
       console.error('Error in /api/gemini/ocr-extract:', error);
-      res.status(500).json({ error: error?.message || 'Lỗi khi trích xuất từ ảnh' });
+      const isUnavailable = error?.message?.includes('503') || error?.message?.includes('Deadline expired') || error?.message?.includes('high demand') || error?.status === 503;
+      const errorMessage = isUnavailable
+        ? 'Hệ thống AI đang quá tải tạm thời (Lỗi 503). Vui lòng thử lại sau giây lát hoặc giảm số lượng ảnh tải lên cùng lúc.'
+        : (error?.message || 'Lỗi khi trích xuất từ ảnh');
+      res.status(500).json({ error: errorMessage });
     }
   });
 
@@ -460,11 +506,13 @@ Trả về JSON thuần tuý:
           ],
         });
       } else if (rawText) {
+        // If rawText is extremely long, truncate to avoid 503 timeout
+        const trimmedText = rawText.length > 50000 ? rawText.substring(0, 50000) + '\n[... Văn bản đã được cắt bớt để tối ưu hóa xử lý AI ...]' : rawText;
         contents.push({
           role: 'user',
           parts: [
             {
-              text: `${prompt}\n\n================ NỘI DUNG TÀI LIỆU ================\n${rawText}`,
+              text: `${prompt}\n\n================ NỘI DUNG TÀI LIỆU ================\n${trimmedText}`,
             },
           ],
         });
@@ -472,20 +520,45 @@ Trả về JSON thuần tuý:
         return res.status(400).json({ error: 'Vui lòng cung cấp file hoặc văn bản sách.' });
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents,
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
+      let response: any = null;
+      let attempts = 0;
+      const maxAttempts = 2;
 
-      const jsonText = response.text || '{}';
+      while (attempts < maxAttempts) {
+        try {
+          attempts++;
+          response = await ai.models.generateContent({
+            model: 'gemini-3.7-flash',
+            contents,
+            config: {
+              responseMimeType: 'application/json',
+            },
+          });
+          break;
+        } catch (apiErr: any) {
+          if (attempts >= maxAttempts) {
+            throw apiErr;
+          }
+          // Wait 1.5s before retry on transient 503
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+      }
+
+      const jsonText = response?.text || '{}';
       res.json(JSON.parse(jsonText));
     } catch (error: any) {
       console.error('Error in /api/gemini/extract-textbook:', error);
-      res.status(500).json({ error: error?.message || 'Lỗi khi xử lý bóc tách sách' });
+      const isTimeout = error?.message?.includes('503') || error?.message?.includes('Deadline expired') || error?.status === 503;
+      const errorMessage = isTimeout
+        ? 'Quá trình phân tích tài liệu mất quá nhiều thời gian hoặc tệp quá lớn (Lỗi 503: Quá thời gian chờ). Vui lòng thử lại với một phần chương ngắn hơn hoặc dán nội dung văn bản trực tiếp.'
+        : (error?.message || 'Lỗi khi xử lý bóc tách sách');
+      res.status(500).json({ error: errorMessage });
     }
+  });
+
+  // Fallback for any other unmatched /api/* routes to prevent returning HTML
+  app.use('/api/*', (req, res) => {
+    res.status(404).json({ error: 'Endpoint not found' });
   });
 
   // Vite middleware setup for development / static for production
