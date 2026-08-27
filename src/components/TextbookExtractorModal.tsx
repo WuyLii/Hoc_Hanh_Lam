@@ -86,6 +86,9 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
       });
 
       if (!response.ok) {
+        if (response.status === 405) {
+          throw new Error('Lỗi 405 (Method Not Allowed) trên Vercel. Hãy đảm bảo bạn đã cấu hình GEMINI_API_KEY trên Vercel Dashboard!');
+        }
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || 'Lỗi khi kết nối tới máy chủ trích xuất AI.');
       }

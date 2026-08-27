@@ -272,7 +272,7 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
 }
 
 export async function handleOcrExtract(body: any) {
-  const { imageBase64, language } = body;
+  const { imageBase64, images, language } = body;
   const ai = getGenAI();
   const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
 
@@ -284,7 +284,7 @@ export async function handleOcrExtract(body: any) {
 
   const prompt = `Phân tích toàn bộ hình ảnh tài liệu/sách/bài tập (${langName}) được cung cấp.
 Nhiệm vụ:
-1. Trích xuất cả TỪ VỰNG (words) VÀ NGỮ PHÁP (grammar) xuất hiện hoặc liên quan trong ảnh.
+1. Trích xuất cả TỪ VỰNG (words) VÀ NGỮ PHÁP (grammar) xuất hiện hoặc liên quan trong tất cả các ảnh.
 2. Phân tích chi tiết từng mục:
    - CẤP ĐỘ (cap_do): ${levelGuide}.
    - CHỦ ĐỀ (chu_de): Phân loại chủ đề rõ ràng (ví dụ: Giao tiếp, Công sở - Kinh doanh, Du lịch - Ẩm thực, Đời sống, Công nghệ, Y tế, Học thuật).
@@ -319,22 +319,31 @@ Trả về định dạng JSON thuần tuý:
   ]
 }`;
 
+  let imageList: string[] = [];
+  if (Array.isArray(images) && images.length > 0) {
+    imageList = images;
+  } else if (imageBase64) {
+    imageList = [imageBase64];
+  }
+
+  if (imageList.length === 0) {
+    throw new Error('Không tìm thấy hình ảnh nào được tải lên.');
+  }
+
+  const parts: any[] = [];
+  imageList.forEach((img) => {
+    parts.push({
+      inlineData: {
+        data: img.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
+        mimeType: 'image/jpeg',
+      },
+    });
+  });
+  parts.push({ text: prompt });
+
   const response = await ai.models.generateContent({
     model: 'gemini-3.7-flash',
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              data: imageBase64.replace(/^data:image\/[a-z]+;base64,/, ''),
-              mimeType: 'image/jpeg',
-            },
-          },
-          { text: prompt },
-        ],
-      },
-    ],
+    contents: [{ role: 'user', parts }],
     config: {
       responseMimeType: 'application/json',
     },

@@ -101,8 +101,11 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
       });
 
       if (!response.ok) {
+        if (response.status === 405) {
+          throw new Error('Lỗi 405 (Method Not Allowed) từ server Vercel static. Hãy cài đặt biến môi trường GEMINI_API_KEY trên Vercel Dashboard và redeploy lại ứng dụng với file vercel.json!');
+        }
         const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || 'Không thể xử lý ảnh qua Gemini Vision');
+        throw new Error(errJson.error || `Không thể xử lý ảnh (Mã lỗi HTTP ${response.status})`);
       }
 
       const data = await response.json();
