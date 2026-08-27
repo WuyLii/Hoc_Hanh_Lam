@@ -72,7 +72,7 @@ app.post('/api/gemini/ocr-extract', async (req, res) => {
 
     let response: any = null;
     let attempts = 0;
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
     let lastError: any = null;
 
     for (const model of modelsToTry) {

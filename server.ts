@@ -33,7 +33,7 @@ async function startServer() {
   };
 
   const callGemini = async (ai: GoogleGenAI, contents: any, config?: any) => {
-    const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    const models = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
     let lastErr: any = null;
     for (const model of models) {
       try {
@@ -110,13 +110,9 @@ Nhiệm vụ của bạn:
         contents = [{ role: 'user', parts: [{ text: 'Xin chào! Hãy giới thiệu bạn có thể giúp gì cho tôi khi học Tiếng Anh, Hàn, Trung.' }] }];
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        },
+      const response = await callGemini(ai, contents, {
+        systemInstruction,
+        temperature: 0.7,
       });
 
       res.json({ reply: response.text || '' });
@@ -381,7 +377,7 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
 
       let response: any = null;
       let attempts = 0;
-      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
       let lastError: any = null;
 
       for (const model of modelsToTry) {
