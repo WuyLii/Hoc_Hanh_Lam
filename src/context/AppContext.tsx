@@ -570,22 +570,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const data = await GoogleSheetsService.pullFromGoogleSheets(sheetsConfig.scriptUrl);
       if (data) {
-        if (Array.isArray(data.Vocabulary) && data.Vocabulary.length > 0) {
-          setVocabulary(data.Vocabulary);
-        }
-        if (Array.isArray(data.Grammar) && data.Grammar.length > 0) {
-          setGrammar(data.Grammar);
-        }
-        if (Array.isArray(data.Decks) && data.Decks.length > 0) {
-          setDecks(data.Decks);
-        }
-        if (Array.isArray(data.Users) && data.Users.length > 0) {
-          setCurrentUser(data.Users[0]);
-        }
+        const vocab = data.vocabulary || data.Vocabulary;
+        if (Array.isArray(vocab)) setVocabulary(vocab);
+
+        const gram = data.grammar || data.Grammar;
+        if (Array.isArray(gram)) setGrammar(gram);
+
+        const dks = data.decks || data.Decks;
+        if (Array.isArray(dks)) setDecks(dks);
+
+        const usr = data.users || data.Users;
+        if (Array.isArray(usr) && usr.length > 0) setCurrentUser(usr[0]);
+
+        const rev = data.reviewSessions || data.ReviewSessions;
+        if (Array.isArray(rev)) setReviewSessions(rev);
+
+        const tsts = data.tests || data.Tests;
+        if (Array.isArray(tsts)) setMockTests(tsts);
+
+        const lst = data.listening || data.Listening;
+        if (Array.isArray(lst)) setListeningExercises(lst);
+
+        const prg = data.progress || data.Progress;
+        if (Array.isArray(prg)) setProgressLogs(prg);
+
+        const jrn = data.journal || data.Journal;
+        if (Array.isArray(jrn)) setJournalEntries(jrn);
+
+        const notis = data.notifications || data.Notifications;
+        if (Array.isArray(notis)) setNotifications(notis);
+
+        const chats = data.chatHistory || data.ChatHistory;
+        if (Array.isArray(chats)) setChatHistory(chats);
+
         setSheetsConfig((prev) => ({ ...prev, lastSyncedAt: new Date().toISOString() }));
-        return { success: true, message: 'Đã tải dữ liệu mới nhất từ Google Sheets về thành công!' };
+        return { success: true, message: 'Đã tải toàn bộ dữ liệu mới nhất từ Google Sheets về thành công!' };
       }
-      return { success: false, message: 'Không có dữ liệu trả về' };
+      return { success: false, message: 'Không có dữ liệu trả về từ Google Sheets' };
     } catch (e: any) {
       return { success: false, message: e.message || 'Lỗi khi tải dữ liệu từ Google Sheets' };
     } finally {
