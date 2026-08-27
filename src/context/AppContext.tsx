@@ -204,6 +204,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedLevelFilter, setSelectedLevelFilter] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
+  // Cross-tab synchronization via storage event listener
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.key || !e.key.startsWith(LOCAL_STORAGE_PREFIX)) return;
+      const key = e.key.replace(LOCAL_STORAGE_PREFIX, '');
+      try {
+        if (!e.newValue) return;
+        const parsed = JSON.parse(e.newValue);
+        if (key === 'vocabulary') setVocabulary(parsed);
+        else if (key === 'decks') setDecks(parsed);
+        else if (key === 'grammar') setGrammar(parsed);
+        else if (key === 'review_sessions') setReviewSessions(parsed);
+        else if (key === 'mock_tests') setMockTests(parsed);
+        else if (key === 'listening') setListeningExercises(parsed);
+        else if (key === 'progress_logs') setProgressLogs(parsed);
+        else if (key === 'journal') setJournalEntries(parsed);
+        else if (key === 'notifications') setNotifications(parsed);
+        else if (key === 'chat_history') setChatHistory(parsed);
+        else if (key === 'current_user') setCurrentUser(parsed);
+        else if (key === 'current_lang') setCurrentLanguage(parsed);
+        else if (key === 'sheets_config') setSheetsConfig(parsed);
+      } catch (err) {
+        console.error('Error syncing storage across tabs:', err);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // Sync to local storage
   useEffect(() => saveToStorage('current_user', currentUser), [currentUser]);
   useEffect(() => saveToStorage('current_lang', currentLanguage), [currentLanguage]);
