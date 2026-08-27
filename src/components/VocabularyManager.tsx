@@ -4,6 +4,7 @@ import { VocabularyItem, LANGUAGES } from '../types';
 import { GoogleSheetsService } from '../services/googleSheetsService';
 import { ttsService } from '../services/ttsService';
 import { TextbookExtractorModal } from './TextbookExtractorModal';
+import { DuplicateVocabModal } from './DuplicateVocabModal';
 import {
   Plus,
   Search,
@@ -18,6 +19,7 @@ import {
   BookOpen,
   LayoutGrid,
   Table as TableIcon,
+  CopyCheck,
 } from 'lucide-react';
 
 export const VocabularyManager: React.FC = () => {
@@ -27,6 +29,7 @@ export const VocabularyManager: React.FC = () => {
     addVocabulary,
     updateVocabulary,
     deleteVocabulary,
+    batchDeleteVocabulary,
     batchAddVocabulary,
     selectedLevelFilter,
     setSelectedLevelFilter,
@@ -40,11 +43,13 @@ export const VocabularyManager: React.FC = () => {
   const [selectedTopic, setSelectedTopic] = useState('ALL');
   const [selectedLevel, setSelectedLevel] = useState(selectedLevelFilter || 'ALL');
   const [selectedSrsBox, setSelectedSrsBox] = useState('ALL');
+  const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical' | 'srs'>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
-  // AI Textbook Extractor Modal State
+  // Modal States
   const [isTextbookModalOpen, setIsTextbookModalOpen] = useState(false);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
 
   React.useEffect(() => {
     if (selectedLevelFilter) {
@@ -224,8 +229,27 @@ export const VocabularyManager: React.FC = () => {
     e.target.value = '';
   };
 
+  // Calculate duplicate words set for fast lookup
+  const duplicateWordSet = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    currentLangVocabulary.forEach((w) => {
+      const k = (w.tu || '').trim().toLowerCase();
+      if (k) counts.set(k, (counts.get(k) || 0) + 1);
+    });
+    const dups = new Set<string>();
+    counts.forEach((count, key) => {
+      if (count > 1) dups.add(key);
+    });
+    return dups;
+  }, [currentLangVocabulary]);
+
   // Filtered & Sorted Vocabulary
   const filteredWords = currentLangVocabulary.filter((w) => {
+    const normWord = (w.tu || '').trim().toLowerCase();
+    const isDuplicate = duplicateWordSet.has(normWord);
+
+    if (showOnlyDuplicates && !isDuplicate) return false;
+
     const matchQuery =
       w.tu.toLowerCase().includes(searchQuery.toLowerCase()) ||
       w.nghia.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -281,6 +305,24 @@ export const VocabularyManager: React.FC = () => {
             accept=".csv,.txt"
             className="hidden"
           />
+
+          <button
+            onClick={() => setIsDuplicateModalOpen(true)}
+            className={`flex items-center gap-1.5 px-3.5 py-2 border-2 text-xs font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm ${
+              duplicateWordSet.size > 0
+                ? 'border-rose-800 bg-rose-100 text-rose-950 hover:bg-rose-200'
+                : 'border-[#1A1A1A] bg-white text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2]'
+            }`}
+            title="Lọc & Dọn Dẹp Từ Vựng Trùng Lập"
+          >
+            <CopyCheck className={`w-3.5 h-3.5 ${duplicateWordSet.size > 0 ? 'text-rose-700 font-bold' : ''}`} />
+            <span>
+              {duplicateWordSet.size > 0
+                ? `🔍 XỬ LÝ TỪ TRÙNG (${duplicateWordSet.size} NHÓM)`
+                : '🔍 LỌC TỪ TRÙNG'}
+            </span>
+          </button>
+
           <button
             onClick={() => setIsTextbookModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 border-2 border-amber-800 bg-amber-100 text-amber-950 hover:bg-amber-200 text-xs font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm"
@@ -382,8 +424,26 @@ export const VocabularyManager: React.FC = () => {
 
         {/* Sort & View Mode Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono gap-3">
-          <div className="text-stone-600">
-            SHOWING <strong className="text-[#1A1A1A]">{sortedWords.length}</strong> OF {currentLangVocabulary.length} TERMS
+          <div className="flex items-center gap-3">
+            <span className="text-stone-600">
+              SHOWING <strong className="text-[#1A1A1A]">{sortedWords.length}</strong> OF {currentLangVocabulary.length} TERMS
+            </span>
+
+            {/* Quick Duplicate Filter Toggle */}
+            {duplicateWordSet.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowOnlyDuplicates((prev) => !prev)}
+                className={`px-2.5 py-1 border text-[10px] font-bold font-mono uppercase transition flex items-center gap-1 ${
+                  showOnlyDuplicates
+                    ? 'bg-rose-600 text-white border-rose-800'
+                    : 'bg-[#F9F7F2] text-rose-900 border-rose-300 hover:border-rose-600'
+                }`}
+              >
+                <CopyCheck className="w-3 h-3" />
+                <span>⚠️ CHỈ HIỆN TỪ TRÙNG ({duplicateWordSet.size} NHÓM)</span>
+              </button>
+            )}
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
@@ -480,6 +540,11 @@ export const VocabularyManager: React.FC = () => {
                         <Volume2 className="w-3.5 h-3.5" />
                       </button>
                       <span>{word.tu}</span>
+                      {duplicateWordSet.has(word.tu.trim().toLowerCase()) && (
+                        <span className="px-1.5 py-0.5 bg-rose-100 text-rose-900 border border-rose-800 text-[9px] font-mono font-bold">
+                          ⚠️ TRÙNG
+                        </span>
+                      )}
                     </td>
                     <td className="p-3.5 font-mono text-xs text-stone-600">{word.phien_am || '—'}</td>
                     <td className="p-3.5 text-[#1A1A1A] font-medium">{word.nghia}</td>
@@ -547,6 +612,11 @@ export const VocabularyManager: React.FC = () => {
                       <span className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-[9px] font-mono text-stone-600">
                         {word.cap_do}
                       </span>
+                      {duplicateWordSet.has(word.tu.trim().toLowerCase()) && (
+                        <span className="px-1.5 py-0.5 bg-rose-100 text-rose-900 border border-rose-800 text-[9px] font-mono font-bold">
+                          ⚠️ TRÙNG
+                        </span>
+                      )}
                     </div>
 
                     {/* SRS Box Indicator */}
@@ -826,6 +896,17 @@ export const VocabularyManager: React.FC = () => {
       <TextbookExtractorModal
         isOpen={isTextbookModalOpen}
         onClose={() => setIsTextbookModalOpen(false)}
+      />
+
+      {/* Duplicate Vocabulary Management Modal */}
+      <DuplicateVocabModal
+        isOpen={isDuplicateModalOpen}
+        onClose={() => setIsDuplicateModalOpen(false)}
+        vocabularyItems={currentLangVocabulary}
+        onDeleteWords={(wordIds) => {
+          batchDeleteVocabulary(wordIds);
+        }}
+        currentLanguage={currentLanguage}
       />
     </div>
   );

@@ -35,6 +35,7 @@ interface AppContextType {
   addVocabulary: (item: Partial<VocabularyItem>) => VocabularyItem;
   updateVocabulary: (item: VocabularyItem) => void;
   deleteVocabulary: (wordId: string) => void;
+  batchDeleteVocabulary: (wordIds: string[]) => number;
   batchAddVocabulary: (items: Partial<VocabularyItem>[]) => number;
   recordSRSRating: (wordId: string, rating: RecallQuality) => void;
 
@@ -298,6 +299,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteVocabulary = (wordId: string) => {
     setVocabulary((prev) => prev.filter((w) => w.word_id !== wordId));
+  };
+
+  const batchDeleteVocabulary = (wordIds: string[]): number => {
+    const idsSet = new Set(wordIds);
+    let deletedCount = 0;
+    setVocabulary((prev) => {
+      const filtered = prev.filter((w) => {
+        if (idsSet.has(w.word_id)) {
+          deletedCount++;
+          return false;
+        }
+        return true;
+      });
+      return filtered;
+    });
+    return wordIds.length;
   };
 
   const batchAddVocabulary = (items: Partial<VocabularyItem>[]): number => {
@@ -627,6 +644,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addVocabulary,
         updateVocabulary,
         deleteVocabulary,
+        batchDeleteVocabulary,
         batchAddVocabulary,
         recordSRSRating,
 

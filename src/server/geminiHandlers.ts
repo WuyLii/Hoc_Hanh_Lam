@@ -17,6 +17,89 @@ export const getGenAI = () => {
   });
 };
 
+export async function callGeminiWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
+  const modelsToTry = [
+    'gemini-3.7-flash',
+    'gemini-3.1-pro-preview',
+    'gemini-flash-latest',
+    'gemini-3.1-flash-lite',
+  ];
+
+  let lastError: any = null;
+
+  for (const model of modelsToTry) {
+    let attempts = 0;
+    const maxAttempts = 3;
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        const res = await ai.models.generateContent({
+          model,
+          contents,
+          config,
+        });
+        if (res && res.text) {
+          return res;
+        }
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
+        const isTransient =
+          errMsg.includes('503') ||
+          errMsg.includes('UNAVAILABLE') ||
+          errMsg.includes('high demand') ||
+          errMsg.includes('429') ||
+          errMsg.includes('Quota') ||
+          errMsg.includes('RESOURCE_EXHAUSTED') ||
+          errMsg.includes('Deadline') ||
+          errMsg.includes('overloaded');
+
+        if (isTransient && attempts < maxAttempts) {
+          // Exponential backoff with jitter: 1200ms, 2400ms
+          await new Promise((resolve) => setTimeout(resolve, attempts * 1200 + Math.random() * 400));
+        } else {
+          // Break attempt loop to try fallback model
+          break;
+        }
+      }
+    }
+  }
+
+  // Parse error message nicely if it's raw JSON from Google API
+  let friendlyMsg = 'Hệ thống AI đang phản hồi chậm hoặc quá tải. Vui lòng thử lại sau giây lát.';
+  if (lastError) {
+    const rawStr = typeof lastError === 'string' ? lastError : lastError?.message || '';
+    if (rawStr.includes('503') || rawStr.includes('high demand') || rawStr.includes('UNAVAILABLE')) {
+      friendlyMsg = 'Hệ thống AI Gemini đang tạm thời quá tải (Lỗi 503 High Demand). Vui lòng bấm nút Thử Lại sau ít giây!';
+    } else if (rawStr.includes('GEMINI_API_KEY')) {
+      friendlyMsg = 'Chưa cấu hình GEMINI_API_KEY trên môi trường server Vercel.';
+    } else if (rawStr) {
+      try {
+        const parsedErr = JSON.parse(rawStr);
+        if (parsedErr?.error?.message) {
+          friendlyMsg = parsedErr.error.message;
+        }
+      } catch (_) {
+        friendlyMsg = rawStr;
+      }
+    }
+  }
+
+  throw new Error(friendlyMsg);
+}
+
+export function safeParseJSON(text: string) {
+  if (!text) return {};
+  let cleanText = text.trim();
+  cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  try {
+    return JSON.parse(cleanText);
+  } catch (err) {
+    console.error('Failed to parse JSON from AI response:', cleanText);
+    throw new Error('Dữ liệu AI trả về không đúng định dạng JSON.');
+  }
+}
+
 export async function handleChat(body: any) {
   const { messages, language, imageBase64, imageMime } = body;
   const ai = getGenAI();
@@ -73,13 +156,9 @@ Nhiệm vụ của bạn:
     contents = [{ role: 'user', parts: [{ text: 'Xin chào! Hãy giới thiệu bạn có thể giúp gì cho tôi khi học Tiếng Anh, Hàn, Trung.' }] }];
   }
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.7-flash',
-    contents,
-    config: {
-      systemInstruction,
-      temperature: 0.7,
-    },
+  const response = await callGeminiWithRetry(ai, contents, {
+    systemInstruction,
+    temperature: 0.7,
   });
 
   return { reply: response.text || '' };
@@ -109,15 +188,11 @@ Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trú
   "synonyms": ["Từ đồng nghĩa 1", "Từ đồng nghĩa 2"]
 }`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.7-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-    },
+  const response = await callGeminiWithRetry(ai, prompt, {
+    responseMimeType: 'application/json',
   });
 
-  return JSON.parse(response.text || '{}');
+  return safeParseJSON(response.text || '{}');
 }
 
 export async function handleRoleplay(body: any) {
@@ -162,13 +237,9 @@ Guidelines:
     });
   }
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.7-flash',
-    contents,
-    config: {
-      systemInstruction,
-      temperature: 0.7,
-    },
+  const response = await callGeminiWithRetry(ai, contents, {
+    systemInstruction,
+    temperature: 0.7,
   });
 
   return { reply: response.text || '' };
@@ -208,15 +279,11 @@ Hãy đánh giá chi tiết và trả về kết quả định dạng JSON thu�
   "encouragement": "Lời động viên cho buổi học tiếp theo"
 }`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.7-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-    },
+  const response = await callGeminiWithRetry(ai, prompt, {
+    responseMimeType: 'application/json',
   });
 
-  return JSON.parse(response.text || '{}');
+  return safeParseJSON(response.text || '{}');
 }
 
 export async function handleGenerateMockTest(body: any) {
@@ -260,15 +327,11 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
   ]
 }`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.7-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-    },
+  const response = await callGeminiWithRetry(ai, prompt, {
+    responseMimeType: 'application/json',
   });
 
-  return JSON.parse(response.text || '{}');
+  return safeParseJSON(response.text || '{}');
 }
 
 export async function handleOcrExtract(body: any) {
@@ -341,13 +404,9 @@ Trả về định dạng JSON thuần tuý:
   });
   parts.push({ text: prompt });
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.7-flash',
-    contents: [{ role: 'user', parts }],
-    config: {
-      responseMimeType: 'application/json',
-    },
+  const response = await callGeminiWithRetry(ai, [{ role: 'user', parts }], {
+    responseMimeType: 'application/json',
   });
 
-  return JSON.parse(response.text || '{}');
+  return safeParseJSON(response.text || '{}');
 }

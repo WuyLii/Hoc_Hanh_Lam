@@ -33,21 +33,69 @@ async function startServer() {
   };
 
   const callGemini = async (ai: GoogleGenAI, contents: any, config?: any) => {
-    const models = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
+    const models = [
+      'gemini-3.7-flash',
+      'gemini-3.1-pro-preview',
+      'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
+    ];
+
     let lastErr: any = null;
+
     for (const model of models) {
-      try {
-        const res = await ai.models.generateContent({
-          model,
-          contents,
-          config,
-        });
-        if (res && res.text) return res;
-      } catch (err: any) {
-        lastErr = err;
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          attempts++;
+          const res = await ai.models.generateContent({
+            model,
+            contents,
+            config,
+          });
+          if (res && res.text) return res;
+        } catch (err: any) {
+          lastErr = err;
+          const errMsg = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
+          const isTransient =
+            errMsg.includes('503') ||
+            errMsg.includes('UNAVAILABLE') ||
+            errMsg.includes('high demand') ||
+            errMsg.includes('429') ||
+            errMsg.includes('Quota') ||
+            errMsg.includes('RESOURCE_EXHAUSTED') ||
+            errMsg.includes('Deadline') ||
+            errMsg.includes('overloaded');
+
+          if (isTransient && attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, attempts * 1200 + Math.random() * 400));
+          } else {
+            break;
+          }
+        }
       }
     }
-    throw lastErr || new Error('Không thể kết nối với mô hình AI');
+
+    let friendlyMsg = 'Hệ thống AI đang phản hồi chậm hoặc quá tải. Vui lòng thử lại sau giây lát.';
+    if (lastErr) {
+      const rawStr = typeof lastErr === 'string' ? lastErr : lastErr?.message || '';
+      if (rawStr.includes('503') || rawStr.includes('high demand') || rawStr.includes('UNAVAILABLE')) {
+        friendlyMsg = 'Hệ thống AI Gemini đang tạm thời quá tải (Lỗi 503 High Demand). Vui lòng bấm nút Thử Lại sau ít giây!';
+      } else if (rawStr.includes('GEMINI_API_KEY')) {
+        friendlyMsg = 'Chưa cấu hình GEMINI_API_KEY trên môi trường server.';
+      } else if (rawStr) {
+        try {
+          const parsedErr = JSON.parse(rawStr);
+          if (parsedErr?.error?.message) {
+            friendlyMsg = parsedErr.error.message;
+          }
+        } catch (_) {
+          friendlyMsg = rawStr;
+        }
+      }
+    }
+
+    throw new Error(friendlyMsg);
   };
 
   // 1. General Language AI Chat & Multi-modal Image Analysis
