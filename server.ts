@@ -32,6 +32,24 @@ async function startServer() {
     });
   };
 
+  const callGemini = async (ai: GoogleGenAI, contents: any, config?: any) => {
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    let lastErr: any = null;
+    for (const model of models) {
+      try {
+        const res = await ai.models.generateContent({
+          model,
+          contents,
+          config,
+        });
+        if (res && res.text) return res;
+      } catch (err: any) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error('Không thể kết nối với mô hình AI');
+  };
+
   // 1. General Language AI Chat & Multi-modal Image Analysis
   app.post('/api/gemini/chat', async (req, res) => {
     try {
@@ -135,12 +153,8 @@ Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trú
   "synonyms": ["Từ đồng nghĩa 1", "Từ đồng nghĩa 2"]
 }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        },
+      const response = await callGemini(ai, prompt, {
+        responseMimeType: 'application/json',
       });
 
       const jsonText = response.text || '{}';
@@ -197,13 +211,9 @@ Guidelines:
         });
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        },
+      const response = await callGemini(ai, contents, {
+        systemInstruction,
+        temperature: 0.7,
       });
 
       res.json({ reply: response.text || '' });
@@ -251,12 +261,8 @@ Hãy đánh giá chi tiết và trả về kết quả định dạng JSON thu�
   "encouragement": "Lời động viên cho buổi học tiếp theo"
 }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        },
+      const response = await callGemini(ai, prompt, {
+        responseMimeType: 'application/json',
       });
 
       const jsonText = response.text || '{}';
@@ -313,12 +319,8 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
   ]
 }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        },
+      const response = await callGemini(ai, prompt, {
+        responseMimeType: 'application/json',
       });
 
       const jsonText = response.text || '{}';
@@ -379,7 +381,7 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
 
       let response: any = null;
       let attempts = 0;
-      const modelsToTry = ['gemini-3.7-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
       let lastError: any = null;
 
       for (const model of modelsToTry) {
@@ -521,28 +523,9 @@ Trả về JSON thuần tuý:
       }
 
       let response: any = null;
-      let attempts = 0;
-      const maxAttempts = 2;
-
-      while (attempts < maxAttempts) {
-        try {
-          attempts++;
-          response = await ai.models.generateContent({
-            model: 'gemini-3.7-flash',
-            contents,
-            config: {
-              responseMimeType: 'application/json',
-            },
-          });
-          break;
-        } catch (apiErr: any) {
-          if (attempts >= maxAttempts) {
-            throw apiErr;
-          }
-          // Wait 1.5s before retry on transient 503
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-        }
-      }
+      response = await callGemini(ai, contents, {
+        responseMimeType: 'application/json',
+      });
 
       const jsonText = response?.text || '{}';
       res.json(JSON.parse(jsonText));
