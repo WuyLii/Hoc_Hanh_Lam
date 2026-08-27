@@ -16,6 +16,8 @@ import {
   X,
   AlertCircle,
   BookOpen,
+  LayoutGrid,
+  Table as TableIcon,
 } from 'lucide-react';
 
 export const VocabularyManager: React.FC = () => {
@@ -39,6 +41,7 @@ export const VocabularyManager: React.FC = () => {
   const [selectedLevel, setSelectedLevel] = useState(selectedLevelFilter || 'ALL');
   const [selectedSrsBox, setSelectedSrsBox] = useState('ALL');
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical' | 'srs'>('recent');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
   // AI Textbook Extractor Modal State
   const [isTextbookModalOpen, setIsTextbookModalOpen] = useState(false);
@@ -377,42 +380,70 @@ export const VocabularyManager: React.FC = () => {
           </div>
         </div>
 
-        {/* Sort Bar */}
-        <div className="flex items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono">
+        {/* Sort & View Mode Bar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono gap-3">
           <div className="text-stone-600">
             SHOWING <strong className="text-[#1A1A1A]">{sortedWords.length}</strong> OF {currentLangVocabulary.length} TERMS
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-stone-500 uppercase">SORT:</span>
-            <button
-              onClick={() => setSortBy('recent')}
-              className={`px-2 py-0.5 border ${
-                sortBy === 'recent' ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-stone-300 hover:border-[#1A1A1A]'
-              }`}
-            >
-              RECENT
-            </button>
-            <button
-              onClick={() => setSortBy('alphabetical')}
-              className={`px-2 py-0.5 border ${
-                sortBy === 'alphabetical' ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-stone-300 hover:border-[#1A1A1A]'
-              }`}
-            >
-              A-Z
-            </button>
-            <button
-              onClick={() => setSortBy('srs')}
-              className={`px-2 py-0.5 border ${
-                sortBy === 'srs' ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-stone-300 hover:border-[#1A1A1A]'
-              }`}
-            >
-              SRS LEVEL
-            </button>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 border border-[#1A1A1A] p-0.5 bg-[#F9F7F2]">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase transition ${
+                  viewMode === 'grid' ? 'bg-[#1A1A1A] text-white' : 'text-[#1A1A1A] hover:bg-stone-200'
+                }`}
+                title="Grid View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>GRID</span>
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase transition ${
+                  viewMode === 'table' ? 'bg-[#1A1A1A] text-white' : 'text-[#1A1A1A] hover:bg-stone-200'
+                }`}
+                title="Table View"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span>TABLE</span>
+              </button>
+            </div>
+
+            {/* Sort Buttons */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-stone-500 uppercase">SORT:</span>
+              <button
+                onClick={() => setSortBy('recent')}
+                className={`px-2 py-1 border ${
+                  sortBy === 'recent' ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-stone-300 hover:border-[#1A1A1A]'
+                }`}
+              >
+                RECENT
+              </button>
+              <button
+                onClick={() => setSortBy('alphabetical')}
+                className={`px-2 py-1 border ${
+                  sortBy === 'alphabetical' ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-stone-300 hover:border-[#1A1A1A]'
+                }`}
+              >
+                A-Z
+              </button>
+              <button
+                onClick={() => setSortBy('srs')}
+                className={`px-2 py-1 border ${
+                  sortBy === 'srs' ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-stone-300 hover:border-[#1A1A1A]'
+                }`}
+              >
+                SRS
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Vocabulary Cards Grid */}
+      {/* Vocabulary Display (Grid or Table) */}
       {sortedWords.length === 0 ? (
         <div className="p-12 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-3">
           <BookOpen className="w-8 h-8 mx-auto text-stone-400" />
@@ -420,6 +451,82 @@ export const VocabularyManager: React.FC = () => {
           <p className="text-xs font-mono text-stone-500 max-w-sm mx-auto">
             Try adjusting your search criteria or add new words via "+ NEW_TERM" or "IMPORT_CSV".
           </p>
+        </div>
+      ) : viewMode === 'table' ? (
+        <div className="bg-white border-2 border-[#1A1A1A] editorial-shadow-sm overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#1A1A1A] text-[#F9F7F2] font-mono text-xs uppercase">
+                <th className="p-3.5 border-b border-[#1A1A1A]">Term</th>
+                <th className="p-3.5 border-b border-[#1A1A1A]">Phonetic</th>
+                <th className="p-3.5 border-b border-[#1A1A1A]">Meaning</th>
+                <th className="p-3.5 border-b border-[#1A1A1A]">Type / Level</th>
+                <th className="p-3.5 border-b border-[#1A1A1A]">Topic</th>
+                <th className="p-3.5 border-b border-[#1A1A1A]">SRS</th>
+                <th className="p-3.5 border-b border-[#1A1A1A] text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1A1A1A]/20 font-serif text-sm">
+              {sortedWords.map((word) => {
+                const accuracy = word.times_reviewed > 0 ? Math.round((word.times_correct / word.times_reviewed) * 100) : 0;
+                return (
+                  <tr key={word.word_id} className="hover:bg-stone-50 transition">
+                    <td className="p-3.5 font-bold text-[#1A1A1A] flex items-center gap-2">
+                      <button
+                        onClick={() => ttsService.speak(word.tu, word.ngon_ngu)}
+                        className="p-1 text-stone-600 hover:text-[#1A1A1A] transition"
+                        title="Pronounce"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                      </button>
+                      <span>{word.tu}</span>
+                    </td>
+                    <td className="p-3.5 font-mono text-xs text-stone-600">{word.phien_am || '—'}</td>
+                    <td className="p-3.5 text-[#1A1A1A] font-medium">{word.nghia}</td>
+                    <td className="p-3.5 font-mono text-xs">
+                      <span className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] mr-1">{word.loai_tu}</span>
+                      <span className="text-stone-500">{word.cap_do}</span>
+                    </td>
+                    <td className="p-3.5 font-mono text-xs text-stone-700 uppercase">{word.chu_de}</td>
+                    <td className="p-3.5 font-mono text-xs">
+                      <div className="flex items-center gap-0.5" title={`SRS Box: ${word.srs_box}/5`}>
+                        {[1, 2, 3, 4, 5].map((lvl) => (
+                          <span
+                            key={lvl}
+                            className={`w-2 h-2 border border-[#1A1A1A] ${
+                              (word.srs_box || 0) >= lvl ? 'bg-[#1A1A1A]' : 'bg-transparent'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleOpenEditModal(word)}
+                          className="p-1.5 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove term "${word.tu}"?`)) {
+                              deleteVocabulary(word.word_id);
+                            }
+                          }}
+                          className="p-1.5 border border-[#1A1A1A] hover:bg-rose-900 hover:text-white transition"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

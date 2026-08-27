@@ -272,27 +272,49 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
 }
 
 export async function handleOcrExtract(body: any) {
-  const { imageBase64, imageMime, language } = body;
+  const { imageBase64, language } = body;
   const ai = getGenAI();
   const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
 
-  const prompt = `Phân tích hình ảnh này (chụp sách, bài báo, biển hiệu, phụ đề hoặc bài tập trong ${langName}).
+  const levelGuide = language === 'en'
+    ? 'Phân tích cấp độ chuẩn TOEIC/CEFR (ví dụ: TOEIC 500, TOEIC 650, TOEIC 800, CEFR B1, IELTS 6.0)'
+    : language === 'ko'
+    ? 'Phân tích cấp độ chuẩn TOPIK (ví dụ: TOPIK 1, TOPIK 2, TOPIK 3, TOPIK 4, TOPIK 5, TOPIK 6)'
+    : 'Phân tích cấp độ chuẩn HSK (ví dụ: HSK 1, HSK 2, HSK 3, HSK 4, HSK 5, HSK 6)';
+
+  const prompt = `Phân tích toàn bộ hình ảnh tài liệu/sách/bài tập (${langName}) được cung cấp.
 Nhiệm vụ:
-1. Đọc và trích xuất tất cả các từ vựng mới, từ khoá quan trọng, cụm từ đáng học xuất hiện trong ảnh.
-2. Trả về danh sách JSON chứa các từ vựng đó để người dùng có thể thêm ngay vào kho từ vựng cá nhân:
+1. Trích xuất cả TỪ VỰNG (words) VÀ NGỮ PHÁP (grammar) xuất hiện hoặc liên quan trong ảnh.
+2. Phân tích chi tiết từng mục:
+   - CẤP ĐỘ (cap_do): ${levelGuide}.
+   - CHỦ ĐỀ (chu_de): Phân loại chủ đề rõ ràng (ví dụ: Giao tiếp, Công sở - Kinh doanh, Du lịch - Ẩm thực, Đời sống, Công nghệ, Y tế, Học thuật).
+   - VÍ DỤ (vi_du & vi_du_dich): BẮT BUỘC mỗi từ vựng và mỗi cấu trúc ngữ pháp đều phải có câu ví dụ minh họa kèm bản dịch Tiếng Việt chuẩn tự nhiên. (Nếu ảnh chứa câu sẵn thì ưu tiên dùng, nếu không có sẵn thì AI tự sinh câu ví dụ minh họa chuẩn).
+
+Trả về định dạng JSON thuần tuý:
 {
-  "extractedText": "Toàn bộ đoạn văn bản chính đọc được từ ảnh",
-  "summary": "Tóm tắt ngắn gọn nội dung ảnh bằng tiếng Việt",
+  "extractedText": "Toàn bộ văn bản chính đọc được từ ảnh",
+  "summary": "Tóm tắt ngắn nội dung ảnh bằng tiếng Việt",
   "words": [
     {
-      "tu": "từ hoặc cụm từ trích xuất",
-      "nghia": "nghĩa tiếng Việt chính xác theo ngữ cảnh ảnh",
-      "phien_am": "phiên âm (IPA / Romaja / Pinyin)",
-      "loai_tu": "danh từ/động từ/tính từ...",
-      "vi_du": "câu xuất hiện trong ảnh hoặc câu mẫu",
-      "vi_du_dich": "dịch nghĩa câu ví dụ",
-      "cap_do": "cấp độ ước lượng (A1-C2 / TOPIK 1-6 / HSK 1-6)",
-      "chu_de": "chủ đề"
+      "tu": "từ hoặc cụm từ",
+      "nghia": "nghĩa tiếng Việt",
+      "phien_am": "phiên âm (IPA/Romaja/Pinyin)",
+      "loai_tu": "loại từ (Danh từ, Động từ, Tính từ...)",
+      "cap_do": "TOEIC 650 (B1) / TOPIK 2 / HSK 3",
+      "chu_de": "Chủ đề từ vựng",
+      "vi_du": "Câu ví dụ thực tế sử dụng từ",
+      "vi_du_dich": "Dịch nghĩa câu ví dụ"
+    }
+  ],
+  "grammar": [
+    {
+      "cau_truc": "Cấu trúc ngữ pháp hoặc mẫu câu",
+      "giai_thich": "Giải thích chi tiết bằng tiếng Việt",
+      "cong_thuc": "Công thức / Dạng chia",
+      "cap_do": "TOEIC 700 / TOPIK 3 / HSK 4",
+      "chu_de": "Chủ đề ngữ pháp",
+      "vi_du": "Câu ví dụ sử dụng cấu trúc ngữ pháp",
+      "vi_du_dich": "Dịch nghĩa câu ví dụ"
     }
   ]
 }`;
@@ -306,7 +328,7 @@ Nhiệm vụ:
           {
             inlineData: {
               data: imageBase64.replace(/^data:image\/[a-z]+;base64,/, ''),
-              mimeType: imageMime || 'image/jpeg',
+              mimeType: 'image/jpeg',
             },
           },
           { text: prompt },

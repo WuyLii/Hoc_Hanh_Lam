@@ -13,6 +13,8 @@ import {
   BookMarked,
   Layers,
   Sparkles,
+  LayoutGrid,
+  List as ListIcon,
 } from 'lucide-react';
 
 export const GrammarManager: React.FC = () => {
@@ -28,6 +30,7 @@ export const GrammarManager: React.FC = () => {
   const currentLangInfo = LANGUAGES[currentLanguage];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLevel, setSelectedLevel] = useState(selectedLevelFilter || 'ALL');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   React.useEffect(() => {
     if (selectedLevelFilter) {
@@ -167,31 +170,62 @@ export const GrammarManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 sm:p-6 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm">
-        <div className="sm:col-span-8 relative">
-          <Search className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
-          <input
-            type="text"
-            placeholder="Search syntax structures, grammar rules, keyword explanations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white"
-          />
+      {/* Filter Bar with View Mode Toggle */}
+      <div className="bg-white border-2 border-[#1A1A1A] editorial-shadow-sm p-4 sm:p-6 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+          <div className="sm:col-span-8 relative">
+            <Search className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
+            <input
+              type="text"
+              placeholder="Search syntax structures, grammar rules, keyword explanations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white"
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <select
+              value={selectedLevel}
+              onChange={(e) => setSelectedLevel(e.target.value)}
+              className="w-full py-2 px-3 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
+            >
+              <option value="ALL">ALL LEVELS ({currentLangInfo.levels.length})</option>
+              {currentLangInfo.levels.map((lvl) => (
+                <option key={lvl} value={lvl}>
+                  {lvl}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="sm:col-span-4">
-          <select
-            value={selectedLevel}
-            onChange={(e) => setSelectedLevel(e.target.value)}
-            className="w-full py-2 px-3 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
-          >
-            <option value="ALL">ALL LEVELS ({currentLangInfo.levels.length})</option>
-            {currentLangInfo.levels.map((lvl) => (
-              <option key={lvl} value={lvl}>
-                {lvl}
-              </option>
-            ))}
-          </select>
+
+        <div className="flex items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono">
+          <div className="text-stone-600">
+            SHOWING <strong className="text-[#1A1A1A]">{filteredGrammar.length}</strong> OF {currentLangGrammar.length} RULES
+          </div>
+
+          <div className="flex items-center gap-1 border border-[#1A1A1A] p-0.5 bg-[#F9F7F2]">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase transition ${
+                viewMode === 'grid' ? 'bg-[#1A1A1A] text-white' : 'text-[#1A1A1A] hover:bg-stone-200'
+              }`}
+              title="Grid View"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>GRID</span>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase transition ${
+                viewMode === 'list' ? 'bg-[#1A1A1A] text-white' : 'text-[#1A1A1A] hover:bg-stone-200'
+              }`}
+              title="List View"
+            >
+              <ListIcon className="w-3.5 h-3.5" />
+              <span>LIST</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -209,6 +243,71 @@ export const GrammarManager: React.FC = () => {
           >
             + ADD_FIRST_RULE
           </button>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredGrammar.map((item) => (
+            <div
+              key={item.grammar_id}
+              className="p-6 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm hover:editorial-shadow transition-all flex flex-col justify-between group"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-[#1A1A1A]/15 pb-2">
+                  <span className="px-2 py-0.5 bg-[#1A1A1A] text-[#F9F7F2] text-[10px] font-mono font-bold uppercase">
+                    {item.cap_do}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEditModal(item)}
+                      className="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
+                      title="Edit Rule"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Remove rule "${item.cau_truc}"?`)) {
+                          deleteGrammar(item.grammar_id);
+                        }
+                      }}
+                      className="p-1 border border-[#1A1A1A] hover:bg-rose-900 hover:text-white transition"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                <h3 className="text-xl font-mono font-black text-[#1A1A1A] tracking-tight">
+                  {item.cau_truc}
+                </h3>
+
+                <p className="text-sm font-serif text-[#1A1A1A] leading-relaxed line-clamp-3">
+                  {item.giai_thich}
+                </p>
+
+                {item.vi_du && (
+                  <div className="p-2.5 bg-[#F9F7F2] border-l-2 border-[#1A1A1A] text-xs">
+                    <p className="font-serif italic text-[#1A1A1A]">"{item.vi_du}"</p>
+                    {item.vi_du_dich && (
+                      <p className="text-stone-600 font-mono text-[10px] mt-0.5">→ {item.vi_du_dich}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-[#1A1A1A]/20 flex flex-wrap gap-1">
+                {item.tags?.map((t, idx) => (
+                  <span
+                    key={idx}
+                    className="px-1.5 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-stone-700 text-[9px] font-mono"
+                  >
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-6">

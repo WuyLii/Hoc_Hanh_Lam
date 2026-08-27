@@ -335,20 +335,45 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
 
       const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
 
-      const prompt = `Phân tích toàn bộ các hình ảnh tài liệu/sách giáo khoa (${langName}) được cung cấp. Trả về danh sách JSON chứa các từ vựng trích xuất từ tất cả các ảnh:
+      const levelGuide = language === 'en'
+        ? 'Phân tích cấp độ chuẩn TOEIC/CEFR (ví dụ: TOEIC 500, TOEIC 650, TOEIC 800, CEFR B1, IELTS 6.0)'
+        : language === 'ko'
+        ? 'Phân tích cấp độ chuẩn TOPIK (ví dụ: TOPIK 1, TOPIK 2, TOPIK 3, TOPIK 4, TOPIK 5, TOPIK 6)'
+        : 'Phân tích cấp độ chuẩn HSK (ví dụ: HSK 1, HSK 2, HSK 3, HSK 4, HSK 5, HSK 6)';
+
+      const prompt = `Phân tích toàn bộ các hình ảnh tài liệu/sách giáo khoa (${langName}) được cung cấp.
+Nhiệm vụ:
+1. Trích xuất cả TỪ VỰNG (words) VÀ NGỮ PHÁP (grammar) xuất hiện hoặc liên quan trong tất cả các ảnh.
+2. Phân tích chi tiết từng mục:
+   - CẤP ĐỘ (cap_do): ${levelGuide}.
+   - CHỦ ĐỀ (chu_de): Phân loại chủ đề rõ ràng (ví dụ: Giao tiếp, Công sở - Kinh doanh, Du lịch - Ẩm thực, Đời sống, Công nghệ, Y tế, Học thuật).
+   - VÍ DỤ (vi_du & vi_du_dich): BẮT BUỘC mỗi từ vựng và mỗi cấu trúc ngữ pháp đều phải có câu ví dụ minh họa kèm bản dịch Tiếng Việt chuẩn tự nhiên. (Nếu ảnh chứa câu sẵn thì ưu tiên dùng, nếu không có sẵn thì AI tự sinh câu ví dụ minh họa chuẩn).
+
+Trả về cấu trúc JSON thuần tuý:
 {
   "extractedText": "Tóm tắt văn bản đọc được từ các ảnh",
-  "summary": "Tóm tắt",
+  "summary": "Tóm tắt ngắn gọn nội dung tài liệu",
   "words": [
     {
-      "tu": "từ",
-      "nghia": "nghĩa",
-      "phien_am": "phiên âm",
-      "loai_tu": "danh từ/động từ...",
-      "vi_du": "câu ví dụ",
-      "vi_du_dich": "dịch",
-      "cap_do": "A1",
-      "chu_de": "chủ đề"
+      "tu": "từ hoặc cụm từ",
+      "nghia": "nghĩa tiếng Việt",
+      "phien_am": "phiên âm (IPA/Romaja/Pinyin)",
+      "loai_tu": "loại từ (Danh từ, Động từ, Tính từ...)",
+      "cap_do": "TOEIC 650 (B1) / TOPIK 2 / HSK 3",
+      "chu_de": "Chủ đề từ vựng",
+      "vi_du": "Câu ví dụ thực tế sử dụng từ",
+      "vi_du_dich": "Dịch nghĩa câu ví dụ"
+    }
+  ],
+  "grammar": [
+    {
+      "cau_truc": "Cấu trúc ngữ pháp hoặc mẫu câu",
+      "giai_thich": "Giải thích chi tiết bằng tiếng Việt",
+      "cong_thuc": "Công thức / Dạng chia",
+      "cap_do": "TOEIC 700 / TOPIK 3 / HSK 4",
+      "chu_de": "Chủ đề ngữ pháp",
+      "vi_du": "Câu ví dụ sử dụng cấu trúc ngữ pháp",
+      "vi_du_dich": "Dịch nghĩa câu ví dụ"
     }
   ]
 }`;

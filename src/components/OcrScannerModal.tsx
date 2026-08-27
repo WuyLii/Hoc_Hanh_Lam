@@ -6,10 +6,13 @@ import {
   Camera,
   Upload,
   X,
-  Check,
   BookmarkPlus,
   AlertCircle,
   Volume2,
+  BookOpen,
+  Layers,
+  Award,
+  Tag,
 } from 'lucide-react';
 import { ttsService } from '../services/ttsService';
 
@@ -23,19 +26,36 @@ interface ExtractedWord {
   nghia: string;
   phien_am: string;
   loai_tu: string;
+  cap_do: string;
+  chu_de: string;
   vi_du: string;
+  vi_du_dich: string;
+  selected: boolean;
+}
+
+interface ExtractedGrammar {
+  cau_truc: string;
+  giai_thich: string;
+  cong_thuc: string;
+  cap_do: string;
+  chu_de: string;
+  vi_du: string;
+  vi_du_dich: string;
   selected: boolean;
 }
 
 export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClose }) => {
-  const { currentLanguage, batchAddVocabulary } = useApp();
+  const { currentLanguage, batchAddVocabulary, batchAddGrammar } = useApp();
   const currentLangInfo = LANGUAGES[currentLanguage];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagesBase64, setImagesBase64] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  
   const [extractedWords, setExtractedWords] = useState<ExtractedWord[]>([]);
+  const [extractedGrammars, setExtractedGrammars] = useState<ExtractedGrammar[]>([]);
+  const [activeTab, setActiveTab] = useState<'words' | 'grammar'>('words');
 
   if (!isOpen) return null;
 
@@ -55,6 +75,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
     });
 
     setExtractedWords([]);
+    setExtractedGrammars([]);
     setScanError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -79,22 +100,53 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
         }),
       });
 
-      if (!response.ok) throw new Error('Không thể xử lý ảnh qua Gemini Vision');
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Không thể xử lý ảnh qua Gemini Vision');
+      }
 
       const data = await response.json();
+
+      let hasData = false;
       if (Array.isArray(data.words) && data.words.length > 0) {
+        hasData = true;
         setExtractedWords(
           data.words.map((w: any) => ({
             tu: w.tu || w.word || '',
             nghia: w.nghia || w.meaning || '',
             phien_am: w.phien_am || w.phonetic || '',
             loai_tu: w.loai_tu || w.type || 'Từ vựng',
+            cap_do: w.cap_do || (currentLanguage === 'en' ? 'TOEIC 500' : currentLanguage === 'ko' ? 'TOPIK 2' : 'HSK 3'),
+            chu_de: w.chu_de || 'Quét OCR Sách',
             vi_du: w.vi_du || w.example || '',
+            vi_du_dich: w.vi_du_dich || w.exampleVi || '',
             selected: true,
           }))
         );
       } else {
-        setScanError('Không trích xuất được từ vựng rõ ràng từ các ảnh. Vui lòng thử lại với ảnh rõ nét hơn.');
+        setExtractedWords([]);
+      }
+
+      if (Array.isArray(data.grammar) && data.grammar.length > 0) {
+        hasData = true;
+        setExtractedGrammars(
+          data.grammar.map((g: any) => ({
+            cau_truc: g.cau_truc || g.pattern || '',
+            giai_thich: g.giai_thich || g.explanation || '',
+            cong_thuc: g.cong_thuc || '',
+            cap_do: g.cap_do || (currentLanguage === 'en' ? 'TOEIC 600' : currentLanguage === 'ko' ? 'TOPIK 2' : 'HSK 3'),
+            chu_de: g.chu_de || 'Quét OCR Sách',
+            vi_du: g.vi_du || g.example || '',
+            vi_du_dich: g.vi_du_dich || g.exampleVi || '',
+            selected: true,
+          }))
+        );
+      } else {
+        setExtractedGrammars([]);
+      }
+
+      if (!hasData) {
+        setScanError('Không trích xuất được từ vựng/ngữ pháp rõ ràng từ các ảnh. Vui lòng thử lại với ảnh rõ nét hơn.');
       }
     } catch (err: any) {
       setScanError(err.message || 'Lỗi khi thực thi trích xuất OCR');
@@ -109,36 +161,73 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
     );
   };
 
-  const handleSaveSelectedWords = () => {
-    const selected = extractedWords.filter((w) => w.selected && w.tu.trim() && w.nghia.trim());
-    if (selected.length === 0) return;
-
-    const count = batchAddVocabulary(
-      selected.map((w) => ({
-        tu: w.tu,
-        nghia: w.nghia,
-        phien_am: w.phien_am,
-        loai_tu: w.loai_tu,
-        vi_du: w.vi_du,
-        cap_do: 'Cốt lõi',
-        chu_de: 'Quét OCR Sách',
-        ngon_ngu: currentLanguage,
-      }))
+  const handleToggleSelectGrammar = (idx: number) => {
+    setExtractedGrammars((prev) =>
+      prev.map((g, i) => (i === idx ? { ...g, selected: !g.selected } : g))
     );
+  };
 
-    alert(`Đã lưu thành công ${count} từ vựng từ ảnh OCR vào sổ tay từ vựng!`);
+  const handleSaveSelectedItems = () => {
+    const selectedVocab = extractedWords.filter((w) => w.selected && w.tu.trim() && w.nghia.trim());
+    const selectedGrammar = extractedGrammars.filter((g) => g.selected && g.cau_truc.trim() && g.giai_thich.trim());
+
+    if (selectedVocab.length === 0 && selectedGrammar.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 từ vựng hoặc 1 cấu trúc ngữ pháp để lưu.');
+      return;
+    }
+
+    let addedVocab = 0;
+    let addedGrammar = 0;
+
+    if (selectedVocab.length > 0) {
+      addedVocab = batchAddVocabulary(
+        selectedVocab.map((w) => ({
+          tu: w.tu,
+          nghia: w.nghia,
+          phien_am: w.phien_am,
+          loai_tu: w.loai_tu,
+          vi_du: w.vi_du,
+          vi_du_dich: w.vi_du_dich,
+          cap_do: w.cap_do,
+          chu_de: w.chu_de,
+          ngon_ngu: currentLanguage,
+          nguon_goc: 'Quét OCR AI',
+        }))
+      );
+    }
+
+    if (selectedGrammar.length > 0) {
+      addedGrammar = batchAddGrammar(
+        selectedGrammar.map((g) => ({
+          cau_truc: g.cau_truc,
+          giai_thich: g.giai_thich,
+          cong_thuc: g.cong_thuc,
+          vi_du: g.vi_du,
+          vi_du_dich: g.vi_du_dich,
+          cap_do: g.cap_do,
+          ngon_ngu: currentLanguage,
+          tags: [g.chu_de, 'Quét OCR AI'],
+        }))
+      );
+    }
+
+    alert(`🎉 Đã lưu thành công ${addedVocab} từ vựng và ${addedGrammar} cấu trúc ngữ pháp vào hệ thống!`);
     onClose();
   };
 
+  const selectedVocabCount = extractedWords.filter((w) => w.selected).length;
+  const selectedGrammarCount = extractedGrammars.filter((g) => g.selected).length;
+  const totalExtracted = extractedWords.length + extractedGrammars.length;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1A1A1A]/70 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-[#F9F7F2] border-4 border-[#1A1A1A] editorial-shadow-lg w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-[#F9F7F2] border-4 border-[#1A1A1A] editorial-shadow-lg w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="px-6 py-4 border-b-2 border-[#1A1A1A] bg-white flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Camera className="w-5 h-5 text-[#1A1A1A]" />
             <h2 className="text-base font-serif font-black uppercase tracking-tight text-[#1A1A1A]">
-              Quét từ vựng qua ảnh OCR AI ({currentLangInfo.name})
+              AI Quét OCR & Phân Tích Trích Xuất ({currentLangInfo.name})
             </h2>
           </div>
           <button
@@ -176,10 +265,10 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
               >
                 <Upload className="w-8 h-8 text-stone-500 mx-auto" />
                 <h3 className="font-serif font-bold text-sm text-[#1A1A1A]">
-                  Tải lên một hoặc nhiều ảnh trang sách giáo khoa / bài tập / tài liệu
+                  Tải lên một hoặc nhiều ảnh sách giáo khoa / bài tập / tài liệu
                 </h3>
                 <p className="text-[10px] font-mono text-stone-500 uppercase">
-                  PNG, JPG, WEBP (Chọn nhiều ảnh cùng lúc) • Nhận diện từ vựng bằng AI
+                  Tự động phân tích Từ Vựng & Ngữ Pháp • Phân loại TOPIC, TOEIC/TOPIK/HSK • Tạo Ví Dụ Thực Tế
                 </p>
               </div>
             ) : (
@@ -197,9 +286,9 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-56 overflow-y-auto p-2 border-2 border-[#1A1A1A] bg-white">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-48 overflow-y-auto p-2 border-2 border-[#1A1A1A] bg-white">
                   {imagesBase64.map((imgSrc, idx) => (
-                    <div key={idx} className="relative border border-[#1A1A1A] bg-stone-100 group h-28 flex items-center justify-center overflow-hidden">
+                    <div key={idx} className="relative border border-[#1A1A1A] bg-stone-100 group h-24 flex items-center justify-center overflow-hidden">
                       <img src={imgSrc} alt={`Ảnh ${idx + 1}`} className="h-full w-full object-cover" />
                       <button
                         type="button"
@@ -222,68 +311,195 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
                   className="w-full py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 disabled:opacity-50 text-xs font-mono font-bold uppercase tracking-widest editorial-shadow-sm flex items-center justify-center gap-2"
                 >
                   <Sparkles className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-                  <span>{isScanning ? 'ĐANG TRÍCH XUẤT TỪ VỰNG TỪ TẤT CẢ ẢNH...' : `BẮT ĐẦU TRÍCH XUẤT OCR (${imagesBase64.length} ẢNH)`}</span>
+                  <span>{isScanning ? 'AI ĐANG PHÂN TÍCH TỪ VỰNG & NGỮ PHÁP...' : `BẮT ĐẦU TRÍCH XUẤT OCR (${imagesBase64.length} ẢNH)`}</span>
                 </button>
               </div>
             )}
           </div>
 
-          {/* Extracted Words List */}
-          {extractedWords.length > 0 && (
+          {/* Extracted Items List */}
+          {totalExtracted > 0 && (
             <div className="space-y-4 pt-4 border-t-2 border-[#1A1A1A]">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-[#1A1A1A]">
-                  Từ vựng trích xuất được ({extractedWords.filter((w) => w.selected).length} từ đã chọn):
-                </h3>
-              </div>
-
-              <div className="space-y-3">
-                {extractedWords.map((word, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleToggleSelectWord(idx)}
-                    className={`p-4 border-2 transition cursor-pointer flex items-start justify-between gap-3 ${
-                      word.selected
-                        ? 'bg-white border-[#1A1A1A] editorial-shadow-sm'
-                        : 'bg-[#F9F7F2] border-stone-300 opacity-60'
+              {/* Tab Navigation */}
+              <div className="flex items-center justify-between border-b-2 border-[#1A1A1A]">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveTab('words')}
+                    className={`px-4 py-2 font-mono text-xs font-bold uppercase transition flex items-center gap-1.5 border-t-2 border-x-2 ${
+                      activeTab === 'words'
+                        ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                        : 'bg-white text-[#1A1A1A] border-transparent hover:bg-stone-100'
                     }`}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-serif font-black text-lg text-[#1A1A1A]">{word.tu}</span>
-                        {word.phien_am && (
-                          <span className="text-xs font-mono text-stone-600">{word.phien_am}</span>
-                        )}
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A]">
-                          {word.loai_tu}
-                        </span>
-                      </div>
-                      <p className="text-xs font-serif font-semibold text-[#1A1A1A]">{word.nghia}</p>
-                    </div>
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>TỪ VỰNG ({selectedVocabCount}/{extractedWords.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('grammar')}
+                    className={`px-4 py-2 font-mono text-xs font-bold uppercase transition flex items-center gap-1.5 border-t-2 border-x-2 ${
+                      activeTab === 'grammar'
+                        ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                        : 'bg-white text-[#1A1A1A] border-transparent hover:bg-stone-100'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>NGỮ PHÁP ({selectedGrammarCount}/{extractedGrammars.length})</span>
+                  </button>
+                </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          ttsService.speak(word.tu, currentLanguage);
-                        }}
-                        className="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white"
-                        title="Nghe phát âm"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                      </button>
-                      <input
-                        type="checkbox"
-                        checked={word.selected}
-                        onChange={() => handleToggleSelectWord(idx)}
-                        className="w-4 h-4 accent-[#1A1A1A]"
-                      />
-                    </div>
-                  </div>
-                ))}
+                <span className="text-[10px] font-mono text-stone-500 uppercase pr-2">
+                  TỔNG CỘNG: {selectedVocabCount + selectedGrammarCount} ĐÃ CHỌN
+                </span>
               </div>
 
+              {/* Tab 1: Vocabulary List */}
+              {activeTab === 'words' && (
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {extractedWords.length === 0 ? (
+                    <div className="p-6 text-center text-xs font-mono text-stone-500">
+                      Không tìm thấy từ vựng nào trong ảnh.
+                    </div>
+                  ) : (
+                    extractedWords.map((word, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleToggleSelectWord(idx)}
+                        className={`p-4 border-2 transition cursor-pointer flex items-start justify-between gap-3 ${
+                          word.selected
+                            ? 'bg-white border-[#1A1A1A] editorial-shadow-sm'
+                            : 'bg-[#F9F7F2] border-stone-300 opacity-60'
+                        }`}
+                      >
+                        <div className="space-y-2 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-serif font-black text-lg text-[#1A1A1A]">{word.tu}</span>
+                            {word.phien_am && (
+                              <span className="text-xs font-mono text-stone-600">[{word.phien_am}]</span>
+                            )}
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A]">
+                              {word.loai_tu}
+                            </span>
+                            
+                            {/* Certificate Badge */}
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-amber-200 border border-[#1A1A1A] text-amber-950 flex items-center gap-1">
+                              <Award className="w-3 h-3 shrink-0" />
+                              <span>{word.cap_do}</span>
+                            </span>
+
+                            {/* Topic Badge */}
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-sky-100 border border-[#1A1A1A] text-sky-900 flex items-center gap-1">
+                              <Tag className="w-3 h-3 shrink-0" />
+                              <span>{word.chu_de}</span>
+                            </span>
+                          </div>
+
+                          <p className="text-sm font-serif font-bold text-[#1A1A1A]">{word.nghia}</p>
+
+                          {/* Example & Translation */}
+                          {word.vi_du && (
+                            <div className="p-2.5 bg-[#F9F7F2] border-l-3 border-[#1A1A1A] text-xs space-y-0.5">
+                              <p className="font-serif italic text-[#1A1A1A]">"{word.vi_du}"</p>
+                              {word.vi_du_dich && (
+                                <p className="text-stone-600 font-mono text-[11px]">→ {word.vi_du_dich}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              ttsService.speak(word.tu, currentLanguage);
+                            }}
+                            className="p-1.5 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
+                            title="Nghe phát âm"
+                          >
+                            <Volume2 className="w-3.5 h-3.5" />
+                          </button>
+                          <input
+                            type="checkbox"
+                            checked={word.selected}
+                            onChange={() => handleToggleSelectWord(idx)}
+                            className="w-4 h-4 accent-[#1A1A1A]"
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Tab 2: Grammar List */}
+              {activeTab === 'grammar' && (
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {extractedGrammars.length === 0 ? (
+                    <div className="p-6 text-center text-xs font-mono text-stone-500">
+                      Không tìm thấy cấu trúc ngữ pháp nào trong ảnh.
+                    </div>
+                  ) : (
+                    extractedGrammars.map((gram, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleToggleSelectGrammar(idx)}
+                        className={`p-4 border-2 transition cursor-pointer flex items-start justify-between gap-3 ${
+                          gram.selected
+                            ? 'bg-white border-[#1A1A1A] editorial-shadow-sm'
+                            : 'bg-[#F9F7F2] border-stone-300 opacity-60'
+                        }`}
+                      >
+                        <div className="space-y-2 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono font-black text-lg text-[#1A1A1A]">{gram.cau_truc}</span>
+                            
+                            {/* Certificate Badge */}
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-amber-200 border border-[#1A1A1A] text-amber-950 flex items-center gap-1">
+                              <Award className="w-3 h-3 shrink-0" />
+                              <span>{gram.cap_do}</span>
+                            </span>
+
+                            {/* Topic Badge */}
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-purple-100 border border-[#1A1A1A] text-purple-900 flex items-center gap-1">
+                              <Tag className="w-3 h-3 shrink-0" />
+                              <span>{gram.chu_de}</span>
+                            </span>
+                          </div>
+
+                          <p className="text-xs font-serif text-[#1A1A1A] leading-relaxed">{gram.giai_thich}</p>
+
+                          {gram.cong_thuc && (
+                            <div className="text-[11px] font-mono font-bold text-stone-700 bg-stone-100 p-1.5 border border-stone-300">
+                              Công thức: {gram.cong_thuc}
+                            </div>
+                          )}
+
+                          {/* Example & Translation */}
+                          {gram.vi_du && (
+                            <div className="p-2.5 bg-[#F9F7F2] border-l-3 border-[#1A1A1A] text-xs space-y-0.5">
+                              <p className="font-serif italic text-[#1A1A1A]">"{gram.vi_du}"</p>
+                              {gram.vi_du_dich && (
+                                <p className="text-stone-600 font-mono text-[11px]">→ {gram.vi_du_dich}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={gram.selected}
+                            onChange={() => handleToggleSelectGrammar(idx)}
+                            className="w-4 h-4 accent-[#1A1A1A]"
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-4 border-t border-[#1A1A1A]">
                 <button
                   type="button"
@@ -294,11 +510,11 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
                 </button>
                 <button
                   type="button"
-                  onClick={handleSaveSelectedWords}
+                  onClick={handleSaveSelectedItems}
                   className="px-6 py-2 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm flex items-center gap-2"
                 >
                   <BookmarkPlus className="w-4 h-4" />
-                  <span>LƯU VÀO KHO TỪ VỰNG</span>
+                  <span>LƯU CÁC MỤC ĐÃ CHỌN ({selectedVocabCount + selectedGrammarCount})</span>
                 </button>
               </div>
             </div>
@@ -308,3 +524,4 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
     </div>
   );
 };
+
