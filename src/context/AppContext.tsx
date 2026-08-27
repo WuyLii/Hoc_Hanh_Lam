@@ -194,8 +194,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig>(() =>
     loadFromStorage('sheets_config', {
       scriptUrl: '',
-      spreadsheetId: '',
-      autoSync: false,
+      spreadsheetUrlOrId: 'https://docs.google.com/spreadsheets/d/1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY/edit?gid=0#gid=0',
+      spreadsheetId: '1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY',
+      autoSync: true,
+      syncIntervalHours: 24,
+      lastSyncedAt: '',
     })
   );
 
@@ -579,49 +582,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const pullGoogleSheets = async (): Promise<{ success: boolean; message: string }> => {
-    if (!sheetsConfig.scriptUrl) {
-      return { success: false, message: 'Vui lòng nhập URL Google Apps Script' };
+    const targetUrl =
+      sheetsConfig.scriptUrl ||
+      sheetsConfig.spreadsheetUrlOrId ||
+      'https://docs.google.com/spreadsheets/d/1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY/edit?gid=0#gid=0';
+
+    if (!targetUrl) {
+      return { success: false, message: 'Vui lòng nhập đường dẫn URL Google Sheets hoặc Web App Script URL' };
     }
 
     setIsSyncing(true);
     try {
-      const data = await GoogleSheetsService.pullFromGoogleSheets(sheetsConfig.scriptUrl);
+      const data = await GoogleSheetsService.pullFromGoogleSheets(targetUrl);
       if (data) {
         const vocab = data.vocabulary || data.Vocabulary;
-        if (Array.isArray(vocab)) setVocabulary(vocab);
+        if (Array.isArray(vocab) && vocab.length > 0) {
+          setVocabulary((prev) => {
+            const map = new Map<string, VocabularyItem>();
+            prev.forEach((item) => {
+              if (item.word_id) map.set(item.word_id, item);
+              else if (item.tu) map.set(`${item.tu}_${item.nghia}`, item);
+            });
+            vocab.forEach((v: any) => {
+              const key = v.word_id || `${v.tu}_${v.nghia}`;
+              const existing = map.get(key);
+              map.set(key, { ...existing, ...v });
+            });
+            return Array.from(map.values());
+          });
+        }
 
         const gram = data.grammar || data.Grammar;
-        if (Array.isArray(gram)) setGrammar(gram);
+        if (Array.isArray(gram) && gram.length > 0) {
+          setGrammar((prev) => {
+            const map = new Map<string, GrammarItem>();
+            prev.forEach((item) => {
+              if (item.grammar_id) map.set(item.grammar_id, item);
+              else if (item.cau_truc) map.set(item.cau_truc, item);
+            });
+            gram.forEach((g: any) => {
+              const key = g.grammar_id || g.cau_truc;
+              const existing = map.get(key);
+              map.set(key, { ...existing, ...g });
+            });
+            return Array.from(map.values());
+          });
+        }
 
         const dks = data.decks || data.Decks;
-        if (Array.isArray(dks)) setDecks(dks);
+        if (Array.isArray(dks) && dks.length > 0) setDecks(dks);
 
         const usr = data.users || data.Users;
         if (Array.isArray(usr) && usr.length > 0) setCurrentUser(usr[0]);
 
         const rev = data.reviewSessions || data.ReviewSessions;
-        if (Array.isArray(rev)) setReviewSessions(rev);
+        if (Array.isArray(rev) && rev.length > 0) setReviewSessions(rev);
 
         const tsts = data.tests || data.Tests;
-        if (Array.isArray(tsts)) setMockTests(tsts);
+        if (Array.isArray(tsts) && tsts.length > 0) setMockTests(tsts);
 
         const lst = data.listening || data.Listening;
-        if (Array.isArray(lst)) setListeningExercises(lst);
+        if (Array.isArray(lst) && lst.length > 0) setListeningExercises(lst);
 
         const prg = data.progress || data.Progress;
-        if (Array.isArray(prg)) setProgressLogs(prg);
+        if (Array.isArray(prg) && prg.length > 0) setProgressLogs(prg);
 
         const jrn = data.journal || data.Journal;
-        if (Array.isArray(jrn)) setJournalEntries(jrn);
+        if (Array.isArray(jrn) && jrn.length > 0) setJournalEntries(jrn);
 
         const notis = data.notifications || data.Notifications;
-        if (Array.isArray(notis)) setNotifications(notis);
+        if (Array.isArray(notis) && notis.length > 0) setNotifications(notis);
 
         const chats = data.chatHistory || data.ChatHistory;
-        if (Array.isArray(chats)) setChatHistory(chats);
+        if (Array.isArray(chats) && chats.length > 0) setChatHistory(chats);
 
-        setSheetsConfig((prev) => ({ ...prev, lastSyncedAt: new Date().toISOString() }));
-        return { success: true, message: 'Đã tải toàn bộ dữ liệu mới nhất từ Google Sheets về thành công!' };
+        const now = new Date().toISOString();
+        setSheetsConfig((prev) => ({ ...prev, lastSyncedAt: now }));
+
+        addNotification({
+          user_id: currentUser.user_id,
+          loai: 'milestone',
+          noi_dung: `🔄 Tự động đồng bộ thành công với Google Sheets lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+          thoi_gian: now,
+          da_doc: false,
+        });
+
+        return { success: true, message: 'Đã tải và đồng bộ dữ liệu mới nhất từ Google Sheets thành công!' };
       }
       return { success: false, message: 'Không có dữ liệu trả về từ Google Sheets' };
     } catch (e: any) {
@@ -630,6 +676,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsSyncing(false);
     }
   };
+
+  // Automatic 24-hour sync check effect
+  useEffect(() => {
+    const targetUrl =
+      sheetsConfig.scriptUrl ||
+      sheetsConfig.spreadsheetUrlOrId ||
+      'https://docs.google.com/spreadsheets/d/1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY/edit?gid=0#gid=0';
+
+    if (!targetUrl || sheetsConfig.autoSync === false) return;
+
+    const intervalMs = (sheetsConfig.syncIntervalHours || 24) * 60 * 60 * 1000;
+
+    const checkAndSync = async () => {
+      const lastSync = sheetsConfig.lastSyncedAt ? new Date(sheetsConfig.lastSyncedAt).getTime() : 0;
+      const now = Date.now();
+      if (now - lastSync >= intervalMs) {
+        console.log('⏰ Executing 24-hour auto sync with Google Sheets...');
+        await pullGoogleSheets();
+      }
+    };
+
+    checkAndSync();
+    const timer = setInterval(checkAndSync, 30 * 60 * 1000); // Check every 30 mins
+    return () => clearInterval(timer);
+  }, [sheetsConfig.autoSync, sheetsConfig.scriptUrl, sheetsConfig.spreadsheetUrlOrId, sheetsConfig.lastSyncedAt]);
 
   return (
     <AppContext.Provider

@@ -242,14 +242,18 @@ function ensureAllTabs(ss) {
   }
 
   /**
-   * Pull data from Google Sheets
+   * Pull data from Google Sheets (Apps Script or Public Sheet URL)
    */
-  public static async pullFromGoogleSheets(scriptUrl: string): Promise<any> {
-    if (!scriptUrl || !scriptUrl.startsWith('https://script.google.com/')) {
-      throw new Error('URL Google Apps Script không hợp lệ');
+  public static async pullFromGoogleSheets(scriptUrlOrSheetUrl: string): Promise<any> {
+    if (!scriptUrlOrSheetUrl) {
+      throw new Error('Vui lòng nhập URL Google Sheets hoặc Web App Script URL');
     }
 
-    const response = await fetch(scriptUrl, {
+    if (scriptUrlOrSheetUrl.includes('docs.google.com/spreadsheets') || !scriptUrlOrSheetUrl.startsWith('https://script.google.com/')) {
+      return GoogleSheetsService.fetchPublicSheets(scriptUrlOrSheetUrl);
+    }
+
+    const response = await fetch(scriptUrlOrSheetUrl, {
       method: 'GET',
       mode: 'cors',
     });
@@ -260,6 +264,22 @@ function ensureAllTabs(ss) {
     } else {
       throw new Error(resJson.message || 'Không thể đọc dữ liệu Google Sheets');
     }
+  }
+
+  /**
+   * Direct fetch from public / shared Google Sheet URL
+   */
+  public static async fetchPublicSheets(urlOrId: string): Promise<any> {
+    const resp = await fetch('/api/sheets/fetch-public', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urlOrId }),
+    });
+    const json = await resp.json();
+    if (!resp.ok) {
+      throw new Error(json.error || 'Lỗi khi kết nối Google Sheets');
+    }
+    return json.data;
   }
 
   /**

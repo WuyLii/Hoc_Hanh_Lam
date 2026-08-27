@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { handleOcrExtract } from './src/server/geminiHandlers.ts';
+import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 
 dotenv.config();
 
@@ -378,122 +380,11 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
   // 6. OCR Photo Extractor to Vocabulary Deck (Supports Multiple Images)
   app.post('/api/gemini/ocr-extract', async (req, res) => {
     try {
-      const { imageBase64, images, language } = req.body;
-      const ai = getGenAI();
-
-      const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
-
-      const levelGuide = language === 'en'
-        ? 'Phân tích cấp độ chuẩn TOEIC/CEFR (ví dụ: TOEIC 500, TOEIC 650, TOEIC 800, CEFR B1, IELTS 6.0)'
-        : language === 'ko'
-        ? 'Phân tích cấp độ chuẩn TOPIK (ví dụ: TOPIK 1, TOPIK 2, TOPIK 3, TOPIK 4, TOPIK 5, TOPIK 6)'
-        : 'Phân tích cấp độ chuẩn HSK (ví dụ: HSK 1, HSK 2, HSK 3, HSK 4, HSK 5, HSK 6)';
-
-      const prompt = `Phân tích toàn bộ các hình ảnh tài liệu/sách giáo khoa (${langName}) được cung cấp.
-Nhiệm vụ:
-1. Trích xuất cả TỪ VỰNG (words) VÀ NGỮ PHÁP (grammar) xuất hiện hoặc liên quan trong tất cả các ảnh.
-2. Phân tích chi tiết từng mục:
-   - CẤP ĐỘ (cap_do): ${levelGuide}.
-   - CHỦ ĐỀ (chu_de): Phân loại chủ đề rõ ràng (ví dụ: Giao tiếp, Công sở - Kinh doanh, Du lịch - Ẩm thực, Đời sống, Công nghệ, Y tế, Học thuật).
-   - VÍ DỤ (vi_du & vi_du_dich): BẮT BUỘC mỗi từ vựng và mỗi cấu trúc ngữ pháp đều phải có câu ví dụ minh họa kèm bản dịch Tiếng Việt chuẩn tự nhiên. (Nếu ảnh chứa câu sẵn thì ưu tiên dùng, nếu không có sẵn thì AI tự sinh câu ví dụ minh họa chuẩn).
-
-Trả về cấu trúc JSON thuần tuý:
-{
-  "extractedText": "Tóm tắt văn bản đọc được từ các ảnh",
-  "summary": "Tóm tắt ngắn gọn nội dung tài liệu",
-  "words": [
-    {
-      "tu": "từ hoặc cụm từ",
-      "nghia": "nghĩa tiếng Việt",
-      "phien_am": "phiên âm (IPA/Romaja/Pinyin)",
-      "loai_tu": "loại từ (Danh từ, Động từ, Tính từ...)",
-      "cap_do": "TOEIC 650 (B1) / TOPIK 2 / HSK 3",
-      "chu_de": "Chủ đề từ vựng",
-      "vi_du": "Câu ví dụ thực tế sử dụng từ",
-      "vi_du_dich": "Dịch nghĩa câu ví dụ"
-    }
-  ],
-  "grammar": [
-    {
-      "cau_truc": "Cấu trúc ngữ pháp hoặc mẫu câu",
-      "giai_thich": "Giải thích chi tiết bằng tiếng Việt",
-      "cong_thuc": "Công thức / Dạng chia",
-      "cap_do": "TOEIC 700 / TOPIK 3 / HSK 4",
-      "chu_de": "Chủ đề ngữ pháp",
-      "vi_du": "Câu ví dụ sử dụng cấu trúc ngữ pháp",
-      "vi_du_dich": "Dịch nghĩa câu ví dụ"
-    }
-  ]
-}`;
-
-      let imageList: string[] = [];
-      if (Array.isArray(images) && images.length > 0) {
-        imageList = images;
-      } else if (imageBase64) {
-        imageList = [imageBase64];
-      }
-
-      if (imageList.length === 0) {
-        return res.status(400).json({ error: 'Không tìm thấy hình ảnh nào được tải lên.' });
-      }
-
-      const parts: any[] = [];
-      imageList.forEach((img) => {
-        parts.push({
-          inlineData: {
-            data: img.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
-            mimeType: 'image/jpeg',
-          },
-        });
-      });
-      parts.push({ text: prompt });
-
-      let response: any = null;
-      let attempts = 0;
-      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
-      let lastError: any = null;
-
-      for (const model of modelsToTry) {
-        attempts = 0;
-        while (attempts < 2) {
-          try {
-            attempts++;
-            response = await ai.models.generateContent({
-              model,
-              contents: [
-                {
-                  role: 'user',
-                  parts,
-                },
-              ],
-              config: {
-                responseMimeType: 'application/json',
-              },
-            });
-            break;
-          } catch (apiErr: any) {
-            lastError = apiErr;
-            const is503 = apiErr?.message?.includes('503') || apiErr?.message?.includes('Deadline expired') || apiErr?.message?.includes('high demand') || apiErr?.status === 503;
-            if (!is503 && attempts >= 2) break;
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-          }
-        }
-        if (response && response.text) break;
-      }
-
-      if (!response || !response.text) {
-        throw lastError || new Error('Không thể nhận phản hồi từ AI sau nhiều lần thử.');
-      }
-
-      const jsonText = response.text || '{}';
-      res.json(JSON.parse(jsonText));
+      const data = await handleOcrExtract(req.body);
+      res.json(data);
     } catch (error: any) {
       console.error('Error in /api/gemini/ocr-extract:', error);
-      const isUnavailable = error?.message?.includes('503') || error?.message?.includes('Deadline expired') || error?.message?.includes('high demand') || error?.status === 503;
-      const errorMessage = isUnavailable
-        ? 'Hệ thống AI đang quá tải tạm thời (Lỗi 503). Vui lòng thử lại sau giây lát hoặc giảm số lượng ảnh tải lên cùng lúc.'
-        : (error?.message || 'Lỗi khi trích xuất từ ảnh');
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: error?.message || 'Lỗi khi trích xuất từ ảnh' });
     }
   });
 
@@ -605,6 +496,23 @@ Trả về JSON thuần tuý:
         ? 'Quá trình phân tích tài liệu mất quá nhiều thời gian hoặc tệp quá lớn (Lỗi 503: Quá thời gian chờ). Vui lòng thử lại với một phần chương ngắn hơn hoặc dán nội dung văn bản trực tiếp.'
         : (error?.message || 'Lỗi khi xử lý bóc tách sách');
       res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // 8. Google Sheets Public / Shared URL Direct Fetch & Auto Sync
+  app.post('/api/sheets/fetch-public', async (req, res) => {
+    try {
+      const { urlOrId } = req.body;
+      if (!urlOrId) {
+        return res.status(400).json({ error: 'Vui lòng cung cấp URL hoặc ID Google Sheets' });
+      }
+      const data = await fetchPublicSpreadsheet(urlOrId);
+      res.json(data);
+    } catch (error: any) {
+      console.error('Error in /api/sheets/fetch-public:', error);
+      res.status(500).json({
+        error: error?.message || 'Không thể đọc tệp Google Sheets. Vui lòng đảm bảo tệp ở chế độ "Bất kỳ ai có đường liên kết đều có thể xem".',
+      });
     }
   });
 

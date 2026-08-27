@@ -345,39 +345,48 @@ export async function handleOcrExtract(body: any) {
     ? 'Phân tích cấp độ chuẩn TOPIK (ví dụ: TOPIK 1, TOPIK 2, TOPIK 3, TOPIK 4, TOPIK 5, TOPIK 6)'
     : 'Phân tích cấp độ chuẩn HSK (ví dụ: HSK 1, HSK 2, HSK 3, HSK 4, HSK 5, HSK 6)';
 
-  const prompt = `Phân tích toàn bộ hình ảnh tài liệu/sách/bài tập (${langName}) được cung cấp.
-Nhiệm vụ:
-1. Trích xuất cả TỪ VỰNG (words) VÀ NGỮ PHÁP (grammar) xuất hiện hoặc liên quan trong tất cả các ảnh.
-2. Phân tích chi tiết từng mục:
-   - CẤP ĐỘ (cap_do): ${levelGuide}.
-   - CHỦ ĐỀ (chu_de): Phân loại chủ đề rõ ràng (ví dụ: Giao tiếp, Công sở - Kinh doanh, Du lịch - Ẩm thực, Đời sống, Công nghệ, Y tế, Học thuật).
-   - VÍ DỤ (vi_du & vi_du_dich): BẮT BUỘC mỗi từ vựng và mỗi cấu trúc ngữ pháp đều phải có câu ví dụ minh họa kèm bản dịch Tiếng Việt chuẩn tự nhiên. (Nếu ảnh chứa câu sẵn thì ưu tiên dùng, nếu không có sẵn thì AI tự sinh câu ví dụ minh họa chuẩn).
+  const prompt = `Bạn là hệ thống OCR Chuyên sâu & Trích xuất Từ vựng Ngôn ngữ (${langName}) với độ chính xác tuyệt đối.
 
-Trả về định dạng JSON thuần tuý:
+YÊU CẦU QUAN TRỌNG HÀNG ĐẦU - ĐỌC VÀ TRÍCH XUẤT 100% TOÀN BỘ DỮ LIỆU:
+1. TRÍCH XUẤT ĐẦY ĐỦ 100% CÁC TỪ VỰNG: Hãy đọc lần lượt từng dòng, từng cột, từng ô từ góc trên trái xuống góc dưới phải của tất cả hình ảnh. Nếu ảnh chứa bảng từ vựng hoặc danh sách 40, 50, 60 hay 100 từ, bạn BẮT BUỘC TRÍCH XUẤT BẰNG HẾT TOÀN BỘ TẤT CẢ TỪ VỰNG vào mảng "words".
+2. TUYỆT ĐỐI KHÔNG DỪNG LẠI GIỮA CHỪNG: KHÔNG ĐƯỢC TÓM TẮT, KHÔNG ĐƯỢC CHỈ LẤY 10-15 TỪ MẪU. Hãy kiên trì liệt kê từng từ một cho đến từ cuối cùng trong tài liệu.
+3. PHÂN TÍCH TỪNG TỪ:
+   - "tu": Từ/cụm từ chính xác trong ảnh (${langName}).
+   - "nghia": Nghĩa Tiếng Việt đầy đủ, chuẩn xác theo ngữ cảnh bài học.
+   - "phien_am": Phiên âm chuẩn (IPA cho Tiếng Anh, Romaja cho Tiếng Hàn, Pinyin có dấu thanh cho Tiếng Trung).
+   - "loai_tu": Loại từ (Danh từ, Động từ, Tính từ, Trạng từ, Cụm từ...).
+   - "cap_do": ${levelGuide}.
+   - "chu_de": Chủ đề phù hợp (Giao tiếp, Đời sống, Công sở, Du lịch, Học thuật...).
+   - "vi_du": Câu ví dụ ngắn gọn, tự nhiên minh họa từ (nếu trong ảnh có sẵn câu thì lấy trong ảnh, nếu không có thì AI tự tạo câu chuẩn).
+   - "vi_du_dich": Dịch nghĩa câu ví dụ sang Tiếng Việt.
+
+4. TRÍCH XUẤT NGỮ PHÁP (nếu có trong ảnh): Liệt kê các cấu trúc/mẫu câu xuất hiện trong ảnh vào mảng "grammar".
+
+Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
 {
-  "extractedText": "Toàn bộ văn bản chính đọc được từ ảnh",
-  "summary": "Tóm tắt ngắn nội dung ảnh bằng tiếng Việt",
+  "extractedText": "Ghi nhận đầy đủ 100% toàn bộ văn bản OCR đọc được từ ảnh",
+  "summary": "Tóm tắt tổng số từ vựng và chủ đề chính trích xuất được từ tài liệu",
   "words": [
     {
       "tu": "từ hoặc cụm từ",
       "nghia": "nghĩa tiếng Việt",
-      "phien_am": "phiên âm (IPA/Romaja/Pinyin)",
-      "loai_tu": "loại từ (Danh từ, Động từ, Tính từ...)",
-      "cap_do": "TOEIC 650 (B1) / TOPIK 2 / HSK 3",
-      "chu_de": "Chủ đề từ vựng",
-      "vi_du": "Câu ví dụ thực tế sử dụng từ",
-      "vi_du_dich": "Dịch nghĩa câu ví dụ"
+      "phien_am": "phiên âm",
+      "loai_tu": "loại từ",
+      "cap_do": "TOEIC 650 / TOPIK 2 / HSK 3",
+      "chu_de": "Chủ đề",
+      "vi_du": "Câu ví dụ ngắn",
+      "vi_du_dich": "Dịch ví dụ"
     }
   ],
   "grammar": [
     {
-      "cau_truc": "Cấu trúc ngữ pháp hoặc mẫu câu",
-      "giai_thich": "Giải thích chi tiết bằng tiếng Việt",
-      "cong_thuc": "Công thức / Dạng chia",
-      "cap_do": "TOEIC 700 / TOPIK 3 / HSK 4",
-      "chu_de": "Chủ đề ngữ pháp",
-      "vi_du": "Câu ví dụ sử dụng cấu trúc ngữ pháp",
-      "vi_du_dich": "Dịch nghĩa câu ví dụ"
+      "cau_truc": "Cấu trúc ngữ pháp",
+      "giai_thich": "Giải thích ngắn gọn",
+      "cong_thuc": "Công thức chia",
+      "cap_do": "Cấp độ",
+      "chu_de": "Chủ đề",
+      "vi_du": "Ví dụ",
+      "vi_du_dich": "Dịch ví dụ"
     }
   ]
 }`;
@@ -406,6 +415,8 @@ Trả về định dạng JSON thuần tuý:
 
   const response = await callGeminiWithRetry(ai, [{ role: 'user', parts }], {
     responseMimeType: 'application/json',
+    temperature: 0.1,
+    maxOutputTokens: 16384,
   });
 
   return safeParseJSON(response.text || '{}');

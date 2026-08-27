@@ -305,8 +305,10 @@ export interface RoleplayMessage {
 
 export interface GoogleSheetsConfig {
   scriptUrl: string;
+  spreadsheetUrlOrId?: string;
   spreadsheetId: string;
   autoSync: boolean;
+  syncIntervalHours?: number;
   lastSyncedAt?: string;
 }
 
