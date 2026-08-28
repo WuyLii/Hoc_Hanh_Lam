@@ -2,7 +2,7 @@
 <html lang="vi" class="h-full bg-[#F9F7F2] overflow-x-hidden">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Học Hành Lắm | Nền tảng Học Ngoại Ngữ Thông Minh</title>
     <meta name="description" content="Học Hành Lắm - Nền tảng học tập ngoại ngữ Anh, Hàn, Trung thông minh cá nhân hóa." />
     <meta name="theme-color" content="#1A1A1A" />
@@ -20,6 +20,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet">
+
+    <!-- Disable mobile zoom gestures JS -->
+    <script>
+      document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+      document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
+      document.addEventListener('gestureend', function(e) { e.preventDefault(); });
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function(e) {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) {
+          if (e.target && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+          }
+        }
+        lastTouchEnd = now;
+      }, false);
+    </script>
   </head>
   <body class="h-full bg-[#F9F7F2] text-[#1A1A1A] antialiased selection:bg-[#1A1A1A] selection:text-[#F9F7F2] overflow-x-hidden w-full max-w-full">
     <div id="root" class="min-h-full flex flex-col overflow-x-hidden max-w-full"></div>
