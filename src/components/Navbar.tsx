@@ -34,7 +34,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
     activeNav,
     setActiveNav,
     syncGoogleSheets,
+    pullGoogleSheets,
+    syncWithCloudServer,
     isSyncing,
+    isCloudSyncing,
     sheetsConfig,
   } = useApp();
 
@@ -45,14 +48,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
   const currentLangInfo = LANGUAGES[currentLanguage];
 
   const handleManualSync = async () => {
-    if (!sheetsConfig.scriptUrl && !sheetsConfig.spreadsheetUrlOrId) {
-      setActiveNav('sheets');
-      setShowMobileDrawer(false);
-      return;
+    setSyncStatusMsg('⏳ Đang đồng bộ Cloud đa thiết bị & Google Sheets...');
+    const cloudRes = await syncWithCloudServer();
+    let sheetsMsg = '';
+    if (sheetsConfig.scriptUrl || sheetsConfig.spreadsheetUrlOrId) {
+      const sheetsRes = await pullGoogleSheets();
+      sheetsMsg = ` • Sheets: ${sheetsRes.message}`;
     }
-    const res = await syncGoogleSheets();
-    setSyncStatusMsg(res.message);
-    setTimeout(() => setSyncStatusMsg(null), 3500);
+    setSyncStatusMsg(`✅ Cloud: ${cloudRes.message}${sheetsMsg}`);
+    setTimeout(() => setSyncStatusMsg(null), 4500);
   };
 
   const navItems = [
@@ -165,16 +169,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
                 )}
               </div>
 
-              {/* Sheets Indicator */}
+              {/* Unified Cloud & Sheets Sync Indicator */}
               <button
                 onClick={handleManualSync}
-                disabled={isSyncing}
-                title="Đồng bộ dữ liệu với Google Sheets"
+                disabled={isSyncing || isCloudSyncing}
+                title="Bấm để đồng bộ dữ liệu giữa Safari iPhone PWA, Chrome PC & Google Sheets"
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-[#1A1A1A] bg-white text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] font-mono text-[11px] transition"
               >
-                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing || isCloudSyncing ? 'animate-spin text-amber-500' : 'text-emerald-600'}`} />
                 <span className="text-[10px] font-bold uppercase tracking-wider">
-                  {isSyncing ? 'ĐANG ĐỒNG BỘ...' : 'SHEETS: ĐÃ NỐI'}
+                  {isSyncing || isCloudSyncing ? 'ĐANG ĐỒNG BỘ...' : 'ĐỒNG BỘ CLOUD'}
                 </span>
               </button>
             </div>
@@ -402,11 +406,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
             <div className="pt-2 border-t border-[#1A1A1A]/20 flex flex-col gap-2">
               <button
                 onClick={handleManualSync}
-                disabled={isSyncing}
-                className="w-full flex items-center justify-center gap-2 p-2.5 border border-[#1A1A1A] bg-white text-xs font-mono font-bold uppercase"
+                disabled={isSyncing || isCloudSyncing}
+                className="w-full flex items-center justify-center gap-2 p-2.5 border border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] text-xs font-mono font-bold uppercase active:bg-stone-800"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Đang đồng bộ Sheets...' : 'Đồng bộ Google Sheets ngay'}</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing || isCloudSyncing ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
+                <span>{isSyncing || isCloudSyncing ? 'Đang đồng bộ Đa Nền Tảng...' : 'Đồng bộ Cloud & Sheets ngay'}</span>
               </button>
             </div>
           </div>

@@ -81,6 +81,11 @@ interface AppContextType {
   pullGoogleSheets: () => Promise<{ success: boolean; message: string }>;
   isSyncing: boolean;
 
+  // Cloud Cross-Device & Cross-Browser Sync (Safari, PWA, Chrome, Mobile)
+  syncWithCloudServer: () => Promise<{ success: boolean; message: string }>;
+  isCloudSyncing: boolean;
+  lastCloudSyncedAt: string;
+
   activeNav: string;
   setActiveNav: (nav: string) => void;
   selectedDeckId: string | null;
@@ -677,6 +682,166 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+  const [lastCloudSyncedAt, setLastCloudSyncedAt] = useState<string>('');
+
+  const syncWithCloudServer = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      setIsCloudSyncing(true);
+      const res = await fetch('/api/sync/store');
+      if (!res.ok) throw new Error('Không thể kết nối máy chủ Cloud Sync');
+      const json = await res.json();
+      const serverStore = json.store || {};
+
+      let hasLocalItems = false;
+
+      // Merge Vocabulary
+      if (Array.isArray(serverStore.vocabulary) && serverStore.vocabulary.length > 0) {
+        setVocabulary((prev) => {
+          const map = new Map<string, VocabularyItem>();
+          serverStore.vocabulary.forEach((item: VocabularyItem) => {
+            const key = item.word_id || `${item.tu}_${item.nghia}`;
+            map.set(key, item);
+          });
+          prev.forEach((item) => {
+            const key = item.word_id || `${item.tu}_${item.nghia}`;
+            if (!map.has(key)) {
+              map.set(key, item);
+              hasLocalItems = true;
+            }
+          });
+          return Array.from(map.values());
+        });
+      } else if (vocabulary.length > 0) {
+        hasLocalItems = true;
+      }
+
+      // Merge Grammar
+      if (Array.isArray(serverStore.grammar) && serverStore.grammar.length > 0) {
+        setGrammar((prev) => {
+          const map = new Map<string, GrammarItem>();
+          serverStore.grammar.forEach((item: GrammarItem) => {
+            const key = item.grammar_id || item.cau_truc;
+            map.set(key, item);
+          });
+          prev.forEach((item) => {
+            const key = item.grammar_id || item.cau_truc;
+            if (!map.has(key)) {
+              map.set(key, item);
+              hasLocalItems = true;
+            }
+          });
+          return Array.from(map.values());
+        });
+      } else if (grammar.length > 0) {
+        hasLocalItems = true;
+      }
+
+      // Merge Decks
+      if (Array.isArray(serverStore.decks) && serverStore.decks.length > 0) {
+        setDecks((prev) => {
+          const map = new Map<string, Deck>();
+          serverStore.decks.forEach((d: Deck) => map.set(d.deck_id, d));
+          prev.forEach((d) => {
+            if (!map.has(d.deck_id)) {
+              map.set(d.deck_id, d);
+              hasLocalItems = true;
+            }
+          });
+          return Array.from(map.values());
+        });
+      } else if (decks.length > 0) {
+        hasLocalItems = true;
+      }
+
+      if (serverStore.sheetsConfig) {
+        setSheetsConfig((prev) => ({ ...prev, ...serverStore.sheetsConfig }));
+      }
+
+      if (serverStore.currentUser) {
+        setCurrentUser((prev) => ({ ...prev, ...serverStore.currentUser }));
+      }
+
+      const now = new Date().toISOString();
+      setLastCloudSyncedAt(now);
+
+      if (hasLocalItems || !serverStore.vocabulary || serverStore.vocabulary.length === 0) {
+        pushToCloudServer();
+      }
+
+      return { success: true, message: 'Đã đồng bộ dữ liệu đám mây thành công!' };
+    } catch (e: any) {
+      console.error('Error in syncWithCloudServer:', e);
+      return { success: false, message: e?.message || 'Lỗi kết nối máy chủ Cloud' };
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
+  const pushToCloudServer = async () => {
+    try {
+      await fetch('/api/sync/store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store: {
+            vocabulary,
+            grammar,
+            decks,
+            reviewSessions,
+            mockTests,
+            listeningExercises,
+            progressLogs,
+            journalEntries,
+            notifications,
+            chatHistory,
+            currentUser,
+            currentLanguage,
+            sheetsConfig,
+          },
+        }),
+      });
+      setLastCloudSyncedAt(new Date().toISOString());
+    } catch (e) {
+      console.error('Error in pushToCloudServer:', e);
+    }
+  };
+
+  // 1. On Mount (When Safari, Chrome or PWA on iPhone opens): Sync Cloud Store & Pull Google Sheets
+  useEffect(() => {
+    const handleInitialSync = async () => {
+      await syncWithCloudServer();
+      await pullGoogleSheets();
+    };
+    handleInitialSync();
+  }, []);
+
+  // 2. On Window Focus & App Re-open (e.g. Opening PWA on iPhone from home screen)
+  useEffect(() => {
+    const handleAppFocus = () => {
+      syncWithCloudServer();
+    };
+    window.addEventListener('focus', handleAppFocus);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncWithCloudServer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('focus', handleAppFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  // 3. Debounced Auto Save to Cloud Server whenever state updates
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      pushToCloudServer();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [vocabulary, grammar, decks, reviewSessions, mockTests, progressLogs, sheetsConfig, currentUser]);
+
   // Automatic 24-hour sync check effect
   useEffect(() => {
     const targetUrl =
@@ -760,6 +925,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncGoogleSheets,
         pullGoogleSheets,
         isSyncing,
+
+        syncWithCloudServer,
+        isCloudSyncing,
+        lastCloudSyncedAt,
 
         activeNav,
         setActiveNav,

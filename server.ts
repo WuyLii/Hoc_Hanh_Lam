@@ -2,6 +2,7 @@ import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { handleOcrExtract } from './src/server/geminiHandlers.ts';
@@ -11,6 +12,46 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Persistent Server Cloud Store for Cross-Device & Cross-Browser Sync
+const STORE_FILE = path.join(__dirname, 'cloud_store.json');
+
+interface CloudStore {
+  vocabulary?: any[];
+  grammar?: any[];
+  decks?: any[];
+  reviewSessions?: any[];
+  mockTests?: any[];
+  listeningExercises?: any[];
+  progressLogs?: any[];
+  journalEntries?: any[];
+  notifications?: any[];
+  chatHistory?: any[];
+  currentUser?: any;
+  currentLanguage?: string;
+  sheetsConfig?: any;
+  lastUpdated?: string;
+}
+
+let memoryStore: CloudStore = {};
+
+try {
+  if (fs.existsSync(STORE_FILE)) {
+    const raw = fs.readFileSync(STORE_FILE, 'utf-8');
+    memoryStore = JSON.parse(raw);
+    console.log('📦 Loaded existing cloud_store.json with', Object.keys(memoryStore).length, 'keys');
+  }
+} catch (e) {
+  console.error('Failed to read cloud_store.json:', e);
+}
+
+function saveMemoryStore() {
+  try {
+    fs.writeFileSync(STORE_FILE, JSON.stringify(memoryStore, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Failed to save cloud_store.json:', e);
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -506,13 +547,60 @@ Trả về JSON thuần tuý:
       if (!urlOrId) {
         return res.status(400).json({ error: 'Vui lòng cung cấp URL hoặc ID Google Sheets' });
       }
-      const data = await fetchPublicSpreadsheet(urlOrId);
-      res.json(data);
+      const resData = await fetchPublicSpreadsheet(urlOrId);
+
+      // Merge Google Sheets data directly into cloud memoryStore so all devices get it immediately
+      if (resData && resData.data) {
+        const vocab = resData.data.vocabulary;
+        if (Array.isArray(vocab) && vocab.length > 0) memoryStore.vocabulary = vocab;
+        const gram = resData.data.grammar;
+        if (Array.isArray(gram) && gram.length > 0) memoryStore.grammar = gram;
+        const dks = resData.data.decks;
+        if (Array.isArray(dks) && dks.length > 0) memoryStore.decks = dks;
+
+        memoryStore.lastUpdated = new Date().toISOString();
+        saveMemoryStore();
+      }
+
+      res.json(resData);
     } catch (error: any) {
       console.error('Error in /api/sheets/fetch-public:', error);
       res.status(500).json({
         error: error?.message || 'Không thể đọc tệp Google Sheets. Vui lòng đảm bảo tệp ở chế độ "Bất kỳ ai có đường liên kết đều có thể xem".',
       });
+    }
+  });
+
+  // 9. Unified Cross-Device Cloud Store API (Safari, PWA, Chrome, Mobile Sync)
+  app.get('/api/sync/store', (req, res) => {
+    res.json({
+      success: true,
+      store: memoryStore,
+      lastUpdated: memoryStore.lastUpdated || null,
+    });
+  });
+
+  app.post('/api/sync/store', (req, res) => {
+    try {
+      const { store } = req.body;
+      if (store && typeof store === 'object') {
+        // Smart merge
+        Object.keys(store).forEach((key) => {
+          if (store[key] !== undefined && store[key] !== null) {
+            (memoryStore as any)[key] = store[key];
+          }
+        });
+        memoryStore.lastUpdated = new Date().toISOString();
+        saveMemoryStore();
+      }
+      res.json({
+        success: true,
+        store: memoryStore,
+        lastUpdated: memoryStore.lastUpdated,
+      });
+    } catch (err: any) {
+      console.error('Error in /api/sync/store:', err);
+      res.status(500).json({ error: 'Lỗi khi lưu trữ dữ liệu đám mây' });
     }
   });
 
