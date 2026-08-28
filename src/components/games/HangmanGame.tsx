@@ -19,6 +19,9 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
   onFinish,
   onExit,
 }) => {
+  const [shuffledWords, setShuffledWords] = useState<VocabularyItem[]>(() =>
+    [...words].sort(() => Math.random() - 0.5)
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [guessedLetters, setGuessedLetters] = useState<Set<string>>(new Set());
   const [livesLeft, setLivesLeft] = useState(6);
@@ -27,15 +30,53 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
   const [correctCount, setCorrectCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const currentWord = words[currentIndex];
+  const restartGame = () => {
+    setShuffledWords([...words].sort(() => Math.random() - 0.5));
+    setCurrentIndex(0);
+    setGuessedLetters(new Set());
+    setLivesLeft(6);
+    setIsAnswered(false);
+    setIsWon(false);
+    setCorrectCount(0);
+    setIsCompleted(false);
+  };
 
-  const targetToGuess = React.useMemo(() => {
-    if (!currentWord) return '';
-    if (language === 'zh' || language === 'ko') {
-      return (currentWord.phien_am || currentWord.tu).toUpperCase().replace(/[^A-Z]/g, '');
+  useEffect(() => {
+    setShuffledWords([...words].sort(() => Math.random() - 0.5));
+    setCurrentIndex(0);
+    setIsCompleted(false);
+  }, [words]);
+
+  const currentWord = shuffledWords[currentIndex];
+
+  const targetChars = React.useMemo(() => {
+    if (!currentWord) return [];
+    return currentWord.tu.trim().split('');
+  }, [currentWord]);
+
+  const isLatinScript = React.useMemo(() => {
+    if (!currentWord) return true;
+    return /^[A-Za-z0-9\s\-'`]+$/.test(currentWord.tu.trim());
+  }, [currentWord]);
+
+  const availableKeyboardButtons = React.useMemo(() => {
+    if (!currentWord) return [];
+    if (isLatinScript) {
+      return ALPHABET;
     }
-    return currentWord.tu.toUpperCase().replace(/[^A-Z]/g, '');
-  }, [currentWord, language]);
+    const targetSet = new Set(targetChars.filter((c) => c.trim().length > 0));
+    const distractorPool: string[] = [];
+    words.forEach((w) => {
+      w.tu.split('').forEach((c) => {
+        if (c.trim() && !targetSet.has(c)) {
+          distractorPool.push(c);
+        }
+      });
+    });
+    const uniqueDistractors = Array.from(new Set(distractorPool)).slice(0, 8);
+    const combined = Array.from(targetSet).concat(uniqueDistractors);
+    return combined.sort(() => 0.5 - Math.random());
+  }, [currentWord, isLatinScript, targetChars, words]);
 
   const initRound = () => {
     setGuessedLetters(new Set());
@@ -49,13 +90,19 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
   }, [currentIndex, words]);
 
   const handleGuessLetter = (letter: string) => {
-    if (isAnswered || guessedLetters.has(letter)) return;
+    if (isAnswered || guessedLetters.has(letter.toUpperCase()) || guessedLetters.has(letter)) return;
 
     const newGuessed = new Set(guessedLetters);
     newGuessed.add(letter);
+    newGuessed.add(letter.toUpperCase());
     setGuessedLetters(newGuessed);
 
-    if (!targetToGuess.includes(letter)) {
+    const isMatch = targetChars.some((char) => {
+      if (!char.trim()) return false;
+      return char === letter || char.toUpperCase() === letter.toUpperCase();
+    });
+
+    if (!isMatch) {
       const newLives = livesLeft - 1;
       setLivesLeft(newLives);
       if (newLives <= 0) {
@@ -63,7 +110,10 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
         setIsWon(false);
       }
     } else {
-      const allGuessed = targetToGuess.split('').every((l) => newGuessed.has(l));
+      const allGuessed = targetChars.every((char) => {
+        if (!char.trim() || /[^A-Za-z0-9\u4e00-\u9fa5\uac00-\ud7a3]/i.test(char)) return true;
+        return newGuessed.has(char) || newGuessed.has(char.toUpperCase());
+      });
       if (allGuessed) {
         setIsAnswered(true);
         setIsWon(true);
@@ -74,16 +124,16 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
   };
 
   const handleNext = () => {
-    if (currentIndex + 1 < words.length) {
+    if (currentIndex + 1 < shuffledWords.length) {
       setCurrentIndex((i) => i + 1);
     } else {
       setIsCompleted(true);
       confetti({ particleCount: 80, spread: 60 });
-      onFinish(correctCount, words.length, correctCount * 30);
+      onFinish(correctCount, shuffledWords.length, correctCount * 30);
     }
   };
 
-  if (!words || words.length === 0) {
+  if (!shuffledWords || shuffledWords.length === 0) {
     return (
       <div className="p-8 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-4 max-w-md mx-auto">
         <p className="text-xs font-mono text-stone-600">Cần có từ vựng để chơi trò đoán chữ (Hangman).</p>
@@ -102,7 +152,7 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
         <div className="grid grid-cols-2 gap-4 p-4 bg-[#F9F7F2] border border-[#1A1A1A]">
           <div>
             <div className="text-3xl font-serif font-bold text-[#1A1A1A]">
-              {correctCount} / {words.length}
+              {correctCount} / {shuffledWords.length}
             </div>
             <div className="text-[10px] font-mono text-stone-600 uppercase">Từ đoán đúng</div>
           </div>
@@ -113,12 +163,20 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
             <div className="text-[10px] font-mono text-stone-600 uppercase">Điểm nhận được</div>
           </div>
         </div>
-        <button
-          onClick={onExit}
-          className="w-full py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm"
-        >
-          QUAY LẠI TRUNG TÂM TRÒ CHƠI →
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={restartGame}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-stone-100 text-[#1A1A1A] hover:bg-stone-200 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            🔄 CHƠI LẠI (XÁO TRỘN ĐỀ MỚI)
+          </button>
+          <button
+            onClick={onExit}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            QUAY LẠI TRUNG TÂM TRÒ CHƠI →
+          </button>
+        </div>
       </div>
     );
   }
@@ -157,14 +215,17 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
 
         {/* Dashed Word Slots */}
         <div className="flex flex-wrap items-center justify-center gap-2 py-4">
-          {targetToGuess.split('').map((letter, idx) => {
-            const isRevealed = guessedLetters.has(letter) || isAnswered;
+          {targetChars.map((char, idx) => {
+            const isBlank = !char.trim();
+            const isRevealed = isBlank || guessedLetters.has(char) || guessedLetters.has(char.toUpperCase()) || isAnswered;
             return (
               <div
                 key={idx}
-                className="w-10 h-12 border-b-4 border-[#1A1A1A] flex items-center justify-center font-serif text-2xl font-black text-[#1A1A1A]"
+                className={`w-10 h-12 ${
+                  isBlank ? 'border-b-0' : 'border-b-4 border-[#1A1A1A]'
+                } flex items-center justify-center font-serif text-2xl font-black text-[#1A1A1A]`}
               >
-                {isRevealed ? letter : ''}
+                {isRevealed ? char : ''}
               </div>
             );
           })}
@@ -207,17 +268,17 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
           </div>
         )}
 
-        {/* Alphabet Keyboard */}
+        {/* Dynamic Character Keyboard */}
         {!isAnswered && (
-          <div className="grid grid-cols-7 sm:grid-cols-9 gap-1.5 pt-2">
-            {ALPHABET.map((char) => {
-              const isUsed = guessedLetters.has(char);
+          <div className="grid grid-cols-6 sm:grid-cols-9 gap-1.5 pt-2">
+            {availableKeyboardButtons.map((char) => {
+              const isUsed = guessedLetters.has(char) || guessedLetters.has(char.toUpperCase());
               return (
                 <button
                   key={char}
                   disabled={isUsed}
                   onClick={() => handleGuessLetter(char)}
-                  className={`p-2 border text-xs font-mono font-bold transition ${
+                  className={`p-2 border text-sm font-mono font-bold transition ${
                     isUsed
                       ? 'bg-stone-200 border-stone-300 text-stone-400 cursor-not-allowed opacity-50'
                       : 'bg-white border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white'

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import confetti from 'canvas-confetti';
@@ -17,6 +17,9 @@ export const PictureGuessGame: React.FC<PictureGuessGameProps> = ({
   onFinish,
   onExit,
 }) => {
+  const [shuffledWords, setShuffledWords] = useState<VocabularyItem[]>(() =>
+    [...words].sort(() => Math.random() - 0.5)
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [revealedClues, setRevealedClues] = useState<number>(1);
   const [userGuess, setUserGuess] = useState('');
@@ -25,7 +28,24 @@ export const PictureGuessGame: React.FC<PictureGuessGameProps> = ({
   const [correctCount, setCorrectCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const currentWord = words[currentIndex];
+  const restartGame = () => {
+    setShuffledWords([...words].sort(() => Math.random() - 0.5));
+    setCurrentIndex(0);
+    setRevealedClues(1);
+    setUserGuess('');
+    setIsAnswered(false);
+    setIsCorrect(false);
+    setCorrectCount(0);
+    setIsCompleted(false);
+  };
+
+  useEffect(() => {
+    setShuffledWords([...words].sort(() => Math.random() - 0.5));
+    setCurrentIndex(0);
+    setIsCompleted(false);
+  }, [words]);
+
+  const currentWord = shuffledWords[currentIndex];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +62,7 @@ export const PictureGuessGame: React.FC<PictureGuessGameProps> = ({
   };
 
   const handleNext = () => {
-    if (currentIndex + 1 < words.length) {
+    if (currentIndex + 1 < shuffledWords.length) {
       setCurrentIndex((i) => i + 1);
       setUserGuess('');
       setIsAnswered(false);
@@ -51,11 +71,11 @@ export const PictureGuessGame: React.FC<PictureGuessGameProps> = ({
     } else {
       setIsCompleted(true);
       confetti({ particleCount: 80, spread: 60 });
-      onFinish(correctCount, words.length, correctCount * 25);
+      onFinish(correctCount, shuffledWords.length, correctCount * 25);
     }
   };
 
-  if (!words || words.length === 0) {
+  if (!shuffledWords || shuffledWords.length === 0) {
     return (
       <div className="p-8 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-4 max-w-md mx-auto">
         <p className="text-xs font-mono text-stone-600">Cần có từ vựng để chơi trò đoán từ qua gợi ý.</p>
@@ -74,7 +94,7 @@ export const PictureGuessGame: React.FC<PictureGuessGameProps> = ({
         <div className="grid grid-cols-2 gap-4 p-4 bg-[#F9F7F2] border border-[#1A1A1A]">
           <div>
             <div className="text-3xl font-serif font-bold text-[#1A1A1A]">
-              {correctCount} / {words.length}
+              {correctCount} / {shuffledWords.length}
             </div>
             <div className="text-[10px] font-mono text-stone-600 uppercase">Từ đoán đúng</div>
           </div>
@@ -85,12 +105,20 @@ export const PictureGuessGame: React.FC<PictureGuessGameProps> = ({
             <div className="text-[10px] font-mono text-stone-600 uppercase">Điểm nhận được</div>
           </div>
         </div>
-        <button
-          onClick={onExit}
-          className="w-full py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm"
-        >
-          QUAY LẠI TRUNG TÂM TRÒ CHƠI →
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={restartGame}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-stone-100 text-[#1A1A1A] hover:bg-stone-200 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            🔄 CHƠI LẠI (XÁO TRỘN ĐỀ MỚI)
+          </button>
+          <button
+            onClick={onExit}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            QUAY LẠI TRUNG TÂM TRÒ CHƠI →
+          </button>
+        </div>
       </div>
     );
   }
@@ -115,7 +143,7 @@ export const PictureGuessGame: React.FC<PictureGuessGameProps> = ({
         </button>
 
         <div className="text-xs font-mono font-bold text-[#1A1A1A]">
-          THẺ {currentIndex + 1} / {words.length}
+          THẺ {currentIndex + 1} / {shuffledWords.length}
         </div>
       </div>
 

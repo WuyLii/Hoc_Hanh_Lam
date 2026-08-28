@@ -35,9 +35,14 @@ export const GameReviewHub: React.FC = () => {
   // Filter state inside Game Hub
   const [activeDeckFilter, setActiveDeckFilter] = useState<string>('ALL');
   const [activeTopicFilter, setActiveTopicFilter] = useState<string>('ALL');
+  const [activePosFilter, setActivePosFilter] = useState<string>('ALL');
+  const [activeLimitFilter, setActiveLimitFilter] = useState<string>('ALL');
   const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'due' | 'difficult'>('due');
 
+  const [shuffleKey, setShuffleKey] = useState<number>(0);
+
   const topics = Array.from(new Set(currentLangVocabulary.map((w) => w.chu_de || 'Tổng hợp'))).filter(Boolean);
+  const posTypes = Array.from(new Set(currentLangVocabulary.map((w) => w.loai_tu || 'Khác'))).filter(Boolean);
 
   // Filter words based on selected source
   const reviewWords = currentLangVocabulary.filter((w) => {
@@ -47,6 +52,10 @@ export const GameReviewHub: React.FC = () => {
     }
 
     if (activeTopicFilter !== 'ALL' && w.chu_de !== activeTopicFilter) {
+      return false;
+    }
+
+    if (activePosFilter !== 'ALL' && w.loai_tu !== activePosFilter) {
       return false;
     }
 
@@ -60,7 +69,16 @@ export const GameReviewHub: React.FC = () => {
     return true;
   });
 
-  const finalWordsToPlay = reviewWords.length > 0 ? reviewWords : currentLangVocabulary;
+  const filteredPool = reviewWords.length > 0 ? reviewWords : currentLangVocabulary;
+  
+  // Dynamic random shuffle every time filters change or user clicks shuffle
+  const finalWordsToPlay = React.useMemo(() => {
+    const shuffled = [...filteredPool].sort(() => Math.random() - 0.5);
+    if (activeLimitFilter !== 'ALL') {
+      return shuffled.slice(0, parseInt(activeLimitFilter, 10));
+    }
+    return shuffled;
+  }, [filteredPool, activeLimitFilter, shuffleKey]);
 
   const handleFinishGame = (correctCount: number, totalCount: number, score: number) => {
     if (selectedGameMode) {
@@ -261,30 +279,78 @@ export const GameReviewHub: React.FC = () => {
 
       {/* Target Word Source Filter */}
       <div className="p-6 bg-[#F9F7F2] border-2 border-[#1A1A1A] editorial-shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1A1A1A] pb-3">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A1A1A] flex items-center gap-2">
             <Filter className="w-3.5 h-3.5" />
-            <span>Bộ lọc nguồn từ vựng để ôn tập:</span>
+            <span>Bộ lọc nguồn từ vựng & xáo trộn:</span>
           </span>
-          <span className="text-xs font-mono font-bold bg-white px-2 py-0.5 border border-[#1A1A1A] text-[#1A1A1A]">
-            {finalWordsToPlay.length} TỪ TRONG HÀNG ĐỢI
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShuffleKey((k) => k + 1)}
+              className="px-2.5 py-1 bg-[#1A1A1A] text-white hover:bg-stone-800 text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition"
+              title="Tự động đảo vị trí từ vựng ngẫu nhiên liên tục"
+            >
+              <span>🎲 XÁO TRỘN ĐỔI TỪ MỚI</span>
+            </button>
+            <span className="text-xs font-mono font-bold bg-white px-2 py-0.5 border border-[#1A1A1A] text-[#1A1A1A]">
+              {finalWordsToPlay.length} TỪ HÀNG ĐỢI
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Status filter */}
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
-              Trạng thái ghi nhớ SRS:
+              Trạng thái SRS:
             </label>
             <select
               value={activeStatusFilter}
               onChange={(e: any) => setActiveStatusFilter(e.target.value)}
-              className="w-full py-2 px-3 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
+              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
             >
-              <option value="due">Cần ôn hôm nay / Chưa thuộc</option>
-              <option value="difficult">Từ khó (Tỉ lệ đúng thấp)</option>
-              <option value="all">Toàn bộ kho từ ({currentLangVocabulary.length})</option>
+              <option value="due">Cần ôn hôm nay</option>
+              <option value="difficult">Từ khó nhớ</option>
+              <option value="all">Toàn bộ kho từ</option>
+            </select>
+          </div>
+
+          {/* Limit Filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
+              Số từ ôn tập:
+            </label>
+            <select
+              value={activeLimitFilter}
+              onChange={(e) => setActiveLimitFilter(e.target.value)}
+              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
+            >
+              <option value="ALL">Tất cả ({filteredPool.length} từ)</option>
+              <option value="5">5 từ</option>
+              <option value="10">10 từ</option>
+              <option value="15">15 từ</option>
+              <option value="20">20 từ</option>
+              <option value="30">30 từ</option>
+              <option value="50">50 từ</option>
+            </select>
+          </div>
+
+          {/* Part of Speech filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
+              Từ loại:
+            </label>
+            <select
+              value={activePosFilter}
+              onChange={(e) => setActivePosFilter(e.target.value)}
+              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
+            >
+              <option value="ALL">Tất cả từ loại ({posTypes.length})</option>
+              {posTypes.map((pos) => (
+                <option key={pos} value={pos}>
+                  {pos}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -296,28 +362,28 @@ export const GameReviewHub: React.FC = () => {
             <select
               value={activeDeckFilter}
               onChange={(e) => setActiveDeckFilter(e.target.value)}
-              className="w-full py-2 px-3 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
+              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
             >
-              <option value="ALL">Tất cả bộ thẻ ({currentLangDecks.length})</option>
+              <option value="ALL">Tất cả bộ thẻ</option>
               {currentLangDecks.map((d) => (
                 <option key={d.deck_id} value={d.deck_id}>
-                  {d.ten_deck} ({d.danh_sach_word_id.length} từ)
+                  {d.ten_deck}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Topic filter */}
+          {/* Topic/Context filter */}
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
-              Chủ đề từ vựng:
+              Ngữ cảnh / Chủ đề:
             </label>
             <select
               value={activeTopicFilter}
               onChange={(e) => setActiveTopicFilter(e.target.value)}
-              className="w-full py-2 px-3 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
+              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
             >
-              <option value="ALL">Tất cả chủ đề ({topics.length})</option>
+              <option value="ALL">Tất cả ngữ cảnh</option>
               {topics.map((t) => (
                 <option key={t} value={t}>
                   {t}

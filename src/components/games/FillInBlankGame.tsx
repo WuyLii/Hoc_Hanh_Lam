@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import confetti from 'canvas-confetti';
@@ -18,8 +18,11 @@ export const FillInBlankGame: React.FC<FillInBlankGameProps> = ({
   onFinish,
   onExit,
 }) => {
-  const validWords = words.filter((w) => w.vi_du && w.vi_du.toLowerCase().includes(w.tu.toLowerCase()));
-  const gameWords = validWords.length >= 3 ? validWords : words;
+  const [shuffledWords, setShuffledWords] = useState<VocabularyItem[]>(() => {
+    const valid = words.filter((w) => w.vi_du && w.vi_du.toLowerCase().includes(w.tu.toLowerCase()));
+    const pool = valid.length >= 3 ? valid : words;
+    return [...pool].sort(() => Math.random() - 0.5);
+  });
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
@@ -29,7 +32,28 @@ export const FillInBlankGame: React.FC<FillInBlankGameProps> = ({
   const [showHint, setShowHint] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const currentWord = gameWords[currentIndex];
+  const restartGame = () => {
+    const valid = words.filter((w) => w.vi_du && w.vi_du.toLowerCase().includes(w.tu.toLowerCase()));
+    const pool = valid.length >= 3 ? valid : words;
+    setShuffledWords([...pool].sort(() => Math.random() - 0.5));
+    setCurrentIndex(0);
+    setUserInput('');
+    setIsAnswered(false);
+    setIsCorrect(false);
+    setCorrectCount(0);
+    setShowHint(false);
+    setIsCompleted(false);
+  };
+
+  useEffect(() => {
+    const valid = words.filter((w) => w.vi_du && w.vi_du.toLowerCase().includes(w.tu.toLowerCase()));
+    const pool = valid.length >= 3 ? valid : words;
+    setShuffledWords([...pool].sort(() => Math.random() - 0.5));
+    setCurrentIndex(0);
+    setIsCompleted(false);
+  }, [words]);
+
+  const currentWord = shuffledWords[currentIndex];
 
   const maskedSentence = React.useMemo(() => {
     if (!currentWord) return '';
@@ -57,7 +81,7 @@ export const FillInBlankGame: React.FC<FillInBlankGameProps> = ({
   };
 
   const handleNext = () => {
-    if (currentIndex + 1 < gameWords.length) {
+    if (currentIndex + 1 < shuffledWords.length) {
       setCurrentIndex((i) => i + 1);
       setUserInput('');
       setIsAnswered(false);
@@ -66,11 +90,11 @@ export const FillInBlankGame: React.FC<FillInBlankGameProps> = ({
     } else {
       setIsCompleted(true);
       confetti({ particleCount: 80, spread: 60 });
-      onFinish(correctCount, gameWords.length, correctCount * 25);
+      onFinish(correctCount, shuffledWords.length, correctCount * 25);
     }
   };
 
-  if (!gameWords || gameWords.length === 0) {
+  if (!shuffledWords || shuffledWords.length === 0) {
     return (
       <div className="p-8 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-4 max-w-md mx-auto">
         <p className="text-xs font-mono text-stone-600">Không đủ dữ liệu câu ví dụ ngữ cảnh để tạo bài tập.</p>
@@ -89,7 +113,7 @@ export const FillInBlankGame: React.FC<FillInBlankGameProps> = ({
         <div className="grid grid-cols-2 gap-4 p-4 bg-[#F9F7F2] border border-[#1A1A1A]">
           <div>
             <div className="text-3xl font-serif font-bold text-[#1A1A1A]">
-              {correctCount} / {gameWords.length}
+              {correctCount} / {shuffledWords.length}
             </div>
             <div className="text-[10px] font-mono text-stone-600 uppercase">Số từ điền chính xác</div>
           </div>
@@ -100,12 +124,20 @@ export const FillInBlankGame: React.FC<FillInBlankGameProps> = ({
             <div className="text-[10px] font-mono text-stone-600 uppercase">Điểm số đạt được</div>
           </div>
         </div>
-        <button
-          onClick={onExit}
-          className="w-full py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm"
-        >
-          QUAY LẠI TRUNG TÂM GAME →
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={restartGame}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-stone-100 text-[#1A1A1A] hover:bg-stone-200 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            🔄 CHƠI LẠI (XÁO TRỘN ĐỀ MỚI)
+          </button>
+          <button
+            onClick={onExit}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            QUAY LẠI TRUNG TÂM GAME →
+          </button>
+        </div>
       </div>
     );
   }
@@ -123,7 +155,7 @@ export const FillInBlankGame: React.FC<FillInBlankGameProps> = ({
         </button>
 
         <div className="text-xs font-mono font-bold text-[#1A1A1A]">
-          CÂU HỎI {currentIndex + 1} / {gameWords.length}
+          CÂU HỎI {currentIndex + 1} / {shuffledWords.length}
         </div>
       </div>
 

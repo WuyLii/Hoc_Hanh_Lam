@@ -152,12 +152,21 @@ export const MatchingPairsGame: React.FC<MatchingPairsGameProps> = ({
             <div className="text-[10px] font-mono text-stone-600 uppercase">Điểm thưởng đạt được</div>
           </div>
         </div>
-        <button
-          onClick={onExit}
-          className="w-full py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm"
-        >
-          QUAY LẠI TRUNG TÂM GAME →
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={initGame}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-stone-100 text-[#1A1A1A] hover:bg-stone-200 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>CHƠI LẠI (XÁO TRỘN BỘ CẶP MỚI)</span>
+          </button>
+          <button
+            onClick={onExit}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            QUAY LẠI TRUNG TÂM GAME →
+          </button>
+        </div>
       </div>
     );
   }
@@ -175,6 +184,15 @@ export const MatchingPairsGame: React.FC<MatchingPairsGameProps> = ({
         </button>
 
         <div className="flex items-center gap-4 text-xs font-mono">
+          <button
+            onClick={initGame}
+            className="flex items-center gap-1 px-2 py-0.5 border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition font-bold uppercase text-[10px]"
+            title="Đổi bộ cặp từ ngẫu nhiên mới"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>ĐỔI BỘ TỪ MỚI</span>
+          </button>
+
           <div className="flex items-center gap-1 text-stone-600">
             <Clock className="w-3.5 h-3.5" />
             <span>{timerSeconds}s</span>

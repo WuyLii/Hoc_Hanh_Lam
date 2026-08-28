@@ -66,12 +66,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
     { id: 'grammar', label: 'Ngữ pháp', num: '04', icon: Layers },
     { id: 'games', label: 'Trò chơi SRS', num: '05', icon: Gamepad2 },
     { id: 'mocktest', label: 'Đề thi thử', num: '06', icon: Award },
-    { id: 'listening', label: 'Luyện nghe', num: '07', icon: Headphones },
-    { id: 'aichat', label: 'Gia sư AI', num: '08', icon: Sparkles },
-    { id: 'roleplay', label: 'Đóng vai hội thoại', num: '09', icon: Sparkle },
-    { id: 'journal', label: 'Nhật ký học', num: '10', icon: Edit3 },
-    { id: 'stroke', label: 'Tập viết nét chữ', num: '11', icon: PenTool },
-    { id: 'sheets', label: 'Google Sheets', num: '12', icon: FileSpreadsheet },
+    { id: 'aichat', label: 'Gia sư AI', num: '07', icon: Sparkles },
+    { id: 'stroke', label: 'Tập viết nét chữ', num: '08', icon: PenTool },
+    { id: 'sheets', label: 'Google Sheets', num: '09', icon: FileSpreadsheet },
   ];
 
   const handleMobileNavClick = (id: string) => {

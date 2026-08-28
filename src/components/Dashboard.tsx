@@ -154,11 +154,11 @@ export const Dashboard: React.FC = () => {
               <span className="text-[10px] font-mono uppercase font-bold tracking-widest">Thi thử</span>
             </button>
             <button
-              onClick={() => setActiveNav('listening')}
+              onClick={() => setActiveNav('grammar')}
               className="flex flex-col items-center justify-center p-6 border-r border-t sm:border-t-0 border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] transition-colors group"
             >
               <span className="text-2xl sm:text-3xl mb-1 font-serif font-bold group-hover:text-amber-300">03</span>
-              <span className="text-[10px] font-mono uppercase font-bold tracking-widest">Luyện nghe</span>
+              <span className="text-[10px] font-mono uppercase font-bold tracking-widest">Ngữ pháp</span>
             </button>
             <button
               onClick={() => setActiveNav('aichat')}
@@ -353,12 +353,12 @@ export const Dashboard: React.FC = () => {
               Công cụ thông minh Gemini AI
             </h4>
             <button
-              onClick={() => setActiveNav('roleplay')}
+              onClick={() => setActiveNav('aichat')}
               className="w-full flex items-center justify-between p-3 border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition text-xs font-serif"
             >
               <div className="flex items-center gap-2">
-                <Smile className="w-4 h-4" />
-                <span>Đóng vai hội thoại tình huống thực tế</span>
+                <Sparkles className="w-4 h-4" />
+                <span>Gia sư AI giải đáp & sửa lỗi ngữ pháp</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>

@@ -35,7 +35,7 @@ export const SentenceScrambleGame: React.FC<SentenceScrambleGameProps> = ({
   const [correctCount, setCorrectCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  useEffect(() => {
+  const initPuzzles = () => {
     const rawSentences: { sentence: string; meaning: string }[] = [];
 
     grammarItems.forEach((g) => {
@@ -50,7 +50,8 @@ export const SentenceScrambleGame: React.FC<SentenceScrambleGameProps> = ({
       }
     });
 
-    const selected = rawSentences.slice(0, 6);
+    const shuffledRaw = [...rawSentences].sort(() => Math.random() - 0.5);
+    const selected = shuffledRaw.slice(0, 8);
     const formatted: PuzzleItem[] = selected.map((item, idx) => {
       let tokens: string[] = [];
       if (language === 'zh') {
@@ -63,7 +64,7 @@ export const SentenceScrambleGame: React.FC<SentenceScrambleGameProps> = ({
       }
 
       return {
-        id: `pz_${idx}`,
+        id: `pz_${idx}_${Math.random()}`,
         originalSentence: item.sentence.trim(),
         meaning: item.meaning,
         words: tokens.filter(Boolean),
@@ -71,6 +72,13 @@ export const SentenceScrambleGame: React.FC<SentenceScrambleGameProps> = ({
     });
 
     setPuzzles(formatted.filter((p) => p.words.length >= 3));
+    setCurrentIndex(0);
+    setCorrectCount(0);
+    setIsCompleted(false);
+  };
+
+  useEffect(() => {
+    initPuzzles();
   }, [grammarItems, vocabularyItems, language]);
 
   const currentPuzzle = puzzles[currentIndex];
@@ -154,12 +162,21 @@ export const SentenceScrambleGame: React.FC<SentenceScrambleGameProps> = ({
             <div className="text-[10px] font-mono text-stone-600 uppercase">Điểm nhận được</div>
           </div>
         </div>
-        <button
-          onClick={onExit}
-          className="w-full py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm"
-        >
-          QUAY LẠI TRUNG TÂM TRÒ CHƠI →
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={initPuzzles}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-stone-100 text-[#1A1A1A] hover:bg-stone-200 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>CHƠI LẠI (XÁO TRỘN CÂU MỚI)</span>
+          </button>
+          <button
+            onClick={onExit}
+            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            QUAY LẠI TRUNG TÂM TRÒ CHƠI →
+          </button>
+        </div>
       </div>
     );
   }

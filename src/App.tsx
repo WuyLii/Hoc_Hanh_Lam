@@ -7,10 +7,7 @@ import { VocabularyManager } from './components/VocabularyManager';
 import { GrammarManager } from './components/GrammarManager';
 import { GameReviewHub } from './components/games/GameReviewHub';
 import { MockTestView } from './components/MockTestView';
-import { ListeningView } from './components/ListeningView';
 import { AiChatboxView } from './components/AiChatboxView';
-import { RoleplayView } from './components/RoleplayView';
-import { JournalView } from './components/JournalView';
 import { StrokeGuideView } from './components/StrokeGuideView';
 import { GoogleSheetsSettings } from './components/GoogleSheetsSettings';
 import { OcrScannerModal } from './components/OcrScannerModal';
@@ -69,14 +66,8 @@ const AppContent: React.FC = () => {
         return <GameReviewHub />;
       case 'mocktest':
         return <MockTestView />;
-      case 'listening':
-        return <ListeningView />;
       case 'aichat':
         return <AiChatboxView />;
-      case 'roleplay':
-        return <RoleplayView />;
-      case 'journal':
-        return <JournalView />;
       case 'stroke':
         return <StrokeGuideView />;
       case 'sheets':
