@@ -556,7 +556,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSheetsConfig = (cfg: Partial<GoogleSheetsConfig>) => {
-    setSheetsConfig((prev) => ({ ...prev, ...cfg }));
+    setSheetsConfig((prev) => {
+      const updated = { ...prev, ...cfg };
+      if (cfg.spreadsheetUrlOrId || cfg.scriptUrl) {
+        setTimeout(() => {
+          pullGoogleSheets();
+        }, 200);
+      }
+      return updated;
+    });
+  };
+
+  const pushToGoogleSheetsAuto = async () => {
+    if (!sheetsConfig.scriptUrl || !sheetsConfig.scriptUrl.startsWith('https://script.google.com/')) {
+      return;
+    }
+    try {
+      const payload: SheetsPayload = {
+        users: [currentUser],
+        vocabulary,
+        decks,
+        grammar,
+        reviewSessions,
+        tests: mockTests,
+        listening: listeningExercises,
+        progress: progressLogs,
+        journal: journalEntries,
+        notifications,
+        chatHistory,
+      };
+      await GoogleSheetsService.syncToGoogleSheets(sheetsConfig.scriptUrl, payload);
+    } catch (e) {
+      console.warn('Auto sync push to Google Sheets background status:', e);
+    }
   };
 
   // Google Sheets Push & Pull
@@ -813,13 +845,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // 4. Fast Auto-Save (300ms) to Cloud Server whenever state updates
+  // 4. Fast Auto-Save to Cloud Server & Google Sheets whenever any state updates (Add / Edit / Delete / Progress)
   useEffect(() => {
     const timer = setTimeout(() => {
       pushToCloudServer();
-    }, 300);
+      if (sheetsConfig.scriptUrl) {
+        pushToGoogleSheetsAuto();
+      }
+    }, 500);
     return () => clearTimeout(timer);
-  }, [vocabulary, grammar, decks, reviewSessions, mockTests, progressLogs, sheetsConfig, currentUser]);
+  }, [
+    vocabulary,
+    grammar,
+    decks,
+    reviewSessions,
+    mockTests,
+    listeningExercises,
+    progressLogs,
+    journalEntries,
+    notifications,
+    chatHistory,
+    currentUser,
+    currentLanguage,
+    sheetsConfig.scriptUrl,
+  ]);
 
   // Automatic 24-hour sync check effect
   useEffect(() => {
