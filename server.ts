@@ -33,12 +33,54 @@ interface CloudStore {
   lastUpdated?: string;
 }
 
+function serverDeduplicateVocab(items: any[]): any[] {
+  if (!Array.isArray(items)) return [];
+  const map = new Map<string, any>();
+  items.forEach((item) => {
+    if (!item) return;
+    const wordKey = String(item.tu || '').trim().toLowerCase();
+    const meaningKey = String(item.nghia || '').trim().toLowerCase();
+    const langKey = String(item.ngon_ngu || 'ko').trim().toLowerCase();
+    if (!wordKey && !item.word_id) return;
+    const key = `${langKey}:${wordKey}:${meaningKey}`;
+    if (!map.has(key)) {
+      map.set(key, { ...item, tu: String(item.tu || '').trim(), nghia: String(item.nghia || '').trim() });
+    } else {
+      const existing = map.get(key);
+      map.set(key, { ...existing, ...item });
+    }
+  });
+  return Array.from(map.values());
+}
+
+function serverDeduplicateGrammar(items: any[]): any[] {
+  if (!Array.isArray(items)) return [];
+  const map = new Map<string, any>();
+  items.forEach((item) => {
+    if (!item) return;
+    const structKey = String(item.cau_truc || '').trim().toLowerCase();
+    const meaningKey = String(item.y_nghia || '').trim().toLowerCase();
+    const langKey = String(item.ngon_ngu || 'ko').trim().toLowerCase();
+    if (!structKey) return;
+    const key = `${langKey}:${structKey}:${meaningKey}`;
+    if (!map.has(key)) {
+      map.set(key, { ...item, cau_truc: String(item.cau_truc || '').trim() });
+    } else {
+      const existing = map.get(key);
+      map.set(key, { ...existing, ...item });
+    }
+  });
+  return Array.from(map.values());
+}
+
 let memoryStore: CloudStore = {};
 
 try {
   if (fs.existsSync(STORE_FILE)) {
     const raw = fs.readFileSync(STORE_FILE, 'utf-8');
     memoryStore = JSON.parse(raw);
+    if (memoryStore.vocabulary) memoryStore.vocabulary = serverDeduplicateVocab(memoryStore.vocabulary);
+    if (memoryStore.grammar) memoryStore.grammar = serverDeduplicateGrammar(memoryStore.grammar);
     console.log('📦 Loaded existing cloud_store.json with', Object.keys(memoryStore).length, 'keys');
   }
 } catch (e) {
@@ -552,9 +594,13 @@ Trả về JSON thuần tuý:
       // Merge Google Sheets data directly into cloud memoryStore so all devices get it immediately
       if (resData && resData.data) {
         const vocab = resData.data.vocabulary;
-        if (Array.isArray(vocab) && vocab.length > 0) memoryStore.vocabulary = vocab;
+        if (Array.isArray(vocab) && vocab.length > 0) {
+          memoryStore.vocabulary = serverDeduplicateVocab([...(memoryStore.vocabulary || []), ...vocab]);
+        }
         const gram = resData.data.grammar;
-        if (Array.isArray(gram) && gram.length > 0) memoryStore.grammar = gram;
+        if (Array.isArray(gram) && gram.length > 0) {
+          memoryStore.grammar = serverDeduplicateGrammar([...(memoryStore.grammar || []), ...gram]);
+        }
         const dks = resData.data.decks;
         if (Array.isArray(dks) && dks.length > 0) memoryStore.decks = dks;
 
@@ -584,12 +630,14 @@ Trả về JSON thuần tuý:
     try {
       const { store } = req.body;
       if (store && typeof store === 'object') {
-        // Smart merge
+        // Smart merge with strict deduplication
         Object.keys(store).forEach((key) => {
           if (store[key] !== undefined && store[key] !== null) {
             (memoryStore as any)[key] = store[key];
           }
         });
+        if (memoryStore.vocabulary) memoryStore.vocabulary = serverDeduplicateVocab(memoryStore.vocabulary);
+        if (memoryStore.grammar) memoryStore.grammar = serverDeduplicateGrammar(memoryStore.grammar);
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
       }

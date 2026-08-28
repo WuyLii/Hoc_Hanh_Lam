@@ -23,6 +23,11 @@ import {
 } from '../data/seedData';
 import { calculateNextSRS, RecallQuality } from '../services/srsEngine';
 import { GoogleSheetsService, SheetsPayload } from '../services/googleSheetsService';
+import {
+  cleanDeduplicateVocab,
+  cleanDeduplicateGrammar,
+  cleanDeduplicateDecks,
+} from '../utils/deduplicate';
 
 interface AppContextType {
   currentUser: UserProfile;
@@ -167,13 +172,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const [vocabulary, setVocabulary] = useState<VocabularyItem[]>(() =>
-    loadFromStorage('vocabulary', [])
+    cleanDeduplicateVocab(loadFromStorage('vocabulary', []))
   );
   const [decks, setDecks] = useState<Deck[]>(() =>
-    loadFromStorage('decks', [])
+    cleanDeduplicateDecks(loadFromStorage('decks', []))
   );
   const [grammar, setGrammar] = useState<GrammarItem[]>(() =>
-    loadFromStorage('grammar', [])
+    cleanDeduplicateGrammar(loadFromStorage('grammar', []))
   );
   const [reviewSessions, setReviewSessions] = useState<ReviewSession[]>(() =>
     loadFromStorage('review_sessions', [])
@@ -358,7 +363,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (newItems.length > 0) {
-      setVocabulary((prev) => [...newItems, ...prev]);
+      setVocabulary((prev) => cleanDeduplicateVocab([...newItems, ...prev]));
       updateUser({ total_points: (currentUser.total_points || 0) + count * 5 });
     }
     return count;
@@ -602,40 +607,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data) {
         const vocab = data.vocabulary || data.Vocabulary;
         if (Array.isArray(vocab) && vocab.length > 0) {
-          setVocabulary((prev) => {
-            const map = new Map<string, VocabularyItem>();
-            prev.forEach((item) => {
-              if (item.word_id) map.set(item.word_id, item);
-              else if (item.tu) map.set(`${item.tu}_${item.nghia}`, item);
-            });
-            vocab.forEach((v: any) => {
-              const key = v.word_id || `${v.tu}_${v.nghia}`;
-              const existing = map.get(key);
-              map.set(key, { ...existing, ...v });
-            });
-            return Array.from(map.values());
-          });
+          setVocabulary((prev) => cleanDeduplicateVocab([...vocab, ...prev]));
         }
 
         const gram = data.grammar || data.Grammar;
         if (Array.isArray(gram) && gram.length > 0) {
-          setGrammar((prev) => {
-            const map = new Map<string, GrammarItem>();
-            prev.forEach((item) => {
-              if (item.grammar_id) map.set(item.grammar_id, item);
-              else if (item.cau_truc) map.set(item.cau_truc, item);
-            });
-            gram.forEach((g: any) => {
-              const key = g.grammar_id || g.cau_truc;
-              const existing = map.get(key);
-              map.set(key, { ...existing, ...g });
-            });
-            return Array.from(map.values());
-          });
+          setGrammar((prev) => cleanDeduplicateGrammar([...gram, ...prev]));
         }
 
         const dks = data.decks || data.Decks;
-        if (Array.isArray(dks) && dks.length > 0) setDecks(dks);
+        if (Array.isArray(dks) && dks.length > 0) {
+          setDecks((prev) => cleanDeduplicateDecks([...dks, ...prev]));
+        }
 
         const usr = data.users || data.Users;
         if (Array.isArray(usr) && usr.length > 0) setCurrentUser(usr[0]);
@@ -705,7 +688,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Update Vocabulary
       if (Array.isArray(serverStore.vocabulary)) {
         if (serverStore.vocabulary.length > 0) {
-          setVocabulary(serverStore.vocabulary);
+          setVocabulary(cleanDeduplicateVocab(serverStore.vocabulary));
         } else if (vocabulary.length > 0) {
           hasLocalItems = true;
         }
@@ -714,7 +697,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Update Grammar
       if (Array.isArray(serverStore.grammar)) {
         if (serverStore.grammar.length > 0) {
-          setGrammar(serverStore.grammar);
+          setGrammar(cleanDeduplicateGrammar(serverStore.grammar));
         } else if (grammar.length > 0) {
           hasLocalItems = true;
         }
@@ -723,7 +706,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Update Decks
       if (Array.isArray(serverStore.decks)) {
         if (serverStore.decks.length > 0) {
-          setDecks(serverStore.decks);
+          setDecks(cleanDeduplicateDecks(serverStore.decks));
         } else if (decks.length > 0) {
           hasLocalItems = true;
         }
@@ -788,6 +771,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Error in pushToCloudServer:', e);
     }
   };
+
+  // Ensure state is deduplicated on boot
+  useEffect(() => {
+    setVocabulary((prev) => cleanDeduplicateVocab(prev));
+    setGrammar((prev) => cleanDeduplicateGrammar(prev));
+  }, []);
 
   // 1. On Mount (When Safari, Chrome or PWA on iPhone opens): Sync Cloud Store & Pull Google Sheets
   useEffect(() => {
