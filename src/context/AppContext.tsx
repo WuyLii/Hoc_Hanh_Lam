@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   UserProfile,
   VocabularyItem,
@@ -684,74 +684,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [lastCloudSyncedAt, setLastCloudSyncedAt] = useState<string>('');
+  const lastServerTimestampRef = useRef<string>('');
 
-  const syncWithCloudServer = async (): Promise<{ success: boolean; message: string }> => {
+  const syncWithCloudServer = async (silent = false): Promise<{ success: boolean; message: string }> => {
     try {
-      setIsCloudSyncing(true);
+      if (!silent) setIsCloudSyncing(true);
       const res = await fetch('/api/sync/store');
       if (!res.ok) throw new Error('Không thể kết nối máy chủ Cloud Sync');
       const json = await res.json();
       const serverStore = json.store || {};
+      const serverUpdated = json.lastUpdated || '';
+
+      // Skip if server hasn't been updated since our last sync
+      if (silent && serverUpdated && serverUpdated === lastServerTimestampRef.current) {
+        return { success: true, message: 'Dữ liệu đã mới nhất' };
+      }
 
       let hasLocalItems = false;
 
-      // Merge Vocabulary
-      if (Array.isArray(serverStore.vocabulary) && serverStore.vocabulary.length > 0) {
-        setVocabulary((prev) => {
-          const map = new Map<string, VocabularyItem>();
-          serverStore.vocabulary.forEach((item: VocabularyItem) => {
-            const key = item.word_id || `${item.tu}_${item.nghia}`;
-            map.set(key, item);
-          });
-          prev.forEach((item) => {
-            const key = item.word_id || `${item.tu}_${item.nghia}`;
-            if (!map.has(key)) {
-              map.set(key, item);
-              hasLocalItems = true;
-            }
-          });
-          return Array.from(map.values());
-        });
-      } else if (vocabulary.length > 0) {
-        hasLocalItems = true;
+      // Update Vocabulary
+      if (Array.isArray(serverStore.vocabulary)) {
+        if (serverStore.vocabulary.length > 0) {
+          setVocabulary(serverStore.vocabulary);
+        } else if (vocabulary.length > 0) {
+          hasLocalItems = true;
+        }
       }
 
-      // Merge Grammar
-      if (Array.isArray(serverStore.grammar) && serverStore.grammar.length > 0) {
-        setGrammar((prev) => {
-          const map = new Map<string, GrammarItem>();
-          serverStore.grammar.forEach((item: GrammarItem) => {
-            const key = item.grammar_id || item.cau_truc;
-            map.set(key, item);
-          });
-          prev.forEach((item) => {
-            const key = item.grammar_id || item.cau_truc;
-            if (!map.has(key)) {
-              map.set(key, item);
-              hasLocalItems = true;
-            }
-          });
-          return Array.from(map.values());
-        });
-      } else if (grammar.length > 0) {
-        hasLocalItems = true;
+      // Update Grammar
+      if (Array.isArray(serverStore.grammar)) {
+        if (serverStore.grammar.length > 0) {
+          setGrammar(serverStore.grammar);
+        } else if (grammar.length > 0) {
+          hasLocalItems = true;
+        }
       }
 
-      // Merge Decks
-      if (Array.isArray(serverStore.decks) && serverStore.decks.length > 0) {
-        setDecks((prev) => {
-          const map = new Map<string, Deck>();
-          serverStore.decks.forEach((d: Deck) => map.set(d.deck_id, d));
-          prev.forEach((d) => {
-            if (!map.has(d.deck_id)) {
-              map.set(d.deck_id, d);
-              hasLocalItems = true;
-            }
-          });
-          return Array.from(map.values());
-        });
-      } else if (decks.length > 0) {
-        hasLocalItems = true;
+      // Update Decks
+      if (Array.isArray(serverStore.decks)) {
+        if (serverStore.decks.length > 0) {
+          setDecks(serverStore.decks);
+        } else if (decks.length > 0) {
+          hasLocalItems = true;
+        }
       }
 
       if (serverStore.sheetsConfig) {
@@ -764,8 +739,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const now = new Date().toISOString();
       setLastCloudSyncedAt(now);
+      if (serverUpdated) lastServerTimestampRef.current = serverUpdated;
 
-      if (hasLocalItems || !serverStore.vocabulary || serverStore.vocabulary.length === 0) {
+      if (hasLocalItems && (!serverStore.vocabulary || serverStore.vocabulary.length === 0)) {
         pushToCloudServer();
       }
 
@@ -774,13 +750,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Error in syncWithCloudServer:', e);
       return { success: false, message: e?.message || 'Lỗi kết nối máy chủ Cloud' };
     } finally {
-      setIsCloudSyncing(false);
+      if (!silent) setIsCloudSyncing(false);
     }
   };
 
   const pushToCloudServer = async () => {
     try {
-      await fetch('/api/sync/store', {
+      const res = await fetch('/api/sync/store', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -801,7 +777,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           },
         }),
       });
-      setLastCloudSyncedAt(new Date().toISOString());
+      if (res.ok) {
+        const json = await res.json();
+        if (json.lastUpdated) {
+          lastServerTimestampRef.current = json.lastUpdated;
+        }
+        setLastCloudSyncedAt(new Date().toISOString());
+      }
     } catch (e) {
       console.error('Error in pushToCloudServer:', e);
     }
@@ -810,21 +792,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 1. On Mount (When Safari, Chrome or PWA on iPhone opens): Sync Cloud Store & Pull Google Sheets
   useEffect(() => {
     const handleInitialSync = async () => {
-      await syncWithCloudServer();
+      await syncWithCloudServer(false);
       await pullGoogleSheets();
     };
     handleInitialSync();
   }, []);
 
-  // 2. On Window Focus & App Re-open (e.g. Opening PWA on iPhone from home screen)
+  // 2. Real-time background polling every 3 seconds for instant cross-device updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      syncWithCloudServer(true);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 3. On Window Focus & App Re-open (e.g. Opening PWA on iPhone from home screen)
   useEffect(() => {
     const handleAppFocus = () => {
-      syncWithCloudServer();
+      syncWithCloudServer(true);
     };
     window.addEventListener('focus', handleAppFocus);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        syncWithCloudServer();
+        syncWithCloudServer(true);
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
@@ -834,11 +824,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // 3. Debounced Auto Save to Cloud Server whenever state updates
+  // 4. Fast Auto-Save (300ms) to Cloud Server whenever state updates
   useEffect(() => {
     const timer = setTimeout(() => {
       pushToCloudServer();
-    }, 1200);
+    }, 300);
     return () => clearTimeout(timer);
   }, [vocabulary, grammar, decks, reviewSessions, mockTests, progressLogs, sheetsConfig, currentUser]);
 
