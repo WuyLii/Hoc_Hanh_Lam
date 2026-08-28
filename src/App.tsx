@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Component, ErrorInfo, ReactNode } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
@@ -14,6 +14,61 @@ import { JournalView } from './components/JournalView';
 import { StrokeGuideView } from './components/StrokeGuideView';
 import { GoogleSheetsSettings } from './components/GoogleSheetsSettings';
 import { OcrScannerModal } from './components/OcrScannerModal';
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+  };
+
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Uncaught error:', error, errorInfo);
+  }
+
+  public handleReset = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.reload();
+  };
+
+  public render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#F9F7F2] text-[#1A1A1A] flex flex-col items-center justify-center p-6 text-center">
+          <div className="max-w-md w-full border-2 border-[#1A1A1A] bg-white p-8 shadow-[6px_6px_0px_0px_#1A1A1A]">
+            <div className="w-12 h-12 bg-amber-100 border border-[#1A1A1A] rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
+              ⚠️
+            </div>
+            <h2 className="text-xl font-serif font-black uppercase mb-2">Đã xảy ra sự cố hiển thị</h2>
+            <p className="text-sm font-mono text-stone-600 mb-6">
+              Ứng dụng đang tự động đồng bộ lại dữ liệu của bạn để đảm bảo không bị sai lệch.
+            </p>
+            <button
+              onClick={this.handleReset}
+              className="w-full py-3 bg-[#1A1A1A] text-[#F9F7F2] font-mono text-xs uppercase font-bold tracking-wider hover:bg-stone-800 transition"
+            >
+              🔄 Tải lại trang & Đồng bộ ngay
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const AppContent: React.FC = () => {
   const { activeNav } = useApp();
@@ -88,9 +143,11 @@ const AppContent: React.FC = () => {
 
 export function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 
