@@ -1,6 +1,6 @@
 {
-  "name": "Học hành lắm",
-  "description": "Ứng dụng học tập và ôn tập ngoại ngữ cá nhân hóa (Anh - Hàn - Trung) với kho từ vựng, ngữ pháp, SRS, AI đọc sách giáo trình và đồng bộ Google Sheets.",
+  "name": "Học Hành Lắm",
+  "description": "Nền tảng học và ôn tập ngoại ngữ cá nhân hóa (Anh - Hàn - Trung) với kho từ vựng, ngữ pháp, SRS, AI đọc sách giáo trình và đồng bộ Google Sheets.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

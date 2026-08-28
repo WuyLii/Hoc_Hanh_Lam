@@ -11,77 +11,76 @@ export const Logo: React.FC<LogoProps> = ({ className = 'w-11 h-11', size = 44 }
       width={size}
       height={size}
       viewBox="0 0 200 200"
-      className={`rounded-full shrink-0 shadow-md border-2 border-[#1A1A1A] ${className}`}
+      className={`rounded-full shrink-0 shadow-sm border-2 border-[#1A1A1A] ${className}`}
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <radialGradient id="smokeBg" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#2c2c2c" />
-          <stop offset="60%" stopColor="#141414" />
-          <stop offset="100%" stopColor="#080808" />
+        <linearGradient id="hhlGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1A1A1A" />
+          <stop offset="100%" stopColor="#2A2A2A" />
+        </linearGradient>
+        <radialGradient id="goldGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#D97706" stopOpacity="0" />
         </radialGradient>
-        <path
-          id="topTextPath"
-          d="M 30,100 A 70,70 0 1,1 170,100"
-          fill="none"
-        />
-        <path
-          id="bottomTextPath"
-          d="M 170,100 A 70,70 0 1,1 30,100"
-          fill="none"
-        />
+        <path id="hhlTopArc" d="M 32,100 A 68,68 0 1,1 168,100" fill="none" />
+        <path id="hhlBottomArc" d="M 168,100 A 68,68 0 1,1 32,100" fill="none" />
       </defs>
 
-      {/* Circle Background */}
-      <circle cx="100" cy="100" r="100" fill="url(#smokeBg)" />
+      {/* Circle Dark Base */}
+      <circle cx="100" cy="100" r="100" fill="url(#hhlGrad)" />
 
-      {/* Outer Inner White Rings */}
-      <circle cx="100" cy="100" r="88" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0.3" />
-      <circle cx="100" cy="100" r="78" fill="none" stroke="#ffffff" strokeWidth="2" opacity="0.9" />
+      {/* Gold Ring & Inner White Ring */}
+      <circle cx="100" cy="100" r="92" fill="none" stroke="#F59E0B" strokeWidth="2" opacity="0.6" />
+      <circle cx="100" cy="100" r="82" fill="none" stroke="#FFFFFF" strokeWidth="1.5" opacity="0.8" />
+      <circle cx="100" cy="100" r="76" fill="url(#goldGlow)" />
 
-      {/* Text along path: VÙNG ĐẤT */}
-      <text fill="#ffffff" fontSize="13" fontFamily="serif" letterSpacing="3" fontWeight="bold">
-        <textPath href="#topTextPath" startOffset="50%" textAnchor="middle">
-          VÙNG ĐẤT
+      {/* Curved Text: HỌC HÀNH LẮM */}
+      <text fill="#FFFFFF" fontSize="13" fontFamily="sans-serif" letterSpacing="3.5" fontWeight="900">
+        <textPath href="#hhlTopArc" startOffset="50%" textAnchor="middle">
+          HỌC HÀNH LẮM
         </textPath>
       </text>
 
-      {/* Text along path: MỘNG MƠ */}
-      <text fill="#ffffff" fontSize="13" fontFamily="serif" letterSpacing="3" fontWeight="bold">
-        <textPath href="#bottomTextPath" startOffset="50%" textAnchor="middle">
-          MỘNG MƠ
+      {/* Curved Text: POLYGLOT LAB */}
+      <text fill="#F59E0B" fontSize="11" fontFamily="monospace" letterSpacing="2.5" fontWeight="700">
+        <textPath href="#hhlBottomArc" startOffset="50%" textAnchor="middle">
+          ● EST. 2026 ●
         </textPath>
       </text>
 
-      {/* Center Cursive 'sf' monogram */}
-      <g transform="translate(100, 100)">
-        {/* Flourish left and right waves */}
+      {/* Center Graphic: Stylized Graduation Cap + Open Book + AI Sparkle */}
+      <g transform="translate(100, 102)">
+        {/* Open Book Wings */}
         <path
-          d="M -65,5 C -45,15 -35,-5 -20,2 C -10,6 -5,0 0,0 C 5,0 10,6 20,2 C 35,-5 45,15 65,5"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="3.5"
-          strokeLinecap="round"
+          d="M -32,10 C -20,2 -8,5 0,12 C 8,5 20,2 32,10 L 32,-12 C 20,-20 8,-17 0,-10 C -8,-17 -20,-20 -32,-12 Z"
+          fill="#FFFFFF"
           opacity="0.95"
         />
-        {/* Letter s */}
         <path
-          d="M -16,16 C -24,18 -30,14 -28,6 C -26,-2 -16,-4 -12,-12 C -8,-20 -18,-30 -26,-26 C -31,-23 -33,-17 -30,-12"
+          d="M -30,8 C -18,0 -6,3 0,10 C 6,3 18,0 30,8"
           fill="none"
-          stroke="#ffffff"
-          strokeWidth="6"
+          stroke="#1A1A1A"
+          strokeWidth="2.5"
           strokeLinecap="round"
         />
-        {/* Letter f */}
+
+        {/* Graduation Cap Top Diamond */}
+        <polygon points="0,-36 28,-24 0,-12 -28,-24" fill="#F59E0B" />
+        <polygon points="0,-36 28,-24 0,-20 -28,-24" fill="#FBBF24" />
+
+        {/* Cap Base & Tassel */}
+        <path d="M -16,-20 L -16,-12 C -16,-6 16,-6 16,-12 L 16,-20" fill="none" stroke="#D97706" strokeWidth="3" />
+        <path d="M 22,-22 L 28,-10 L 28,-4" fill="none" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="28" cy="-2" r="2" fill="#FBBF24" />
+
+        {/* Center Sparkle */}
         <path
-          d="M -2,-32 C 4,-34 10,-32 10,-24 C 10,-15 10,-5 10,12 C 10,24 14,32 24,30 C 30,28 32,22 28,18"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="6"
-          strokeLinecap="round"
+          d="M 0,-6 L 2,-2 L 6,0 L 2,2 L 0,6 L -2,2 L -6,0 L -2,-2 Z"
+          fill="#1A1A1A"
         />
-        <line x1="2" y1="-12" x2="16" y2="-12" stroke="#ffffff" strokeWidth="4.5" strokeLinecap="round" />
       </g>
     </svg>
   );
 };
+

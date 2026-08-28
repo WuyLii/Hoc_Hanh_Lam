@@ -71,13 +71,13 @@ export const Dashboard: React.FC = () => {
       <div className="bg-[#F9F7F2] border-2 border-[#1A1A1A] editorial-shadow flex flex-col overflow-hidden">
         {/* Main Section: Word of the Day & Large Action Strip */}
         <section className="w-full border-b border-[#1A1A1A] flex flex-col justify-between bg-white">
-          <div className="p-8 sm:p-12 relative flex-1 flex flex-col justify-center">
-            <div className="absolute top-6 left-8 text-[80px] sm:text-[120px] font-serif opacity-[0.04] select-none leading-none font-black pointer-events-none">
+          <div className="p-4 sm:p-8 lg:p-12 relative flex-1 flex flex-col justify-center">
+            <div className="absolute top-4 left-4 sm:top-6 sm:left-8 text-[60px] sm:text-[120px] font-serif opacity-[0.04] select-none leading-none font-black pointer-events-none">
               MEMORY
             </div>
 
             {/* Word of the Day Tag */}
-            <div className="flex flex-wrap items-baseline gap-3 mb-6 relative z-10">
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-3 mb-4 sm:mb-6 relative z-10">
               <span className="bg-[#1A1A1A] text-[#F9F7F2] text-[10px] px-2.5 py-1 font-mono font-bold uppercase tracking-widest">
                 Từ vựng hôm nay
               </span>
@@ -88,17 +88,17 @@ export const Dashboard: React.FC = () => {
 
             {/* Main Word Display */}
             {wordOfTheDay ? (
-              <div className="relative z-10 space-y-4">
-                <div className="flex items-center gap-6">
-                  <h2 className="text-5xl sm:text-7xl lg:text-8xl font-serif font-black leading-none tracking-tighter text-[#1A1A1A]">
+              <div className="relative z-10 space-y-3 sm:space-y-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-6">
+                  <h2 className="text-3xl sm:text-6xl lg:text-8xl font-serif font-black leading-none tracking-tighter text-[#1A1A1A] break-words max-w-full">
                     {wordOfTheDay.tu}
                   </h2>
                   <button
                     onClick={() => handlePlayAudio(wordOfTheDay.tu, wordOfTheDay.ngon_ngu)}
-                    className="p-3 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition"
+                    className="p-2.5 sm:p-3 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition shrink-0"
                     title="Nghe phát âm chuẩn"
                   >
-                    <Volume2 className="w-5 h-5" />
+                    <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
 
