@@ -260,6 +260,12 @@ export interface ChatMessage {
   timestamp: string;
   image_url?: string;
   image?: string; // base64
+  tutor_info?: {
+    id: string;
+    name: string;
+    model: string;
+    turn?: number;
+  };
   suggested_words?: { word: string; meaning: string; phonetic?: string }[];
   savedVocabs?: Partial<VocabularyItem>[];
 }

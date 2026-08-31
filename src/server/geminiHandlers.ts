@@ -64,30 +64,68 @@ export function formatGeminiError(err: any): string {
   return 'Hệ thống AI đang phản hồi chậm hoặc quá tải. Vui lòng bấm nút "Thử Lại" sau ít giây!';
 }
 
-export async function callGeminiTutorWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
-  // GIA SƯ AI LÀ MỘT CON AI RIÊNG VÀ LÀ MÔ HÌNH THÔNG MINH NHẤT (FLAGSHIP TUTOR ENGINE)
-  // Ưu tiên chuỗi mô hình thông minh nhất dành riêng cho việc giảng dạy và tư duy sâu
-  const tutorModelsToTry = [
-    'gemini-3.7-flash',
-    'gemini-flash-latest',
-    'gemini-2.5-flash',
-  ];
+// =========================================================================
+// 1. BẢNG PHÂN BỔ ĐỘC QUYỀN 2 CON AI CỐ ĐỊNH CHO GIA SƯ (TUTOR DEDICATED ONLY)
+// 2 con AI này CHỈ ĐƯỢC LÀM GIA SƯ, thay phiên nhau từng lượt hỏi.
+// Tuyệt đối KHÔNG BAO GIỜ được gọi bởi các tính năng khác.
+// =========================================================================
+export const DEDICATED_TUTOR_MODELS = [
+  {
+    id: 'tutor-1',
+    name: 'Gia sư AI 1 (Gemini 3.7 Flash)',
+    model: 'gemini-3.7-flash',
+    description: 'Chuyên gia Sư phạm & Tư duy Sâu sắc',
+  },
+  {
+    id: 'tutor-2',
+    name: 'Gia sư AI 2 (Gemini 3.1 Pro)',
+    model: 'gemini-3.1-pro-preview',
+    description: 'Chuyên gia Phân tích Chuyên sâu & Logic Ngôn ngữ',
+  },
+] as const;
+
+// Biến đếm lượt hỏi toàn cục để 2 con AI gia sư thay phiên nhau chính xác
+let globalTutorTurnCounter = 0;
+
+export async function callGeminiTutorAlternating(
+  ai: GoogleGenAI,
+  contents: any,
+  config?: any,
+  requestedTurn?: number
+) {
+  // Xác định lượt của con AI nào
+  const currentTurn = typeof requestedTurn === 'number' ? requestedTurn : globalTutorTurnCounter++;
+  const isTurn0 = currentTurn % 2 === 0;
+
+  // Lượt chẵn: Gia sư 1 trước, nếu lỗi chỉ fallback sang Gia sư 2.
+  // Lượt lẻ: Gia sư 2 trước, nếu lỗi chỉ fallback sang Gia sư 1.
+  const tutorSequence = isTurn0
+    ? [DEDICATED_TUTOR_MODELS[0], DEDICATED_TUTOR_MODELS[1]]
+    : [DEDICATED_TUTOR_MODELS[1], DEDICATED_TUTOR_MODELS[0]];
 
   let lastError: any = null;
 
-  for (const model of tutorModelsToTry) {
+  for (const tutor of tutorSequence) {
     let attempts = 0;
     const maxAttempts = 2;
     while (attempts < maxAttempts) {
       try {
         attempts++;
         const res = await ai.models.generateContent({
-          model,
+          model: tutor.model,
           contents,
           config,
         });
         if (res && res.text) {
-          return res;
+          return {
+            res,
+            tutorInfo: {
+              id: tutor.id,
+              name: tutor.name,
+              model: tutor.model,
+              turn: currentTurn + 1,
+            },
+          };
         }
       } catch (err: any) {
         lastError = err;
@@ -114,17 +152,21 @@ export async function callGeminiTutorWithRetry(ai: GoogleGenAI, contents: any, c
   throw new Error(formatGeminiError(lastError));
 }
 
-export async function callGeminiWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
-  const modelsToTry = [
-    'gemini-3.7-flash',
-    'gemini-flash-latest',
-    'gemini-3.1-flash-lite',
-    'gemini-2.5-flash',
-  ];
+// =========================================================================
+// 2. MÔ HÌNH DÀNH RIÊNG CHO CÁC TÍNH NĂNG KHÁC (NON-TUTOR ONLY)
+// OCR, Bóc tách Sách, Đề thi, Nhật ký, Tạo từ vựng, Nhập vai...
+// TUYỆT ĐỐI KHÔNG ĐƯỢC CHỨA gemini-3.7-flash HOẶC gemini-3.1-pro-preview
+// (2 con AI gia sư được bảo vệ độc quyền).
+// =========================================================================
+export const NON_TUTOR_MODELS = [
+  'gemini-flash-latest',
+  'gemini-3.1-flash-lite',
+];
 
+export async function callNonTutorGeminiWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
   let lastError: any = null;
 
-  for (const model of modelsToTry) {
+  for (const model of NON_TUTOR_MODELS) {
     let attempts = 0;
     const maxAttempts = 2;
     while (attempts < maxAttempts) {
@@ -251,12 +293,17 @@ Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markd
     contents = [{ role: 'user', parts: [{ text: 'Xin chào! Hãy đóng vai Gia sư AI của tôi.' }] }];
   }
 
-  const response = await callGeminiTutorWithRetry(ai, contents, {
-    systemInstruction,
-    temperature: 0.7,
-  });
+  const { res, tutorInfo } = await callGeminiTutorAlternating(
+    ai,
+    contents,
+    {
+      systemInstruction,
+      temperature: 0.7,
+    },
+    body.turn
+  );
 
-  const replyText = response.text || '';
+  const replyText = res.text || '';
   let suggestedWords: any[] = [];
 
   const match = replyText.match(/---VOCAB_SUGGESTIONS---\s*([\s\S]*?)\s*---END_VOCAB_SUGGESTIONS---/);
@@ -270,7 +317,7 @@ Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markd
 
   const cleanedReply = replyText.replace(/---VOCAB_SUGGESTIONS---[\s\S]*?---END_VOCAB_SUGGESTIONS---/, '').trim();
 
-  return { reply: cleanedReply || replyText, suggestedWords };
+  return { reply: cleanedReply || replyText, suggestedWords, tutorInfo };
 }
 
 export async function handleGenerateExample(body: any) {
@@ -297,7 +344,7 @@ Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trú
   "synonyms": ["Từ đồng nghĩa 1", "Từ đồng nghĩa 2"]
 }`;
 
-  const response = await callGeminiWithRetry(ai, prompt, {
+  const response = await callNonTutorGeminiWithRetry(ai, prompt, {
     responseMimeType: 'application/json',
   });
 
@@ -346,7 +393,7 @@ Guidelines:
     });
   }
 
-  const response = await callGeminiWithRetry(ai, contents, {
+  const response = await callNonTutorGeminiWithRetry(ai, contents, {
     systemInstruction,
     temperature: 0.7,
   });
@@ -388,7 +435,7 @@ Hãy đánh giá chi tiết và trả về kết quả định dạng JSON thu�
   "encouragement": "Lời động viên cho buổi học tiếp theo"
 }`;
 
-  const response = await callGeminiWithRetry(ai, prompt, {
+  const response = await callNonTutorGeminiWithRetry(ai, prompt, {
     responseMimeType: 'application/json',
   });
 
@@ -436,7 +483,7 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
   ]
 }`;
 
-  const response = await callGeminiWithRetry(ai, prompt, {
+  const response = await callNonTutorGeminiWithRetry(ai, prompt, {
     responseMimeType: 'application/json',
   });
 
@@ -524,7 +571,7 @@ Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
   });
   parts.push({ text: prompt });
 
-  const response = await callGeminiWithRetry(ai, [{ role: 'user', parts }], {
+  const response = await callNonTutorGeminiWithRetry(ai, [{ role: 'user', parts }], {
     responseMimeType: 'application/json',
     temperature: 0.1,
     maxOutputTokens: 16384,
@@ -624,7 +671,7 @@ Trả về JSON thuần tuý:
     throw new Error('Vui lòng cung cấp file hoặc văn bản sách.');
   }
 
-  const response = await callGeminiWithRetry(ai, contents, {
+  const response = await callNonTutorGeminiWithRetry(ai, contents, {
     responseMimeType: 'application/json',
   });
 

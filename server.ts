@@ -1,11 +1,19 @@
 import express from 'express';
-import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { handleOcrExtract, handleExtractTextbook, handleChat, formatGeminiError } from './src/server/geminiHandlers.ts';
+import {
+  handleOcrExtract,
+  handleExtractTextbook,
+  handleChat,
+  handleGenerateExample,
+  handleRoleplay,
+  handleCheckJournal,
+  handleGenerateMockTest,
+  formatGeminiError,
+} from './src/server/geminiHandlers.ts';
 import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 
 dotenv.config();
@@ -101,69 +109,6 @@ async function startServer() {
 
   app.use(express.json({ limit: '25mb' }));
 
-  // Initialize Google GenAI
-  const getGenAI = () => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not configured in server environment');
-    }
-    return new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-  };
-
-  const callGemini = async (ai: GoogleGenAI, contents: any, config?: any) => {
-    const models = [
-      'gemini-3.7-flash',
-      'gemini-flash-latest',
-      'gemini-3.1-flash-lite',
-      'gemini-2.5-flash',
-    ];
-
-    let lastErr: any = null;
-
-    for (const model of models) {
-      let attempts = 0;
-      const maxAttempts = 2;
-      while (attempts < maxAttempts) {
-        try {
-          attempts++;
-          const res = await ai.models.generateContent({
-            model,
-            contents,
-            config,
-          });
-          if (res && res.text) return res;
-        } catch (err: any) {
-          lastErr = err;
-          const errMsg = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
-          const isTransient =
-            errMsg.includes('503') ||
-            errMsg.includes('UNAVAILABLE') ||
-            errMsg.includes('high demand') ||
-            errMsg.includes('429') ||
-            errMsg.includes('Quota') ||
-            errMsg.includes('RESOURCE_EXHAUSTED') ||
-            errMsg.includes('Deadline') ||
-            errMsg.includes('overloaded');
-
-          if (isTransient && attempts < maxAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
-          } else {
-            break;
-          }
-        }
-      }
-    }
-
-    throw new Error(formatGeminiError(lastErr));
-  };
-
   // 1. General Language AI Chat & Multi-modal Image Analysis
   app.post('/api/gemini/chat', async (req, res) => {
     try {
@@ -178,37 +123,8 @@ async function startServer() {
   // 2. Vocabulary Enrichment & Auto Example Generator
   app.post('/api/gemini/generate-example', async (req, res) => {
     try {
-      const { word, language, meaning } = req.body;
-      const ai = getGenAI();
-
-      const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
-
-      const prompt = `Hãy làm giàu thông tin cho từ vựng sau trong ${langName}:
-Từ: "${word}"
-Nghĩa gợi ý (nếu có): "${meaning || ''}"
-
-Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trúc sau:
-{
-  "word": "${word}",
-  "meaning": "Nghĩa tiếng Việt chuẩn, đầy đủ và tự nhiên",
-  "phonetic": "Phiên âm chuẩn (IPA cho tiếng Anh, Romaja cho tiếng Hàn, Pinyin có dấu cho tiếng Trung)",
-  "type": "Loại từ (Danh từ, Động từ, Tính từ, Trạng từ, Cụm từ, Liên từ...)",
-  "example": "Câu ví dụ thực tế, tự nhiên sử dụng từ trên",
-  "exampleVi": "Dịch nghĩa câu ví dụ sang tiếng Việt",
-  "level": "Cấp độ đề xuất (A1, A2, B1, B2, C1, C2 cho tiếng Anh; TOPIK 1 - TOPIK 6 cho tiếng Hàn; HSK 1 - HSK 6 cho tiếng Trung)",
-  "topic": "Chủ đề phù hợp (Giao tiếp, Du lịch, Công việc, Ẩm thực, Đời sống, Cảm xúc, Học thuật...)",
-  "collocations": ["Cụm từ hay đi kèm 1", "Cụm từ 2"],
-  "mnemonic": "Mẹo ghi nhớ nhanh hoặc nguồn gốc chữ/từ (nếu có)",
-  "synonyms": ["Từ đồng nghĩa 1", "Từ đồng nghĩa 2"]
-}`;
-
-      const response = await callGemini(ai, prompt, {
-        responseMimeType: 'application/json',
-      });
-
-      const jsonText = response.text || '{}';
-      const parsed = JSON.parse(jsonText);
-      res.json(parsed);
+      const result = await handleGenerateExample(req.body);
+      res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/generate-example:', error);
       res.status(500).json({ error: error?.message || 'Lỗi khi tạo dữ liệu từ vựng' });
@@ -218,54 +134,8 @@ Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trú
   // 3. Situational Roleplay Conversation
   app.post('/api/gemini/roleplay', async (req, res) => {
     try {
-      const { scenario, language, messages, userLevel } = req.body;
-      const ai = getGenAI();
-
-      const langName = language === 'en' ? 'English' : language === 'ko' ? 'Korean (한국어)' : 'Chinese (中文)';
-
-      const systemInstruction = `You are an interactive conversational language tutor roleplaying in ${langName}.
-Current Scenario: ${scenario.title} (${scenario.description}).
-Your role: ${scenario.aiRole}.
-User role: ${scenario.userRole}.
-User Target Level: ${userLevel || 'Intermediate'}.
-
-Guidelines:
-1. Respond in natural ${langName} keeping the roleplay active and engaging.
-2. Keep responses appropriate for the user's level (1-3 sentences per turn).
-3. At the end of your response, ALWAYS include a JSON block for evaluation and hints in this exact format:
----FEEDBACK_DATA---
-{
-  "vietnameseTranslation": "Dịch câu thoại của AI sang tiếng Việt",
-  "pronunciationGuide": "Romaja / Pinyin / IPA for AI's line",
-  "suggestedReplies": [
-    { "text": "Câu trả lời gợi ý 1 bằng ${langName}", "meaning": "Nghĩa tiếng Việt" },
-    { "text": "Câu trả lời gợi ý 2 bằng ${langName}", "meaning": "Nghĩa tiếng Việt" }
-  ],
-  "userCorrection": "Nếu câu trước của người dùng có lỗi ngữ pháp/từ vựng, nhận xét ngắn gọn và cách sửa tự nhiên hơn (nếu người dùng nói tốt thì để trống null)"
-}
----END_FEEDBACK_DATA---`;
-
-      const contents: any[] = [];
-      if (Array.isArray(messages) && messages.length > 0) {
-        messages.forEach((m: any) => {
-          contents.push({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-          });
-        });
-      } else {
-        contents.push({
-          role: 'user',
-          parts: [{ text: `[Bắt đầu tình huống: ${scenario.title}. Hãy chào người dùng bằng ${langName} theo đúng vai diễn của bạn].` }],
-        });
-      }
-
-      const response = await callGemini(ai, contents, {
-        systemInstruction,
-        temperature: 0.7,
-      });
-
-      res.json({ reply: response.text || '' });
+      const result = await handleRoleplay(req.body);
+      res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/roleplay:', error);
       res.status(500).json({ error: error?.message || 'Lỗi hội thoại tình huống' });
@@ -273,107 +143,24 @@ Guidelines:
   });
 
   // 4. Learning Journal Grammar & Phrasing Review
-  const handleJournalCheck = async (req: express.Request, res: express.Response) => {
+  const handleJournalReview = async (req: express.Request, res: express.Response) => {
     try {
-      const { text, content, language, promptTopic } = req.body;
-      const journalText = text || content;
-      const ai = getGenAI();
-
-      const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
-
-      const prompt = `Bạn là giảng viên hiệu đính ngôn ngữ chuyên nghiệp cho bài nhật ký học tập (${langName}).
-Chủ đề (nếu có): ${promptTopic || 'Tự do'}
-Nội dung người học viết:
-"""
-${journalText}
-"""
-
-Hãy đánh giá chi tiết và trả về kết quả định dạng JSON thuần tuý:
-{
-  "score": 85,
-  "summary": "Lời khen ngợi và nhận xét tổng quan ngắn gọn truyền cảm hứng bằng tiếng Việt",
-  "corrections": [
-    {
-      "original": "đoạn sai hoặc chưa tự nhiên",
-      "corrected": "cách sửa chuẩn và tự nhiên",
-      "explanation": "giải thích chi tiết vì sao nên sửa như vậy bằng tiếng Việt"
-    }
-  ],
-  "improvedVersion": "Toàn bộ bài viết đã được chỉnh sửa chuẩn, mượt mà và tự nhiên nhất",
-  "vocabularyUpgrades": [
-    {
-      "basic": "từ đơn giản người dùng đã dùng",
-      "advanced": "từ nâng cao/tự nhiên hơn nên dùng thay thế",
-      "meaning": "nghĩa tiếng Việt"
-    }
-  ],
-  "encouragement": "Lời động viên cho buổi học tiếp theo"
-}`;
-
-      const response = await callGemini(ai, prompt, {
-        responseMimeType: 'application/json',
-      });
-
-      const jsonText = response.text || '{}';
-      res.json(JSON.parse(jsonText));
+      const result = await handleCheckJournal(req.body);
+      res.json(result);
     } catch (error: any) {
       console.error('Error in journal check endpoint:', error);
       res.status(500).json({ error: error?.message || 'Lỗi khi kiểm tra nhật ký' });
     }
   };
 
-  app.post('/api/gemini/check-journal', handleJournalCheck);
-  app.post('/api/gemini/correct-journal', handleJournalCheck);
+  app.post('/api/gemini/check-journal', handleJournalReview);
+  app.post('/api/gemini/correct-journal', handleJournalReview);
 
   // 5. Dynamic Standardized Mock Test Generator (TOEIC/IELTS, TOPIK, HSK)
   app.post('/api/gemini/generate-mock-test', async (req, res) => {
     try {
-      const { testType, language, level, wordList } = req.body;
-      const ai = getGenAI();
-
-      let typePrompt = '';
-      if (language === 'en') {
-        typePrompt = `Mô phỏng đề kiểm tra Tiếng Anh định dạng ${testType || 'TOEIC/CEFR'} cấp độ ${level || 'B1-B2'}. Gồm 5 câu hỏi trắc nghiệm đa dạng: từ vựng trong ngữ cảnh, ngữ pháp điền khuyết, chọn từ đồng nghĩa, và hoàn thành câu.`;
-      } else if (language === 'ko') {
-        typePrompt = `Mô phỏng đề kiểm tra Tiếng Hàn định dạng ${testType || 'TOPIK'} cấp độ ${level || 'TOPIK 2-3'}. Gồm 5 câu hỏi trắc nghiệm: 빈칸에 들어갈 알맞은 말 (Điền từ vào chỗ trống), 밑줄 친 부분과 의미가 비슷한 것 (Tìm từ đồng nghĩa), 문법 구조 (Ngữ pháp).`;
-      } else {
-        typePrompt = `Mô phỏng đề kiểm tra Tiếng Trung định dạng ${testType || 'HSK'} cấp độ ${level || 'HSK 3-4'}. Gồm 5 câu hỏi trắc nghiệm: 选词填空 (Chọn từ điền khuyết), 词语搭配 (Kết hợp từ), 语法辨析 (Phân tích ngữ pháp), 汉字拼音 (Nhận diện chữ Hán & Pinyin).`;
-      }
-
-      const wordsContext = Array.isArray(wordList) && wordList.length > 0
-        ? `Ưu tiên lồng ghép các từ vựng này vào câu hỏi: ${wordList.map((w: any) => `${w.tu} (${w.nghia})`).join(', ')}`
-        : '';
-
-      const prompt = `Hãy tạo một đề kiểm tra ngắn gồm 5 câu hỏi theo yêu cầu:
-${typePrompt}
-${wordsContext}
-
-Trả về định dạng JSON thuần tuý với cấu trúc:
-{
-  "testTitle": "Tên đề thi",
-  "language": "${language}",
-  "level": "${level}",
-  "timeLimitSeconds": 300,
-  "questions": [
-    {
-      "id": 1,
-      "type": "multiple_choice",
-      "question": "Nội dung câu hỏi",
-      "phoneticOrTranslation": "Phiên âm hoặc dịch nghĩa",
-      "options": ["A", "B", "C", "D"],
-      "correctIndex": 0,
-      "explanation": "Giải thích chi tiết",
-      "targetWord": "từ trọng tâm"
-    }
-  ]
-}`;
-
-      const response = await callGemini(ai, prompt, {
-        responseMimeType: 'application/json',
-      });
-
-      const jsonText = response.text || '{}';
-      res.json(JSON.parse(jsonText));
+      const result = await handleGenerateMockTest(req.body);
+      res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/generate-mock-test:', error);
       res.status(500).json({ error: error?.message || 'Lỗi khi tạo đề thi thử' });

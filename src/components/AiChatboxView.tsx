@@ -45,7 +45,7 @@ export const AiChatboxView: React.FC = () => {
   const defaultWelcomeMsg: ChatMessage = {
     id: 'msg_welcome',
     sender: 'ai',
-    text: `Xin chào ${currentUser.ten}! Tôi là **Gia Sư AI Độc Lập** — thực thể AI riêng biệt và thông minh nhất được thiết kế dành riêng cho bạn học môn ${currentLangInfo.name} (${currentLangInfo.nativeName}).\n\nTôi hoạt động hoàn toàn độc lập với các công cụ tiện ích AI khác (như bóc tách sách, kiểm tra nhật ký) để đem lại chất lượng tư duy & giải đáp sâu sắc nhất:\n• Dịch thuật chuyên sâu sát nghĩa tự nhiên như người bản xứ\n• Phân tích cấu trúc ngữ pháp, sắc thái từ & sửa câu chi tiết\n• Phân tích hình ảnh bài tập/sách (OCR) bằng thị giác AI thông minh nhất\n• Đóng vai luyện hội thoại giao tiếp thực tế`,
+    text: `Xin chào ${currentUser.ten}! Tôi là **Gia Sư AI** đồng hành cùng bạn học môn **${currentLangInfo.name} (${currentLangInfo.nativeName})**.\n\nBạn có thể hỏi tôi bất cứ điều gì:\n• Dịch thuật tự nhiên và phân tích cấu trúc ngữ pháp\n• Giải thích sự khác biệt giữa các từ đồng nghĩa\n• Đọc và chữa bài tập qua hình ảnh tải lên\n• Luyện hội thoại và sửa lỗi diễn đạt\n\nHãy nhập câu hỏi hoặc gửi ảnh bài học để bắt đầu nhé!`,
     timestamp: new Date().toISOString(),
   };
 
@@ -75,7 +75,7 @@ export const AiChatboxView: React.FC = () => {
       {
         id: `msg_welcome_${Date.now()}`,
         sender: 'ai',
-        text: `Chào mừng buổi học mới! Bạn muốn Gia sư AI hỗ trợ dịch thuật, giải thích ngữ pháp hay đọc ảnh từ vựng hôm nay?`,
+        text: `Chào mừng bạn đến với phiên học mới môn ${currentLangInfo.name}! Bạn muốn hỏi hoặc luyện tập phần nào hôm nay?`,
         timestamp: new Date().toISOString(),
       },
     ]);
@@ -112,6 +112,9 @@ export const AiChatboxView: React.FC = () => {
     setImageError(null);
     setIsLoading(true);
 
+    // Tính toán lượt hỏi hiện tại của người dùng để server luân phiên chính xác
+    const userMessageCount = updatedMessages.filter((m) => m.sender === 'user').length;
+
     try {
       const response = await fetch('/api/gemini/chat', {
         method: 'POST',
@@ -121,6 +124,7 @@ export const AiChatboxView: React.FC = () => {
           message: userMsg.text,
           imageBase64: currentImg,
           responseLength,
+          turn: userMessageCount - 1,
           messages: updatedMessages.map((m) => ({
             role: m.sender === 'user' ? 'user' : 'model',
             content: m.text,
@@ -140,6 +144,7 @@ export const AiChatboxView: React.FC = () => {
         sender: 'ai',
         text: data.reply || 'Gia sư AI đã ghi nhận. Bạn có muốn hỏi thêm gì không?',
         timestamp: new Date().toISOString(),
+        tutor_info: data.tutorInfo,
         suggested_words: data.suggestedWords || [],
       };
 
@@ -320,16 +325,10 @@ export const AiChatboxView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="font-serif font-black text-base text-[#1A1A1A]">
-                  Gia sư AI Độc Lập — {currentLangInfo.name}
+                  Gia Sư AI — {currentLangInfo.name}
                 </h2>
                 <span className="text-sm">{currentLangInfo.flag}</span>
-                <span className="px-2 py-0.5 bg-amber-100 border border-amber-800 text-amber-900 text-[10px] font-mono font-bold tracking-tight rounded-sm">
-                  ⭐ AI THÔNG MINH NHẤT (FLAGSHIP TUTOR)
-                </span>
               </div>
-              <p className="text-[10px] font-mono text-stone-600 uppercase tracking-wider mt-0.5">
-                🤖 Động cơ AI Gia Sư Chuyên Biệt • Hoàn toàn độc lập với các công cụ bóc tách/OCR khác
-              </p>
             </div>
           </div>
 
@@ -363,22 +362,6 @@ export const AiChatboxView: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-
-        {/* Quick prompt bar */}
-        <div className="px-4 py-2 border-b border-[#1A1A1A]/15 bg-stone-50 flex items-center gap-2 overflow-x-auto text-xs">
-          <span className="text-[10px] font-mono font-bold text-stone-600 shrink-0">Gợi ý nhanh:</span>
-          {quickPrompts.map((qp, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setInputText(qp.prompt + ' ');
-              }}
-              className="px-2.5 py-1 border border-[#1A1A1A]/30 bg-white hover:bg-[#1A1A1A] hover:text-white transition whitespace-nowrap font-serif text-[11px]"
-            >
-              {qp.label}
-            </button>
-          ))}
         </div>
 
         {/* Message Feed */}
