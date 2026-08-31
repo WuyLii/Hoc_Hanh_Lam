@@ -41,6 +41,7 @@ export const GrammarManager: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTextbookModalOpen, setIsTextbookModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<GrammarItem | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form Fields
   const [formStructure, setFormStructure] = useState('');
@@ -60,6 +61,7 @@ export const GrammarManager: React.FC = () => {
     setFormNotes('');
     setFormTags('Ngữ pháp cốt lõi');
     setEditingItem(null);
+    setFormError(null);
   };
 
   const handleOpenAddModal = () => {
@@ -76,13 +78,14 @@ export const GrammarManager: React.FC = () => {
     setFormLevel(item.cap_do);
     setFormNotes(item.ghi_chu || '');
     setFormTags(item.tags?.join(', ') || 'Ngữ pháp');
+    setFormError(null);
     setIsModalOpen(true);
   };
 
   const handleSaveGrammar = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStructure.trim() || !formExplanation.trim()) {
-      alert('Vui lòng nhập cấu trúc câu và giải thích!');
+      setFormError('Vui lòng nhập cấu trúc câu và giải thích!');
       return;
     }
 
@@ -417,6 +420,11 @@ export const GrammarManager: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveGrammar} className="p-6 space-y-4 overflow-y-auto flex-1 bg-[#F9F7F2]">
+              {formError && (
+                <div className="p-3 bg-rose-50 border border-rose-500 text-rose-800 text-xs font-mono">
+                  {formError}
+                </div>
+              )}
               <div>
                 <label className="block text-[10px] font-mono uppercase font-bold tracking-widest text-[#1A1A1A] mb-1">
                   Grammar Structure / Formula *

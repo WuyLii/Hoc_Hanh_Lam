@@ -21,6 +21,7 @@ import {
   Grid,
   X,
   Menu,
+  Calculator,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -68,7 +69,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
     { id: 'mocktest', label: 'Đề thi thử', num: '06', icon: Award },
     { id: 'aichat', label: 'Gia sư AI', num: '07', icon: Sparkles },
     { id: 'stroke', label: 'Tập viết nét chữ', num: '08', icon: PenTool },
-    { id: 'sheets', label: 'Google Sheets', num: '09', icon: FileSpreadsheet },
+    { id: 'numbers', label: 'Số & Lượng từ', num: '09', icon: Calculator },
+    { id: 'sheets', label: 'Google Sheets', num: '10', icon: FileSpreadsheet },
   ];
 
   const handleMobileNavClick = (id: string) => {

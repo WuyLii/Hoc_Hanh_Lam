@@ -75,6 +75,12 @@ export const ProficiencyLevelView: React.FC = () => {
 
   // Equivalency Matrix Modal
   const [isEquivModalOpen, setIsEquivModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   // Sync active level if language changes
   useEffect(() => {
@@ -124,7 +130,7 @@ export const ProficiencyLevelView: React.FC = () => {
       [currentLanguage]: level.name,
     };
     updateUser({ cap_do: updatedCapDo });
-    alert(`Đã cập nhật cấp bậc học hiện tại của bạn thành: ${level.name}`);
+    showToast(`✅ Đã cập nhật cấp bậc học hiện tại của bạn thành: ${level.name}`);
   };
 
   // Jump to other modules with level filter
@@ -204,12 +210,22 @@ export const ProficiencyLevelView: React.FC = () => {
       };
       updateUser({ cap_do: updatedCapDo });
       setIsDiagnosticOpen(false);
-      alert(`Tuyệt vời! Đã thiết lập cấp độ học của bạn thành: ${diagResultLevel}`);
+      showToast(`🎯 Tuyệt vời! Đã thiết lập cấp độ học của bạn thành: ${diagResultLevel}`);
     }
   };
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-20 right-6 z-50 bg-[#1A1A1A] text-[#F9F7F2] border-2 border-amber-400 px-4 py-3 shadow-xl font-mono text-xs animate-in slide-in-from-top-4 flex items-center gap-2">
+          <span>{toastMessage}</span>
+          <button onClick={() => setToastMessage(null)} className="ml-2 text-stone-400 hover:text-white">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-2 border-[#1A1A1A] pb-6">
         <div>

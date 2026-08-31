@@ -45,7 +45,10 @@ export const GoogleSheetsSettings: React.FC = () => {
       autoSync: autoSyncEnabled,
       syncIntervalHours: 24,
     });
-    alert('Đã lưu cấu hình tự động đồng bộ Google Sheets!');
+    setSyncFeedback({
+      success: true,
+      message: '✅ Đã lưu cấu hình tự động đồng bộ Google Sheets thành công!',
+    });
   };
 
   const handleTestSync = async () => {

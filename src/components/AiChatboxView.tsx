@@ -150,6 +150,7 @@ export const AiChatboxView: React.FC = () => {
       saveChatConversation({
         chat_id: activeConversationId,
         user_id: currentUser.user_id,
+        chu_de: userMsg.text.slice(0, 35) || 'Hỏi đáp Gia sư AI',
         tieu_de: userMsg.text.slice(0, 35) || 'Hỏi đáp Gia sư AI',
         ngon_ngu: currentLanguage,
         created_at: new Date().toISOString(),

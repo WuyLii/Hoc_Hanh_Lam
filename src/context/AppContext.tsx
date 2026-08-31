@@ -33,6 +33,7 @@ interface AppContextType {
   currentUser: UserProfile;
   currentLanguage: LanguageCode;
   setCurrentLanguage: (lang: LanguageCode) => void;
+  setLanguage: (lang: LanguageCode) => void;
   updateUser: (user: Partial<UserProfile>) => void;
 
   vocabulary: VocabularyItem[];
@@ -911,6 +912,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         currentLanguage,
         setCurrentLanguage,
+        setLanguage: setCurrentLanguage,
         updateUser,
 
         vocabulary,

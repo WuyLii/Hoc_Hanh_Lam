@@ -9,44 +9,61 @@ import { GameReviewHub } from './components/games/GameReviewHub';
 import { MockTestView } from './components/MockTestView';
 import { AiChatboxView } from './components/AiChatboxView';
 import { StrokeGuideView } from './components/StrokeGuideView';
+import { NumbersView } from './components/NumbersView';
 import { GoogleSheetsSettings } from './components/GoogleSheetsSettings';
 import { OcrScannerModal } from './components/OcrScannerModal';
 
-const ErrorBoundary: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [hasError, setHasError] = useState(false);
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
 
-  React.useEffect(() => {
-    const errorHandler = (event: ErrorEvent) => {
-      console.error('Captured window error:', event.error);
-    };
-    window.addEventListener('error', errorHandler);
-    return () => window.removeEventListener('error', errorHandler);
-  }, []);
+interface ErrorBoundaryState {
+  hasError: boolean;
+  errorMessage?: string;
+}
 
-  if (hasError) {
-    return (
-      <div className="min-h-screen bg-[#F9F7F2] text-[#1A1A1A] flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md w-full border-2 border-[#1A1A1A] bg-white p-8 shadow-[6px_6px_0px_0px_#1A1A1A]">
-          <div className="w-12 h-12 bg-amber-100 border border-[#1A1A1A] rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-            ⚠️
-          </div>
-          <h2 className="text-xl font-serif font-black uppercase mb-2">Đã xảy ra sự cố hiển thị</h2>
-          <p className="text-sm font-mono text-stone-600 mb-6">
-            Ứng dụng đang tự động đồng bộ lại dữ liệu của bạn để đảm bảo không bị sai lệch.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full py-3 bg-[#1A1A1A] text-[#F9F7F2] font-mono text-xs uppercase font-bold tracking-wider hover:bg-stone-800 transition"
-          >
-            🔄 Tải lại trang & Đồng bộ ngay
-          </button>
-        </div>
-      </div>
-    );
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false,
+  };
+
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, errorMessage: error.message };
   }
 
-  return <>{children}</>;
-};
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  }
+
+  public render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#F9F7F2] text-[#1A1A1A] flex flex-col items-center justify-center p-6 text-center">
+          <div className="max-w-md w-full border-2 border-[#1A1A1A] bg-white p-8 shadow-[6px_6px_0px_0px_#1A1A1A]">
+            <div className="w-12 h-12 bg-amber-100 border border-[#1A1A1A] rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
+              ⚠️
+            </div>
+            <h2 className="text-xl font-serif font-black uppercase mb-2">Đã xảy ra sự cố hiển thị</h2>
+            <p className="text-sm font-mono text-stone-600 mb-6">
+              Ứng dụng đang tự động lưu trữ dữ liệu an toàn. Vui lòng tải lại để tiếp tục học tập.
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.reload();
+              }}
+              className="w-full py-3 bg-[#1A1A1A] text-[#F9F7F2] font-mono text-xs uppercase font-bold tracking-wider hover:bg-stone-800 transition"
+            >
+              🔄 Tải lại trang & Khôi phục
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const AppContent: React.FC = () => {
   const { activeNav } = useApp();
@@ -70,6 +87,8 @@ const AppContent: React.FC = () => {
         return <AiChatboxView />;
       case 'stroke':
         return <StrokeGuideView />;
+      case 'numbers':
+        return <NumbersView />;
       case 'sheets':
         return <GoogleSheetsSettings />;
       default:

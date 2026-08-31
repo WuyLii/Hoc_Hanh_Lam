@@ -287,7 +287,7 @@ function ensureAllTabs(ss) {
    */
   public static exportToCSV(filename: string, rows: Record<string, any>[]): void {
     if (!rows || !rows.length) {
-      alert('Không có dữ liệu để xuất file CSV.');
+      console.warn('Không có dữ liệu để xuất file CSV.');
       return;
     }
 

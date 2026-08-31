@@ -9,6 +9,7 @@ export interface LanguageInfo {
   levels: string[];
   defaultVoiceLang: string;
   description: string;
+  examType?: string;
 }
 
 export const LANGUAGES: Record<LanguageCode, LanguageInfo> = {
@@ -21,6 +22,7 @@ export const LANGUAGES: Record<LanguageCode, LanguageInfo> = {
     levels: ['A1 - Cơ bản', 'A2 - Sơ cấp', 'B1 - Trung cấp', 'B2 - Trung cao', 'C1 - Cao cấp', 'C2 - Thành thạo', 'TOEIC 500-750', 'TOEIC 750+', 'IELTS 6.5+'],
     defaultVoiceLang: 'en-US',
     description: 'Hệ thống phiên âm IPA chuẩn quốc tế, từ vựng theo CEFR / TOEIC / IELTS.',
+    examType: 'TOEIC/IELTS (CEFR)',
   },
   ko: {
     code: 'ko',
@@ -31,6 +33,7 @@ export const LANGUAGES: Record<LanguageCode, LanguageInfo> = {
     levels: ['TOPIK 1 (Sơ cấp 1)', 'TOPIK 2 (Sơ cấp 2)', 'TOPIK 3 (Trung cấp 1)', 'TOPIK 4 (Trung cấp 2)', 'TOPIK 5 (Cao cấp 1)', 'TOPIK 6 (Cao cấp 2)', 'Giao tiếp hàng ngày'],
     defaultVoiceLang: 'ko-KR',
     description: 'Chữ Hangul kèm Romaja, kính ngữ 존댓말/반말, cấu trúc ngữ pháp TOPIK.',
+    examType: 'TOPIK I-II (EPS/NIIED)',
   },
   zh: {
     code: 'zh',
@@ -41,6 +44,7 @@ export const LANGUAGES: Record<LanguageCode, LanguageInfo> = {
     levels: ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6', 'Khẩu ngữ thường nhật', 'Thương mại'],
     defaultVoiceLang: 'zh-CN',
     description: 'Chữ Hán giản thể/phồn thể, Pinyin có dấu thanh, bộ thủ và mẫu câu HSK.',
+    examType: 'HSK 1-6 & HSKK (Hanban)',
   },
 };
 
@@ -88,6 +92,7 @@ export interface VocabularyItem {
 export interface Deck {
   deck_id: string;
   ten_bo: string;
+  ten_deck?: string;
   ngon_ngu: LanguageCode;
   mo_ta: string;
   nguoi_tao: string;
@@ -131,8 +136,9 @@ export interface ReviewSession {
   so_cau_dung: number;
   so_cau_sai: number;
   diem: number;
-  ngon_ngu: LanguageCode;
-  word_ids_reviewed: string[];
+  ngon_ngu?: LanguageCode;
+  word_ids_reviewed?: string[];
+  danh_sach_word_id?: string[];
 }
 
 export interface MockQuestion {
@@ -262,6 +268,7 @@ export interface ChatConversation {
   chat_id: string;
   user_id: string;
   chu_de: string;
+  tieu_de?: string;
   ngon_ngu: LanguageCode;
   cac_tin_nhan?: ChatMessage[];
   messages?: ChatMessage[];
