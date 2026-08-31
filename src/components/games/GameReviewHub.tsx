@@ -367,7 +367,7 @@ export const GameReviewHub: React.FC = () => {
               <option value="ALL">Tất cả bộ thẻ</option>
               {currentLangDecks.map((d) => (
                 <option key={d.deck_id} value={d.deck_id}>
-                  {d.ten_deck}
+                  {(d as any).ten_bo || d.ten_deck || 'Bộ thẻ'}
                 </option>
               ))}
             </select>

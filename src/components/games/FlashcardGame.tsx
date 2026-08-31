@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { RecallQuality } from '../../services/srsEngine';
@@ -68,15 +68,18 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     setIsFlipped(!isFlipped);
   };
 
+  const isAdvancingRef = useRef(false);
+
   const handleRate = (rating: RecallQuality) => {
-    if (!currentWord) return;
+    if (!currentWord || isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
 
     onRecordSRS(currentWord.word_id, rating);
     const newResults = [...sessionResults, { wordId: currentWord.word_id, rating }];
     setSessionResults(newResults);
 
     if (currentIndex + 1 < activeWords.length) {
-      setCurrentIndex(currentIndex + 1);
+      setCurrentIndex((prev) => prev + 1);
       setIsFlipped(false);
     } else {
       setIsCompleted(true);
@@ -85,6 +88,10 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
       const score = correctCount * 20;
       onFinish(correctCount, activeWords.length, score);
     }
+
+    setTimeout(() => {
+      isAdvancingRef.current = false;
+    }, 350);
   };
 
   const handlePlayAudio = (e: React.MouseEvent) => {

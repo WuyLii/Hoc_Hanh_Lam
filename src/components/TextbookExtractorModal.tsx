@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { LANGUAGES } from '../types';
 import { TextbookExtractResult, ExtractedVocabItem, ExtractedGrammarItem } from '../types';
+import { compressImageForAI } from '../utils/imageCompressor';
 import {
   BookOpen,
   Sparkles,
@@ -45,20 +46,30 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
 
   if (!isOpen) return null;
 
-  // Handle file upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file upload with automatic image compression for AI
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
-    setFileMime(file.type);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64String = reader.result as string;
-      setFileBase64(base64String);
-    };
-    reader.readAsDataURL(file);
+    if (file.type.startsWith('image/')) {
+      setFileMime('image/jpeg');
+      try {
+        const compressedBase64 = await compressImageForAI(file, 1280, 0.75);
+        setFileBase64(compressedBase64);
+      } catch (err) {
+        console.error('Lỗi khi nén ảnh sách:', err);
+      }
+    } else {
+      setFileMime(file.type);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = reader.result as string;
+        setFileBase64(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleRunExtraction = async () => {

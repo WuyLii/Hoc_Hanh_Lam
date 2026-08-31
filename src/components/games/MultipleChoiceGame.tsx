@@ -80,8 +80,11 @@ export const MultipleChoiceGame: React.FC<MultipleChoiceGameProps> = ({
     return () => clearInterval(timer);
   }, [timeLeft, isAnswered, isCompleted]);
 
+  const isChoosingRef = React.useRef(false);
+
   const handleChoose = (opt: string | null) => {
-    if (isAnswered || !currentWord) return;
+    if (isAnswered || isChoosingRef.current || !currentWord) return;
+    isChoosingRef.current = true;
 
     setSelectedOption(opt);
     setIsAnswered(true);
@@ -98,6 +101,7 @@ export const MultipleChoiceGame: React.FC<MultipleChoiceGameProps> = ({
     }
 
     setTimeout(() => {
+      isChoosingRef.current = false;
       if (currentIndex + 1 < gameWords.length) {
         setCurrentIndex((i) => i + 1);
         setIsAnswered(false);

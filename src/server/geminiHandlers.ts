@@ -19,17 +19,19 @@ export const getGenAI = () => {
 
 export async function callGeminiWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
   const modelsToTry = [
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
     'gemini-3.7-flash',
     'gemini-3.1-pro-preview',
-    'gemini-flash-latest',
-    'gemini-3.1-flash-lite',
   ];
 
   let lastError: any = null;
 
   for (const model of modelsToTry) {
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 2;
     while (attempts < maxAttempts) {
       try {
         attempts++;
@@ -55,24 +57,21 @@ export async function callGeminiWithRetry(ai: GoogleGenAI, contents: any, config
           errMsg.includes('overloaded');
 
         if (isTransient && attempts < maxAttempts) {
-          // Exponential backoff with jitter: 1200ms, 2400ms
-          await new Promise((resolve) => setTimeout(resolve, attempts * 1200 + Math.random() * 400));
+          await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
         } else {
-          // Break attempt loop to try fallback model
           break;
         }
       }
     }
   }
 
-  // Parse error message nicely if it's raw JSON from Google API
   let friendlyMsg = 'Hệ thống AI đang phản hồi chậm hoặc quá tải. Vui lòng thử lại sau giây lát.';
   if (lastError) {
     const rawStr = typeof lastError === 'string' ? lastError : lastError?.message || '';
     if (rawStr.includes('503') || rawStr.includes('high demand') || rawStr.includes('UNAVAILABLE')) {
       friendlyMsg = 'Hệ thống AI Gemini đang tạm thời quá tải (Lỗi 503 High Demand). Vui lòng bấm nút Thử Lại sau ít giây!';
     } else if (rawStr.includes('GEMINI_API_KEY')) {
-      friendlyMsg = 'Chưa cấu hình GEMINI_API_KEY trên môi trường server Vercel.';
+      friendlyMsg = 'Chưa cấu hình GEMINI_API_KEY trên môi trường server.';
     } else if (rawStr) {
       try {
         const parsedErr = JSON.parse(rawStr);
@@ -92,68 +91,86 @@ export function safeParseJSON(text: string) {
   if (!text) return {};
   let cleanText = text.trim();
   cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const firstBrace = cleanText.search(/[\{\[]/);
+  const lastBrace = Math.max(cleanText.lastIndexOf('}'), cleanText.lastIndexOf(']'));
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+  }
   try {
     return JSON.parse(cleanText);
   } catch (err) {
     console.error('Failed to parse JSON from AI response:', cleanText);
-    throw new Error('Dữ liệu AI trả về không đúng định dạng JSON.');
+    return {};
   }
 }
 
 export async function handleChat(body: any) {
-  const { messages, language, imageBase64, imageMime } = body;
+  const { messages, language, imageBase64, imageMime, responseLength } = body;
   const ai = getGenAI();
   const langName = language === 'en' ? 'English (Tiếng Anh)' : language === 'ko' ? 'Korean (Tiếng Hàn)' : 'Chinese (Tiếng Trung)';
 
-  const systemInstruction = `Bạn là trợ lý AI chuyên gia giáo dục ngôn ngữ cho ứng dụng Polyglot Hub học 3 thứ tiếng: Tiếng Anh, Tiếng Hàn, Tiếng Trung.
-Ngôn ngữ người dùng đang tập trung hỏi hoặc học hiện tại: ${langName}.
-Nhiệm vụ của bạn:
-1. Giải đáp chi tiết, dễ hiểu, thân thiện bằng Tiếng Việt về: ngữ pháp, cách dùng từ, phân biệt từ đồng nghĩa, nguồn gốc từ, văn hoá giao tiếp, dịch câu, sửa lỗi câu người dùng tự đặt.
-2. Với tiếng Anh: cung cấp phiên âm IPA chuẩn.
-3. Với tiếng Hàn: cung cấp chữ Hangul, phiên âm Romaja và kính ngữ (반말 / 존댓말).
-4. Với tiếng Trung: cung cấp chữ Hán (Giản thể / Phồn thể), phiên âm Pinyin có dấu thanh và bộ thủ.
-5. Nếu trong câu trả lời có các từ vựng hoặc cấu trúc câu mới tiêu biểu đáng học, hãy đính kèm ở cuối phản hồi một danh sách JSON theo định dạng chuẩn:
+  const lengthDirective = responseLength === 'short'
+    ? '⚡ QUY ĐỊNH ĐỘ DÀI: TRẢ LỜI NGẮN GỌN (Short Mode). Trả lời thật súc tích, đi thẳng vào đáp án chính hoặc bản dịch cốt lõi (dưới 3-4 câu).'
+    : '📚 QUY ĐỊNH ĐỘ DÀI: TRẢ LỜI CHI TIẾT (Long Mode). Đóng vai Gia sư AI cá nhân thực thụ, giải thích tận tình, dịch đầy đủ toàn vẹn, phân tích chi tiết từng thành phần ngữ pháp, từ vựng, phiên âm, ví dụ tự nhiên và mẹo nhớ.';
+
+  const systemInstruction = `Bạn là Gia sư AI cá nhân chuyên sâu (AI Personal Language Tutor) cho ứng dụng Polyglot Hub học 3 ngôn ngữ: Tiếng Anh, Tiếng Hàn, Tiếng Trung.
+Ngôn ngữ người học đang tập trung hiện tại: ${langName}.
+
+${lengthDirective}
+
+Nhiệm vụ của Gia sư AI:
+1. Đóng vai gia sư thiệt sự: Luôn sẵn sàng dịch câu/đoạn văn, giải thích nghĩa từ/cấu trúc, phân biệt từ đồng nghĩa, sửa lỗi sai người dùng đặt câu, hướng dẫn giao tiếp, hoặc nhập vai trò chuyện thực tế.
+2. Khi được yêu cầu DỊCH: Hãy dịch toàn vẹn, sát nghĩa tự nhiên, kèm giải thích các cụm từ quan trọng trong câu.
+3. Với Tiếng Anh: Cung cấp phiên âm IPA chuẩn cho từ/cụm từ quan trọng.
+4. Với Tiếng Hàn: Cung cấp Hangul, phiên âm Romaja và kính ngữ (존댓말/반말).
+5. Với Tiếng Trung: Cung cấp chữ Hán (Giản thể/Phồn thể), Pinyin có dấu thanh và bộ thủ.
+6. Khi xử lý HÌNH ẢNH đính kèm (sách giáo khoa, bảng từ, đề thi): Hãy đọc toàn bộ nội dung chữ trong hình ảnh (OCR), dịch nghĩa và giải thích chi tiết các từ vựng hoặc điểm ngữ pháp có trong ảnh.
+
+Nếu trong phản hồi có các từ vựng mới tiêu biểu đáng lưu vào sổ từ, hãy đính kèm ở cuối bài khối JSON:
 ---VOCAB_SUGGESTIONS---
 [
   {
     "word": "từ",
     "meaning": "nghĩa tiếng Việt",
     "phonetic": "phiên âm",
-    "type": "noun/verb/adj...",
-    "example": "câu ví dụ",
-    "exampleVi": "dịch câu ví dụ",
-    "level": "A1/TOPIK 1/HSK 1..."
+    "type": "loại từ",
+    "example": "ví dụ",
+    "exampleVi": "dịch ví dụ"
   }
 ]
 ---END_VOCAB_SUGGESTIONS---
-(Lưu ý: Nếu không có từ mới nổi bật, không cần xuất khối JSON này). Trả lời định dạng Markdown đẹp mắt, rõ ràng.`;
+Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markdown đẹp mắt.`;
 
   let contents: any[] = [];
   if (Array.isArray(messages) && messages.length > 0) {
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
-      if (i === messages.length - 1 && imageBase64) {
+      const isLastMsg = i === messages.length - 1;
+      const msgText = msg.content || msg.text || '';
+      const msgImage = isLastMsg && imageBase64 ? imageBase64 : msg.image_url || msg.image;
+
+      if (msgImage) {
         contents.push({
-          role: 'user',
+          role: msg.role === 'assistant' || msg.sender === 'ai' ? 'model' : 'user',
           parts: [
             {
               inlineData: {
-                data: imageBase64.replace(/^data:image\/[a-z]+;base64,/, ''),
+                data: msgImage.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
                 mimeType: imageMime || 'image/jpeg',
               },
             },
-            { text: msg.content || 'Hãy phân tích hình ảnh này và giải thích từ vựng, ngữ pháp hoặc dịch nội dung trong ảnh.' },
+            { text: msgText || 'Hãy phân tích hình ảnh này, đọc chữ (OCR) và giải thích nghĩa, ngữ pháp hoặc dịch nội dung trong ảnh.' },
           ],
         });
       } else {
         contents.push({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }],
+          role: msg.role === 'assistant' || msg.sender === 'ai' ? 'model' : 'user',
+          parts: [{ text: msgText }],
         });
       }
     }
   } else {
-    contents = [{ role: 'user', parts: [{ text: 'Xin chào! Hãy giới thiệu bạn có thể giúp gì cho tôi khi học Tiếng Anh, Hàn, Trung.' }] }];
+    contents = [{ role: 'user', parts: [{ text: 'Xin chào! Hãy đóng vai Gia sư AI của tôi.' }] }];
   }
 
   const response = await callGeminiWithRetry(ai, contents, {
@@ -161,7 +178,21 @@ Nhiệm vụ của bạn:
     temperature: 0.7,
   });
 
-  return { reply: response.text || '' };
+  const replyText = response.text || '';
+  let suggestedWords: any[] = [];
+
+  const match = replyText.match(/---VOCAB_SUGGESTIONS---\s*([\s\S]*?)\s*---END_VOCAB_SUGGESTIONS---/);
+  if (match && match[1]) {
+    try {
+      suggestedWords = JSON.parse(match[1].trim());
+    } catch (e) {
+      console.error('Failed to parse vocab suggestions:', e);
+    }
+  }
+
+  const cleanedReply = replyText.replace(/---VOCAB_SUGGESTIONS---[\s\S]*?---END_VOCAB_SUGGESTIONS---/, '').trim();
+
+  return { reply: cleanedReply || replyText, suggestedWords };
 }
 
 export async function handleGenerateExample(body: any) {
@@ -404,10 +435,12 @@ Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
 
   const parts: any[] = [];
   imageList.forEach((img) => {
+    const matchMime = img.match(/^data:(image\/[a-z0-9\+\.-]+);base64,/i);
+    const mimeType = matchMime ? matchMime[1] : 'image/jpeg';
     parts.push({
       inlineData: {
         data: img.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
-        mimeType: 'image/jpeg',
+        mimeType,
       },
     });
   });

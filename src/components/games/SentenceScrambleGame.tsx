@@ -122,7 +122,12 @@ export const SentenceScrambleGame: React.FC<SentenceScrambleGameProps> = ({
     }
   };
 
+  const isAdvancingRef = React.useRef(false);
+
   const handleNext = () => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
     if (currentIndex + 1 < puzzles.length) {
       setCurrentIndex((i) => i + 1);
     } else {
@@ -130,6 +135,10 @@ export const SentenceScrambleGame: React.FC<SentenceScrambleGameProps> = ({
       confetti({ particleCount: 80, spread: 60 });
       onFinish(correctCount, puzzles.length, correctCount * 30);
     }
+
+    setTimeout(() => {
+      isAdvancingRef.current = false;
+    }, 400);
   };
 
   if (!puzzles || puzzles.length === 0) {

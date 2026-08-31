@@ -89,7 +89,12 @@ export const TypingPracticeGame: React.FC<TypingPracticeGameProps> = ({
     }
   };
 
+  const isAdvancingRef = useRef(false);
+
   const handleNextWord = () => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
     if (currentIndex + 1 < shuffledWords.length) {
       setCurrentIndex((i) => i + 1);
     } else {
@@ -99,6 +104,10 @@ export const TypingPracticeGame: React.FC<TypingPracticeGameProps> = ({
       const speedBonus = Math.max(50, Math.round(500 - timeTakenSec * 5));
       onFinish(correctCount, shuffledWords.length, correctCount * 30 + speedBonus);
     }
+
+    setTimeout(() => {
+      isAdvancingRef.current = false;
+    }, 450);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

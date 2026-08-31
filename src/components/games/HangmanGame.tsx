@@ -123,7 +123,12 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
     }
   };
 
+  const isAdvancingRef = React.useRef(false);
+
   const handleNext = () => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
     if (currentIndex + 1 < shuffledWords.length) {
       setCurrentIndex((i) => i + 1);
     } else {
@@ -131,6 +136,10 @@ export const HangmanGame: React.FC<HangmanGameProps> = ({
       confetti({ particleCount: 80, spread: 60 });
       onFinish(correctCount, shuffledWords.length, correctCount * 30);
     }
+
+    setTimeout(() => {
+      isAdvancingRef.current = false;
+    }, 400);
   };
 
   if (!shuffledWords || shuffledWords.length === 0) {

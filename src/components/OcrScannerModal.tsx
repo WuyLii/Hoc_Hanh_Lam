@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { LANGUAGES } from '../types';
+import { compressImageForAI } from '../utils/imageCompressor';
 import {
   Sparkles,
   Camera,
@@ -60,20 +61,22 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const res = evt.target?.result as string;
-        if (res) {
-          setImagesBase64((prev) => [...prev, res]);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.type.startsWith('image/')) {
+        try {
+          // Tự động nén chất lượng & kích thước ảnh về mức tối ưu (max 1280px, quality 0.75) để AI đọc OCR chuẩn xác và không bị nghẽn
+          const compressed = await compressImageForAI(file, 1280, 0.75);
+          setImagesBase64((prev) => [...prev, compressed]);
+        } catch (err) {
+          console.error('Lỗi khi nén ảnh:', err);
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+    }
 
     setExtractedWords([]);
     setExtractedGrammars([]);

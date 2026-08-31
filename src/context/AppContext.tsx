@@ -79,6 +79,8 @@ interface AppContextType {
 
   chatHistory: ChatConversation[];
   saveChatConversation: (conv: ChatConversation) => void;
+  deleteChatConversation: (chatId: string) => void;
+  clearChatHistory: () => void;
 
   sheetsConfig: GoogleSheetsConfig;
   updateSheetsConfig: (config: Partial<GoogleSheetsConfig>) => void;
@@ -555,6 +557,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const deleteChatConversation = (chatId: string) => {
+    setChatHistory((prev) => prev.filter((c) => c.chat_id !== chatId));
+  };
+
+  const clearChatHistory = () => {
+    setChatHistory([]);
+  };
+
   const updateSheetsConfig = (cfg: Partial<GoogleSheetsConfig>) => {
     setSheetsConfig((prev) => {
       const updated = { ...prev, ...cfg };
@@ -947,6 +957,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         chatHistory,
         saveChatConversation,
+        deleteChatConversation,
+        clearChatHistory,
 
         sheetsConfig,
         updateSheetsConfig,
