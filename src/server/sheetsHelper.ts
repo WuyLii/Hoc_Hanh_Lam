@@ -142,6 +142,14 @@ export async function fetchPublicSpreadsheet(urlOrId: string) {
               const expText = row.giai_thich || row.explanation || row['giải thích'];
 
               if (wordText || meanText) {
+                const rawLang = row.ngon_ngu || row.language || row.lang || 'ko';
+                let detectedLang = 'en';
+                const lLower = String(rawLang).toLowerCase();
+                if (lLower.includes('ko') || lLower.includes('han') || lLower.includes('korean')) detectedLang = 'ko';
+                else if (lLower.includes('zh') || lLower.includes('trung') || lLower.includes('chinese') || lLower.includes('hsk')) detectedLang = 'zh';
+                else if (lLower.includes('en') || lLower.includes('anh') || lLower.includes('english')) detectedLang = 'en';
+                else detectedLang = lLower.slice(0, 2);
+
                 resultData.vocabulary.push({
                   word_id: row.id || `w_sheet_${idx}_${Date.now()}`,
                   tu: wordText || '',
@@ -152,7 +160,7 @@ export async function fetchPublicSpreadsheet(urlOrId: string) {
                   cap_do: row.cap_do || 'Cơ bản',
                   vi_du: row.vi_du || '',
                   vi_du_dich: row.vi_du_dich || '',
-                  ngon_ngu: row.ngon_ngu || 'en',
+                  ngon_ngu: detectedLang,
                   srs_box: Number(row.srs_box) || 0,
                   nguon_goc: 'Google Sheets (Auto Sync)',
                   created_at: new Date().toISOString().split('T')[0],
