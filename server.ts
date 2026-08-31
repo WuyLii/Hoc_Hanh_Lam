@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { handleOcrExtract, formatGeminiError } from './src/server/geminiHandlers.ts';
+import { handleOcrExtract, handleExtractTextbook, formatGeminiError } from './src/server/geminiHandlers.ts';
 import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 
 dotenv.config();
@@ -122,7 +122,7 @@ async function startServer() {
       'gemini-2.5-flash',
       'gemini-2.0-flash',
       'gemini-1.5-flash',
-      'gemini-2.5-pro',
+      'gemini-1.5-flash-8b',
     ];
 
     let lastErr: any = null;
@@ -483,104 +483,8 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
   // 7. Large Textbook & Language Book Full AI Extractor
   app.post('/api/gemini/extract-textbook', async (req, res) => {
     try {
-      const {
-        fileBase64,
-        fileMime,
-        rawText,
-        fileName,
-        language,
-        extractMode,
-        customInstruction,
-      } = req.body;
-
-      const ai = getGenAI();
-
-      const targetLangName =
-        language === 'en'
-          ? 'Tiếng Anh (English)'
-          : language === 'ko'
-          ? 'Tiếng Hàn (한국어)'
-          : language === 'zh'
-          ? 'Tiếng Trung (中文)'
-          : 'Đa ngôn ngữ';
-
-      const prompt = `Bạn là chuyên gia ngôn ngữ học và trợ lý AI cao cấp chuyên phân tích, bóc tách sách giáo khoa, giáo trình ngoại ngữ (${targetLangName}).
-Tài liệu: ${fileName || 'Sách giáo khoa'}.
-Chế độ: ${extractMode === 'vocab' ? 'Chỉ từ vựng' : extractMode === 'grammar' ? 'Chỉ ngữ pháp' : 'Toàn diện'}.
-${customInstruction ? `Yêu cầu: ${customInstruction}` : ''}
-
-Trả về JSON thuần tuý:
-{
-  "bookTitle": "Tên sách",
-  "detectedLanguage": "${language || 'ko'}",
-  "level": "Cấp độ",
-  "totalUnits": 5,
-  "summary": "Tóm tắt",
-  "unitList": ["Bài 1"],
-  "vocabulary": [
-    {
-      "tu": "từ",
-      "nghia": "nghĩa",
-      "phien_am": "phiên âm",
-      "loai_tu": "loại từ",
-      "unit": "Bài 1",
-      "vi_du": "ví dụ",
-      "vi_du_dich": "dịch",
-      "cap_do": "TOPIK 1",
-      "chu_de": "chủ đề"
-    }
-  ],
-  "grammar": [
-    {
-      "cau_truc": "cấu trúc",
-      "giai_thich": "giải thích",
-      "cong_thuc": "công thức",
-      "unit": "Bài 1",
-      "cap_do": "Sơ cấp 1",
-      "vi_du": "ví dụ",
-      "vi_du_dich": "dịch",
-      "ghi_chu": "ghi chú"
-    }
-  ]
-}`;
-
-      let contents: any[] = [];
-
-      if (fileBase64 && fileMime) {
-        contents.push({
-          role: 'user',
-          parts: [
-            {
-              inlineData: {
-                data: fileBase64.replace(/^data:[^;]+;base64,/, ''),
-                mimeType: fileMime,
-              },
-            },
-            { text: prompt },
-          ],
-        });
-      } else if (rawText) {
-        // If rawText is extremely long, truncate to avoid 503 timeout
-        const trimmedText = rawText.length > 50000 ? rawText.substring(0, 50000) + '\n[... Văn bản đã được cắt bớt để tối ưu hóa xử lý AI ...]' : rawText;
-        contents.push({
-          role: 'user',
-          parts: [
-            {
-              text: `${prompt}\n\n================ NỘI DUNG TÀI LIỆU ================\n${trimmedText}`,
-            },
-          ],
-        });
-      } else {
-        return res.status(400).json({ error: 'Vui lòng cung cấp file hoặc văn bản sách.' });
-      }
-
-      let response: any = null;
-      response = await callGemini(ai, contents, {
-        responseMimeType: 'application/json',
-      });
-
-      const jsonText = response?.text || '{}';
-      res.json(JSON.parse(jsonText));
+      const result = await handleExtractTextbook(req.body);
+      res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/extract-textbook:', error);
       const isTimeout = error?.message?.includes('503') || error?.message?.includes('Deadline expired') || error?.status === 503;

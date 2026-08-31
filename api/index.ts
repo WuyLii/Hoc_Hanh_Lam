@@ -6,6 +6,7 @@ import {
   handleCheckJournal,
   handleGenerateMockTest,
   handleOcrExtract,
+  handleExtractTextbook,
 } from '../src/server/geminiHandlers.js';
 import { fetchPublicSpreadsheet } from '../src/server/sheetsHelper.js';
 
@@ -192,6 +193,20 @@ app.post('/api/gemini/generate-mock-test', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi tạo đề thi' });
+  }
+});
+
+app.post('/api/gemini/extract-textbook', async (req, res) => {
+  try {
+    const result = await handleExtractTextbook(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in Vercel API /api/gemini/extract-textbook:', error);
+    const isTimeout = error?.message?.includes('503') || error?.message?.includes('Deadline expired') || error?.status === 503;
+    const errorMessage = isTimeout
+      ? 'Quá trình phân tích tài liệu mất quá nhiều thời gian hoặc tệp quá lớn (Lỗi 503: Quá thời gian chờ). Vui lòng thử lại với một phần chương ngắn hơn hoặc dán nội dung văn bản trực tiếp.'
+      : (error?.message || 'Lỗi khi xử lý bóc tách sách');
+    res.status(500).json({ error: errorMessage });
   }
 });
 

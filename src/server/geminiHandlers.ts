@@ -69,7 +69,7 @@ export async function callGeminiWithRetry(ai: GoogleGenAI, contents: any, config
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
-    'gemini-2.5-pro',
+    'gemini-1.5-flash-8b',
   ];
 
   let lastError: any = null;
@@ -476,6 +476,104 @@ Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
     responseMimeType: 'application/json',
     temperature: 0.1,
     maxOutputTokens: 16384,
+  });
+
+  return safeParseJSON(response.text || '{}');
+}
+
+export async function handleExtractTextbook(body: any) {
+  const {
+    fileBase64,
+    fileMime,
+    rawText,
+    fileName,
+    language,
+    extractMode,
+    customInstruction,
+  } = body;
+
+  const ai = getGenAI();
+
+  const targetLangName =
+    language === 'en'
+      ? 'Tiếng Anh (English)'
+      : language === 'ko'
+      ? 'Tiếng Hàn (한국어)'
+      : language === 'zh'
+      ? 'Tiếng Trung (中文)'
+      : 'Đa ngôn ngữ';
+
+  const prompt = `Bạn là chuyên gia ngôn ngữ học và trợ lý AI cao cấp chuyên phân tích, bóc tách sách giáo khoa, giáo trình ngoại ngữ (${targetLangName}).
+Tài liệu: ${fileName || 'Sách giáo khoa'}.
+Chế độ: ${extractMode === 'vocab' ? 'Chỉ từ vựng' : extractMode === 'grammar' ? 'Chỉ ngữ pháp' : 'Toàn diện'}.
+${customInstruction ? `Yêu cầu: ${customInstruction}` : ''}
+
+Trả về JSON thuần tuý:
+{
+  "bookTitle": "Tên sách",
+  "detectedLanguage": "${language || 'ko'}",
+  "level": "Cấp độ",
+  "totalUnits": 5,
+  "summary": "Tóm tắt",
+  "unitList": ["Bài 1"],
+  "vocabulary": [
+    {
+      "tu": "từ",
+      "nghia": "nghĩa",
+      "phien_am": "phiên âm",
+      "loai_tu": "loại từ",
+      "unit": "Bài 1",
+      "vi_du": "ví dụ",
+      "vi_du_dich": "dịch",
+      "cap_do": "TOPIK 1",
+      "chu_de": "chủ đề"
+    }
+  ],
+  "grammar": [
+    {
+      "cau_truc": "cấu trúc",
+      "giai_thich": "giải thích",
+      "cong_thuc": "công thức",
+      "unit": "Bài 1",
+      "cap_do": "Sơ cấp 1",
+      "vi_du": "ví dụ",
+      "vi_du_dich": "dịch",
+      "ghi_chu": "ghi chú"
+    }
+  ]
+}`;
+
+  let contents: any[] = [];
+
+  if (fileBase64 && fileMime) {
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          inlineData: {
+            data: fileBase64.replace(/^data:[^;]+;base64,/, ''),
+            mimeType: fileMime,
+          },
+        },
+        { text: prompt },
+      ],
+    });
+  } else if (rawText) {
+    const trimmedText = rawText.length > 50000 ? rawText.substring(0, 50000) + '\n[... Văn bản đã được cắt bớt để tối ưu hóa xử lý AI ...]' : rawText;
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          text: `${prompt}\n\n================ NỘI DUNG TÀI LIỆU ================\n${trimmedText}`,
+        },
+      ],
+    });
+  } else {
+    throw new Error('Vui lòng cung cấp file hoặc văn bản sách.');
+  }
+
+  const response = await callGeminiWithRetry(ai, contents, {
+    responseMimeType: 'application/json',
   });
 
   return safeParseJSON(response.text || '{}');
