@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   Table as TableIcon,
   CopyCheck,
+  RotateCw,
 } from 'lucide-react';
 
 export const VocabularyManager: React.FC = () => {
@@ -133,7 +134,8 @@ export const VocabularyManager: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Không thể kết nối máy chủ AI');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Hệ thống AI tạm thời chưa phản hồi. Vui lòng thử lại!');
       }
 
       const data = await response.json();
@@ -730,9 +732,22 @@ export const VocabularyManager: React.FC = () => {
             {/* Modal Form */}
             <form onSubmit={handleSaveWord} className="p-6 space-y-4 overflow-y-auto flex-1 bg-[#F9F7F2]">
               {aiError && (
-                <div className="p-3 bg-rose-100 border-2 border-rose-800 text-rose-900 text-xs font-mono flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{aiError}</span>
+                <div className="p-3 bg-rose-100 border-2 border-rose-800 text-rose-900 text-xs font-mono flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-1">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span className="leading-relaxed font-bold">{aiError}</span>
+                  </div>
+                  {formWord.trim() && (
+                    <button
+                      type="button"
+                      onClick={handleAiAutoEnrich}
+                      disabled={isAiLoading}
+                      className="px-2 py-1 bg-rose-900 text-white font-mono text-[10px] font-bold uppercase hover:bg-rose-950 flex items-center gap-1 shrink-0 transition disabled:opacity-50 cursor-pointer"
+                    >
+                      <RotateCw className={`w-3 h-3 ${isAiLoading ? 'animate-spin' : ''}`} />
+                      <span>THỬ LẠI</span>
+                    </button>
+                  )}
                 </div>
               )}
 

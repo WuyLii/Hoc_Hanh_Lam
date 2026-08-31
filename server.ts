@@ -119,10 +119,10 @@ async function startServer() {
 
   const callGemini = async (ai: GoogleGenAI, contents: any, config?: any) => {
     const models = [
+      'gemini-3.7-flash',
+      'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
       'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-8b',
     ];
 
     let lastErr: any = null;
