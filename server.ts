@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { handleOcrExtract } from './src/server/geminiHandlers.ts';
+import { handleOcrExtract, formatGeminiError } from './src/server/geminiHandlers.ts';
 import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 
 dotenv.config();
@@ -120,18 +120,16 @@ async function startServer() {
   const callGemini = async (ai: GoogleGenAI, contents: any, config?: any) => {
     const models = [
       'gemini-2.5-flash',
-      'gemini-2.5-pro',
       'gemini-2.0-flash',
       'gemini-1.5-flash',
-      'gemini-3.7-flash',
-      'gemini-3.1-pro-preview',
+      'gemini-2.5-pro',
     ];
 
     let lastErr: any = null;
 
     for (const model of models) {
       let attempts = 0;
-      const maxAttempts = 3;
+      const maxAttempts = 2;
       while (attempts < maxAttempts) {
         try {
           attempts++;
@@ -155,7 +153,7 @@ async function startServer() {
             errMsg.includes('overloaded');
 
           if (isTransient && attempts < maxAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, attempts * 1200 + Math.random() * 400));
+            await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
           } else {
             break;
           }
@@ -163,26 +161,7 @@ async function startServer() {
       }
     }
 
-    let friendlyMsg = 'Hệ thống AI đang phản hồi chậm hoặc quá tải. Vui lòng thử lại sau giây lát.';
-    if (lastErr) {
-      const rawStr = typeof lastErr === 'string' ? lastErr : lastErr?.message || '';
-      if (rawStr.includes('503') || rawStr.includes('high demand') || rawStr.includes('UNAVAILABLE')) {
-        friendlyMsg = 'Hệ thống AI Gemini đang tạm thời quá tải (Lỗi 503 High Demand). Vui lòng bấm nút Thử Lại sau ít giây!';
-      } else if (rawStr.includes('GEMINI_API_KEY')) {
-        friendlyMsg = 'Chưa cấu hình GEMINI_API_KEY trên môi trường server.';
-      } else if (rawStr) {
-        try {
-          const parsedErr = JSON.parse(rawStr);
-          if (parsedErr?.error?.message) {
-            friendlyMsg = parsedErr.error.message;
-          }
-        } catch (_) {
-          friendlyMsg = rawStr;
-        }
-      }
-    }
-
-    throw new Error(friendlyMsg);
+    throw new Error(formatGeminiError(lastErr));
   };
 
   // 1. General Language AI Chat & Multi-modal Image Analysis

@@ -17,14 +17,59 @@ export const getGenAI = () => {
   });
 };
 
+export function formatGeminiError(err: any): string {
+  if (!err) return 'Hệ thống AI tạm thời chưa phản hồi. Vui lòng thử lại!';
+  const rawStr = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
+
+  if (
+    rawStr.includes('Quota exceeded') ||
+    rawStr.includes('quota') ||
+    rawStr.includes('429') ||
+    rawStr.includes('RESOURCE_EXHAUSTED') ||
+    rawStr.includes('rate limit') ||
+    rawStr.includes('limit: 0')
+  ) {
+    return 'Hệ thống AI vừa chạm giới hạn số lượt gửi trong 1 phút (Quota / Rate Limit - Lỗi 429). Vui lòng đợi khoảng 30–60 giây rồi bấm nút "Thử Lại"!';
+  }
+
+  if (
+    rawStr.includes('503') ||
+    rawStr.includes('UNAVAILABLE') ||
+    rawStr.includes('high demand') ||
+    rawStr.includes('overloaded')
+  ) {
+    return 'Hệ thống AI Gemini từ Google đang quá tải tạm thời (Lỗi 503 High Demand). Vui lòng bấm nút "Thử Lại" sau 10 - 15 giây!';
+  }
+
+  if (rawStr.includes('GEMINI_API_KEY')) {
+    return 'Chưa cấu hình GEMINI_API_KEY hợp lệ trên môi trường máy chủ.';
+  }
+
+  try {
+    const parsedErr = JSON.parse(rawStr);
+    if (parsedErr?.error?.message) {
+      const msg = parsedErr.error.message;
+      if (
+        msg.includes('Quota') ||
+        msg.includes('quota') ||
+        msg.includes('429') ||
+        msg.includes('RESOURCE_EXHAUSTED')
+      ) {
+        return 'Hệ thống AI vừa chạm giới hạn số lượt gửi trong 1 phút (Quota / Rate Limit - Lỗi 429). Vui lòng đợi khoảng 30–60 giây rồi bấm nút "Thử Lại"!';
+      }
+      return msg;
+    }
+  } catch (_) {}
+
+  return 'Hệ thống AI đang phản hồi chậm hoặc quá tải. Vui lòng bấm nút "Thử Lại" sau ít giây!';
+}
+
 export async function callGeminiWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
   const modelsToTry = [
     'gemini-2.5-flash',
-    'gemini-2.5-pro',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
-    'gemini-3.7-flash',
-    'gemini-3.1-pro-preview',
+    'gemini-2.5-pro',
   ];
 
   let lastError: any = null;
@@ -65,26 +110,7 @@ export async function callGeminiWithRetry(ai: GoogleGenAI, contents: any, config
     }
   }
 
-  let friendlyMsg = 'Hệ thống AI đang phản hồi chậm hoặc quá tải. Vui lòng thử lại sau giây lát.';
-  if (lastError) {
-    const rawStr = typeof lastError === 'string' ? lastError : lastError?.message || '';
-    if (rawStr.includes('503') || rawStr.includes('high demand') || rawStr.includes('UNAVAILABLE')) {
-      friendlyMsg = 'Hệ thống AI Gemini đang tạm thời quá tải (Lỗi 503 High Demand). Vui lòng bấm nút Thử Lại sau ít giây!';
-    } else if (rawStr.includes('GEMINI_API_KEY')) {
-      friendlyMsg = 'Chưa cấu hình GEMINI_API_KEY trên môi trường server.';
-    } else if (rawStr) {
-      try {
-        const parsedErr = JSON.parse(rawStr);
-        if (parsedErr?.error?.message) {
-          friendlyMsg = parsedErr.error.message;
-        }
-      } catch (_) {
-        friendlyMsg = rawStr;
-      }
-    }
-  }
-
-  throw new Error(friendlyMsg);
+  throw new Error(formatGeminiError(lastError));
 }
 
 export function safeParseJSON(text: string) {

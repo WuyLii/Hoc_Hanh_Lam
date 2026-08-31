@@ -251,9 +251,11 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
             <div className="p-3 bg-rose-100 border-2 border-rose-800 text-rose-900 text-xs font-mono flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-1">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-800" />
-                <span className="leading-relaxed">
-                  {typeof scanError === 'string' && (scanError.startsWith('{') || scanError.includes('503') || scanError.includes('high demand') || scanError.includes('UNAVAILABLE'))
-                    ? '⚠️ Hệ thống AI Gemini đang tạm thời quá tải (Lỗi 503 High Demand). Vui lòng bấm "Thử Lại" bên cạnh sau ít giây.'
+                <span className="leading-relaxed font-bold">
+                  {scanError.includes('Quota') || scanError.includes('429') || scanError.includes('RESOURCE_EXHAUSTED') || scanError.includes('generativelanguage')
+                    ? '⚠️ Hệ thống AI vừa chạm giới hạn số lượt gửi trong 1 phút (Quota / Rate Limit - Lỗi 429). Vui lòng đợi khoảng 30–60 giây rồi bấm nút "THỬ LẠI"!'
+                    : scanError.startsWith('{') || scanError.includes('503') || scanError.includes('high demand') || scanError.includes('UNAVAILABLE')
+                    ? '⚠️ Hệ thống AI Gemini đang quá tải (Lỗi 503). Vui lòng bấm "THỬ LẠI" bên cạnh sau 10 giây.'
                     : scanError}
                 </span>
               </div>
@@ -261,7 +263,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
                 type="button"
                 onClick={handleScanImage}
                 disabled={isScanning}
-                className="px-3 py-1.5 bg-rose-900 text-white font-mono text-[11px] font-bold uppercase hover:bg-rose-950 flex items-center gap-1.5 shrink-0 transition editorial-shadow-sm disabled:opacity-50"
+                className="px-3 py-1.5 bg-rose-900 text-white font-mono text-[11px] font-bold uppercase hover:bg-rose-950 flex items-center gap-1.5 shrink-0 transition editorial-shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 <RotateCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
                 <span>THỬ LẠI</span>

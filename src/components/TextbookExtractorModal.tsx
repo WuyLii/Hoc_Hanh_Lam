@@ -307,9 +307,11 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
                 <div className="p-4 bg-red-50 border-2 border-red-800 text-red-900 text-xs font-mono flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 flex-1">
                     <AlertCircle className="w-4 h-4 shrink-0 text-red-700" />
-                    <span className="leading-relaxed">
-                      {typeof errorMsg === 'string' && (errorMsg.startsWith('{') || errorMsg.includes('503') || errorMsg.includes('high demand') || errorMsg.includes('UNAVAILABLE'))
-                        ? '⚠️ Hệ thống AI Gemini đang tạm thời quá tải (Lỗi 503 High Demand). Vui lòng bấm "Thử Lại" bên cạnh sau ít giây.'
+                    <span className="leading-relaxed font-bold">
+                      {errorMsg.includes('Quota') || errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('generativelanguage')
+                        ? '⚠️ Hệ thống AI vừa chạm giới hạn số lượt gửi trong 1 phút (Quota / Rate Limit - Lỗi 429). Vui lòng đợi khoảng 30–60 giây rồi bấm nút "THỬ LẠI"!'
+                        : errorMsg.startsWith('{') || errorMsg.includes('503') || errorMsg.includes('high demand') || errorMsg.includes('UNAVAILABLE')
+                        ? '⚠️ Hệ thống AI Gemini đang quá tải (Lỗi 503). Vui lòng bấm nút "THỬ LẠI" bên cạnh sau 10 giây.'
                         : errorMsg}
                     </span>
                   </div>
@@ -317,7 +319,7 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
                     type="button"
                     onClick={handleRunExtraction}
                     disabled={isLoading}
-                    className="px-3 py-1.5 bg-rose-900 text-white font-mono text-[11px] font-bold uppercase hover:bg-rose-950 flex items-center gap-1.5 shrink-0 transition editorial-shadow-sm disabled:opacity-50"
+                    className="px-3 py-1.5 bg-rose-900 text-white font-mono text-[11px] font-bold uppercase hover:bg-rose-950 flex items-center gap-1.5 shrink-0 transition editorial-shadow-sm disabled:opacity-50 cursor-pointer"
                   >
                     <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
                     <span>THỬ LẠI</span>
