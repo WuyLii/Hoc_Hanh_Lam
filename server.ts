@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { handleOcrExtract, handleExtractTextbook, formatGeminiError } from './src/server/geminiHandlers.ts';
+import { handleOcrExtract, handleExtractTextbook, handleChat, formatGeminiError } from './src/server/geminiHandlers.ts';
 import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 
 dotenv.config();
@@ -167,100 +167,11 @@ async function startServer() {
   // 1. General Language AI Chat & Multi-modal Image Analysis
   app.post('/api/gemini/chat', async (req, res) => {
     try {
-      const { messages, language, targetLanguage, imageBase64, imageMime, responseLength, mode } = req.body;
-      const ai = getGenAI();
-
-      const langName = language === 'en' ? 'English (Tiếng Anh)' : language === 'ko' ? 'Korean (Tiếng Hàn)' : 'Chinese (Tiếng Trung)';
-
-      const lengthDirective = responseLength === 'short'
-        ? '⚡ QUY ĐỊNH ĐỘ DÀI: TRẢ LỜI NGẮN GỌN (Short Mode). Hãy trả lời cực kỳ súc tích, ngắn gọn, đi thẳng vào đáp án chính hoặc bản dịch cốt lõi (dưới 3-4 câu).'
-        : '📚 QUY ĐỊNH ĐỘ DÀI: TRẢ LỜI CHI TIẾT (Long Mode). Hãy đóng vai một Gia sư AI cá nhân thực thụ, giải thích tận tình, dịch đầy đủ toàn vẹn, phân tích chi tiết từng thành phần ngữ pháp, từ vựng, phiên âm, ví dụ tự nhiên và mẹo nhớ.';
-
-      const systemInstruction = `Bạn là Gia sư AI cá nhân chuyên sâu (AI Personal Language Tutor) cho ứng dụng Polyglot Hub học 3 ngôn ngữ: Tiếng Anh, Tiếng Hàn, Tiếng Trung.
-Ngôn ngữ người học đang tập trung hiện tại: ${langName}.
-
-${lengthDirective}
-
-Nhiệm vụ của Gia sư AI:
-1. Đóng vai gia sư thiệt sự: Luôn sẵn sàng dịch câu/đoạn văn, giải thích nghĩa từ/cấu trúc, phân biệt từ đồng nghĩa, sửa lỗi sai người dùng đặt câu, hướng dẫn giao tiếp, hoặc nhập vai trò chuyện thực tế.
-2. Khi được yêu cầu DỊCH: Hãy dịch toàn vẹn, sát nghĩa tự nhiên, kèm giải thích các cụm từ quan trọng trong câu.
-3. Với Tiếng Anh: Cung cấp phiên âm IPA chuẩn cho từ/cụm từ quan trọng.
-4. Với Tiếng Hàn: Cung cấp Hangul, phiên âm Romaja và kính ngữ (존댓말/반말).
-5. Với Tiếng Trung: Cung cấp chữ Hán (Giản thể/Phồn thể), Pinyin có dấu thanh và bộ thủ.
-6. Khi xử lý HÌNH ẢNH đính kèm (sách giáo khoa, bảng từ, đề thi): Hãy đọc toàn bộ nội dung chữ trong hình ảnh (OCR), dịch nghĩa và giải thích chi tiết các từ vựng hoặc điểm ngữ pháp có trong ảnh.
-
-Nếu trong phản hồi có các từ vựng mới tiêu biểu đáng lưu vào sổ từ, hãy đính kèm ở cuối bài khối JSON:
----VOCAB_SUGGESTIONS---
-[
-  {
-    "word": "từ",
-    "meaning": "nghĩa tiếng Việt",
-    "phonetic": "phiên âm",
-    "type": "loại từ",
-    "example": "ví dụ",
-    "exampleVi": "dịch ví dụ"
-  }
-]
----END_VOCAB_SUGGESTIONS---
-Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markdown đẹp mắt.`;
-
-      let contents: any[] = [];
-
-      if (Array.isArray(messages) && messages.length > 0) {
-        for (let i = 0; i < messages.length; i++) {
-          const msg = messages[i];
-          const isLastMsg = i === messages.length - 1;
-          const msgText = msg.content || msg.text || '';
-          const msgImage = isLastMsg && imageBase64 ? imageBase64 : msg.image_url || msg.image;
-
-          if (msgImage) {
-            contents.push({
-              role: msg.role === 'assistant' || msg.sender === 'ai' ? 'model' : 'user',
-              parts: [
-                {
-                  inlineData: {
-                    data: msgImage.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
-                    mimeType: imageMime || 'image/jpeg',
-                  },
-                },
-                { text: msgText || 'Hãy phân tích hình ảnh này, đọc chữ (OCR) và giải thích nghĩa, ngữ pháp hoặc dịch nội dung trong ảnh.' },
-              ],
-            });
-          } else {
-            contents.push({
-              role: msg.role === 'assistant' || msg.sender === 'ai' ? 'model' : 'user',
-              parts: [{ text: msgText }],
-            });
-          }
-        }
-      } else {
-        contents = [{ role: 'user', parts: [{ text: 'Xin chào! Hãy đóng vai Gia sư AI của tôi.' }] }];
-      }
-
-      const response = await callGemini(ai, contents, {
-        systemInstruction,
-        temperature: 0.7,
-      });
-
-      const replyText = response.text || '';
-      let suggestedWords: any[] = [];
-
-      // Extract suggested words if JSON block present
-      const match = replyText.match(/---VOCAB_SUGGESTIONS---\s*([\s\S]*?)\s*---END_VOCAB_SUGGESTIONS---/);
-      if (match && match[1]) {
-        try {
-          suggestedWords = JSON.parse(match[1].trim());
-        } catch (e) {
-          console.error('Failed to parse vocab suggestions:', e);
-        }
-      }
-
-      const cleanedReply = replyText.replace(/---VOCAB_SUGGESTIONS---[\s\S]*?---END_VOCAB_SUGGESTIONS---/, '').trim();
-
-      res.json({ reply: cleanedReply || replyText, suggestedWords });
+      const result = await handleChat(req.body);
+      res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/chat:', error);
-      res.status(500).json({ error: error?.message || 'Lỗi khi kết nối với máy chủ AI' });
+      res.status(500).json({ error: error?.message || 'Lỗi khi kết nối với máy chủ Gia sư AI' });
     }
   });
 

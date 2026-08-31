@@ -64,6 +64,56 @@ export function formatGeminiError(err: any): string {
   return 'Hệ thống AI đang phản hồi chậm hoặc quá tải. Vui lòng bấm nút "Thử Lại" sau ít giây!';
 }
 
+export async function callGeminiTutorWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
+  // GIA SƯ AI LÀ MỘT CON AI RIÊNG VÀ LÀ MÔ HÌNH THÔNG MINH NHẤT (FLAGSHIP TUTOR ENGINE)
+  // Ưu tiên chuỗi mô hình thông minh nhất dành riêng cho việc giảng dạy và tư duy sâu
+  const tutorModelsToTry = [
+    'gemini-3.7-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash',
+  ];
+
+  let lastError: any = null;
+
+  for (const model of tutorModelsToTry) {
+    let attempts = 0;
+    const maxAttempts = 2;
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        const res = await ai.models.generateContent({
+          model,
+          contents,
+          config,
+        });
+        if (res && res.text) {
+          return res;
+        }
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
+        const isTransient =
+          errMsg.includes('503') ||
+          errMsg.includes('UNAVAILABLE') ||
+          errMsg.includes('high demand') ||
+          errMsg.includes('429') ||
+          errMsg.includes('Quota') ||
+          errMsg.includes('RESOURCE_EXHAUSTED') ||
+          errMsg.includes('Deadline') ||
+          errMsg.includes('overloaded');
+
+        if (isTransient && attempts < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  throw new Error(formatGeminiError(lastError));
+}
+
 export async function callGeminiWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
   const modelsToTry = [
     'gemini-3.7-flash',
@@ -139,18 +189,20 @@ export async function handleChat(body: any) {
     ? '⚡ QUY ĐỊNH ĐỘ DÀI: TRẢ LỜI NGẮN GỌN (Short Mode). Trả lời thật súc tích, đi thẳng vào đáp án chính hoặc bản dịch cốt lõi (dưới 3-4 câu).'
     : '📚 QUY ĐỊNH ĐỘ DÀI: TRẢ LỜI CHI TIẾT (Long Mode). Đóng vai Gia sư AI cá nhân thực thụ, giải thích tận tình, dịch đầy đủ toàn vẹn, phân tích chi tiết từng thành phần ngữ pháp, từ vựng, phiên âm, ví dụ tự nhiên và mẹo nhớ.';
 
-  const systemInstruction = `Bạn là Gia sư AI cá nhân chuyên sâu (AI Personal Language Tutor) cho ứng dụng Polyglot Hub học 3 ngôn ngữ: Tiếng Anh, Tiếng Hàn, Tiếng Trung.
+  const systemInstruction = `Bạn là THỰC THỂ AI GIA SƯ NGÔN NGỮ ĐỘC LẬP VÀ THÔNG MINH NHẤT (Polyglot Hub Dedicated Flagship Language Tutor).
+Bạn hoạt động như một con AI riêng biệt, thông minh nhất hệ thống, chuyên biệt nâng cao năng lực ngoại ngữ cho người học. Bạn hoàn toàn độc lập và không bị ảnh hưởng hay liên can tới các module AI bóc tách/OCR tiện ích khác.
+
 Ngôn ngữ người học đang tập trung hiện tại: ${langName}.
 
 ${lengthDirective}
 
-Nhiệm vụ của Gia sư AI:
-1. Đóng vai gia sư thiệt sự: Luôn sẵn sàng dịch câu/đoạn văn, giải thích nghĩa từ/cấu trúc, phân biệt từ đồng nghĩa, sửa lỗi sai người dùng đặt câu, hướng dẫn giao tiếp, hoặc nhập vai trò chuyện thực tế.
-2. Khi được yêu cầu DỊCH: Hãy dịch toàn vẹn, sát nghĩa tự nhiên, kèm giải thích các cụm từ quan trọng trong câu.
-3. Với Tiếng Anh: Cung cấp phiên âm IPA chuẩn cho từ/cụm từ quan trọng.
-4. Với Tiếng Hàn: Cung cấp Hangul, phiên âm Romaja và kính ngữ (존댓말/반말).
+Nhiệm vụ của Gia sư AI Chuyên biệt:
+1. Đóng vai Gia sư cá nhân thông minh & uyên bác: Luôn sẵn sàng dịch câu/đoạn văn chuẩn xác tự nhiên nhất, giải thích chi tiết sắc thái ngữ nghĩa, cấu trúc ngữ pháp sâu, phân biệt từ đồng nghĩa, sửa lỗi đặt câu, hướng dẫn giao tiếp thực tế và hội thoại nhập vai.
+2. Khi DỊCH: Dịch thoát ý, tự nhiên như người bản xứ, giải thích chi tiết các cụm từ đắt giá.
+3. Với Tiếng Anh: Cung cấp phiên âm IPA chuẩn xác cho từ/cụm từ quan trọng.
+4. Với Tiếng Hàn: Cung cấp Hangul, phiên âm Romaja và phân tích kính ngữ (존댓말/반말).
 5. Với Tiếng Trung: Cung cấp chữ Hán (Giản thể/Phồn thể), Pinyin có dấu thanh và bộ thủ.
-6. Khi xử lý HÌNH ẢNH đính kèm (sách giáo khoa, bảng từ, đề thi): Hãy đọc toàn bộ nội dung chữ trong hình ảnh (OCR), dịch nghĩa và giải thích chi tiết các từ vựng hoặc điểm ngữ pháp có trong ảnh.
+6. Khi xử lý HÌNH ẢNH đính kèm (sách giáo khoa, bảng từ, bài tập): Phân tích chi tiết hình ảnh bằng nhãn quan AI cao cấp nhất, đọc chữ (OCR), dịch nghĩa và giải thích ngữ pháp bài tập sâu sát.
 
 Nếu trong phản hồi có các từ vựng mới tiêu biểu đáng lưu vào sổ từ, hãy đính kèm ở cuối bài khối JSON:
 ---VOCAB_SUGGESTIONS---
@@ -199,7 +251,7 @@ Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markd
     contents = [{ role: 'user', parts: [{ text: 'Xin chào! Hãy đóng vai Gia sư AI của tôi.' }] }];
   }
 
-  const response = await callGeminiWithRetry(ai, contents, {
+  const response = await callGeminiTutorWithRetry(ai, contents, {
     systemInstruction,
     temperature: 0.7,
   });

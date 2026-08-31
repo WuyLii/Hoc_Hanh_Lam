@@ -45,7 +45,7 @@ export const AiChatboxView: React.FC = () => {
   const defaultWelcomeMsg: ChatMessage = {
     id: 'msg_welcome',
     sender: 'ai',
-    text: `Xin chào ${currentUser.ten}! Tôi là Gia sư AI ngôn ngữ cá nhân của bạn cho ${currentLangInfo.name} (${currentLangInfo.nativeName}).\n\nBạn có thể yêu cầu tôi:\n• Dịch trôi chảy các câu/đoạn văn\n• Giải thích ngữ nghĩa từ & phân tích ngữ pháp chi tiết\n• Tải ảnh sách/bài tập (OCR) để giải đáp bài tập lập tức\n• Nhập vai luyện hội thoại thực tế`,
+    text: `Xin chào ${currentUser.ten}! Tôi là **Gia Sư AI Độc Lập** — thực thể AI riêng biệt và thông minh nhất được thiết kế dành riêng cho bạn học môn ${currentLangInfo.name} (${currentLangInfo.nativeName}).\n\nTôi hoạt động hoàn toàn độc lập với các công cụ tiện ích AI khác (như bóc tách sách, kiểm tra nhật ký) để đem lại chất lượng tư duy & giải đáp sâu sắc nhất:\n• Dịch thuật chuyên sâu sát nghĩa tự nhiên như người bản xứ\n• Phân tích cấu trúc ngữ pháp, sắc thái từ & sửa câu chi tiết\n• Phân tích hình ảnh bài tập/sách (OCR) bằng thị giác AI thông minh nhất\n• Đóng vai luyện hội thoại giao tiếp thực tế`,
     timestamp: new Date().toISOString(),
   };
 
@@ -317,14 +317,17 @@ export const AiChatboxView: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="font-serif font-black text-base text-[#1A1A1A]">
-                  Gia sư AI cá nhân — {currentLangInfo.name}
+                  Gia sư AI Độc Lập — {currentLangInfo.name}
                 </h2>
                 <span className="text-sm">{currentLangInfo.flag}</span>
+                <span className="px-2 py-0.5 bg-amber-100 border border-amber-800 text-amber-900 text-[10px] font-mono font-bold tracking-tight rounded-sm">
+                  ⭐ AI THÔNG MINH NHẤT (FLAGSHIP TUTOR)
+                </span>
               </div>
-              <p className="text-[10px] font-mono text-stone-600 uppercase tracking-wider">
-                Động cơ Gemini 3.7 Flash • Nhận diện OCR hình ảnh • Trợ lý học tập thực thụ
+              <p className="text-[10px] font-mono text-stone-600 uppercase tracking-wider mt-0.5">
+                🤖 Động cơ AI Gia Sư Chuyên Biệt • Hoàn toàn độc lập với các công cụ bóc tách/OCR khác
               </p>
             </div>
           </div>
