@@ -28,6 +28,7 @@ import {
   cleanDeduplicateGrammar,
   cleanDeduplicateDecks,
 } from '../utils/deduplicate';
+import { idbGet, idbSet } from '../utils/idbStorage';
 
 interface AppContextType {
   currentUser: UserProfile;
@@ -108,21 +109,45 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_PREFIX = 'polyglot_hub_v1_';
 
+// Keys that are heavy collections (>100KB - 10MB) stored in IndexedDB
+const IDB_KEYS = new Set([
+  'vocabulary',
+  'grammar',
+  'decks',
+  'review_sessions',
+  'mock_tests',
+  'listening',
+  'progress_logs',
+  'journal',
+  'notifications',
+  'chat_history',
+]);
+
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
     const item = localStorage.getItem(LOCAL_STORAGE_PREFIX + key);
     return item ? JSON.parse(item) : fallback;
   } catch (e) {
-    console.error(`Error loading ${key} from localStorage`, e);
     return fallback;
   }
 }
 
 function saveToStorage<T>(key: string, value: T): void {
+  // 1. Always persist to IndexedDB for large datasets
+  if (IDB_KEYS.has(key)) {
+    idbSet(key, value).catch(() => {});
+  }
+
+  // 2. Safely persist to localStorage for metadata; skip large collections to avoid QuotaExceededError
   try {
-    localStorage.setItem(LOCAL_STORAGE_PREFIX + key, JSON.stringify(value));
+    if (IDB_KEYS.has(key)) {
+      // Clean up localStorage to free up quota
+      localStorage.removeItem(LOCAL_STORAGE_PREFIX + key);
+    } else {
+      localStorage.setItem(LOCAL_STORAGE_PREFIX + key, JSON.stringify(value));
+    }
   } catch (e) {
-    console.error(`Error saving ${key} to localStorage`, e);
+    // Quota exceeded: silently ignore to prevent crash
   }
 }
 
@@ -144,6 +169,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'current_user');
       localStorage.setItem('polyglot_hub_zero_state_v5', 'true');
     }
+  }, []);
+
+  // Initialize large datasets from IndexedDB on startup
+  useEffect(() => {
+    let isMounted = true;
+    const hydrateFromIDB = async () => {
+      try {
+        const [cachedVocab, cachedGrammar, cachedDecks, cachedReviews, cachedTests, cachedListening, cachedLogs, cachedJournal, cachedNotis, cachedChats] = await Promise.all([
+          idbGet<VocabularyItem[]>('vocabulary', []),
+          idbGet<GrammarItem[]>('grammar', []),
+          idbGet<Deck[]>('decks', []),
+          idbGet<ReviewSession[]>('review_sessions', []),
+          idbGet<MockTestRecord[]>('mock_tests', []),
+          idbGet<ListeningExercise[]>('listening', []),
+          idbGet<ProgressRecord[]>('progress_logs', []),
+          idbGet<JournalEntry[]>('journal', []),
+          idbGet<NotificationItem[]>('notifications', []),
+          idbGet<ChatConversation[]>('chat_history', []),
+        ]);
+
+        if (isMounted) {
+          if (cachedVocab && cachedVocab.length > 0) setVocabulary(cleanDeduplicateVocab(cachedVocab));
+          if (cachedGrammar && cachedGrammar.length > 0) setGrammar(cleanDeduplicateGrammar(cachedGrammar));
+          if (cachedDecks && cachedDecks.length > 0) setDecks(cleanDeduplicateDecks(cachedDecks));
+          if (cachedReviews && cachedReviews.length > 0) setReviewSessions(cachedReviews);
+          if (cachedTests && cachedTests.length > 0) setMockTests(cachedTests);
+          if (cachedListening && cachedListening.length > 0) setListeningExercises(cachedListening);
+          if (cachedLogs && cachedLogs.length > 0) setProgressLogs(cachedLogs);
+          if (cachedJournal && cachedJournal.length > 0) setJournalEntries(cachedJournal);
+          if (cachedNotis && cachedNotis.length > 0) setNotifications(cachedNotis);
+          if (cachedChats && cachedChats.length > 0) setChatHistory(cachedChats);
+        }
+      } catch (err) {
+        console.warn('Could not read from IndexedDB, falling back to memory/server:', err);
+      }
+    };
+    hydrateFromIDB();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const [currentUser, setCurrentUser] = useState<UserProfile>(() =>
@@ -711,11 +776,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [lastCloudSyncedAt, setLastCloudSyncedAt] = useState<string>('');
   const lastServerTimestampRef = useRef<string>('');
+  const isPushingRef = useRef<boolean>(false);
+
+  // Helper with AbortController timeout to prevent hung requests
+  const safeFetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 15000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      return res;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 
   const syncWithCloudServer = async (silent = false): Promise<{ success: boolean; message: string }> => {
     try {
       if (!silent) setIsCloudSyncing(true);
-      const res = await fetch('/api/sync/store');
+
+      // In silent/background mode, check lightweight status first to prevent transferring large payloads
+      if (silent && lastServerTimestampRef.current) {
+        try {
+          const statusRes = await safeFetchWithTimeout('/api/sync/status', {}, 5000);
+          if (statusRes.ok) {
+            const statusJson = await statusRes.json();
+            if (statusJson.lastUpdated && statusJson.lastUpdated === lastServerTimestampRef.current) {
+              return { success: true, message: 'Dữ liệu đã mới nhất' };
+            }
+          }
+        } catch {
+          // If status check fails, proceed with normal fetch or skip silently
+          return { success: false, message: 'Máy chủ tạm thời bận' };
+        }
+      }
+
+      const res = await safeFetchWithTimeout('/api/sync/store', {}, 20000);
       if (!res.ok) throw new Error('Không thể kết nối máy chủ Cloud Sync');
       const json = await res.json();
       const serverStore = json.store || {};
@@ -731,7 +826,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Update Vocabulary
       if (Array.isArray(serverStore.vocabulary)) {
         if (serverStore.vocabulary.length > 0) {
-          setVocabulary(cleanDeduplicateVocab(serverStore.vocabulary));
+          const cleanVocab = cleanDeduplicateVocab(serverStore.vocabulary);
+          setVocabulary(cleanVocab);
+          idbSet('vocabulary', cleanVocab).catch(() => {});
         } else if (vocabulary.length > 0) {
           hasLocalItems = true;
         }
@@ -740,7 +837,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Update Grammar
       if (Array.isArray(serverStore.grammar)) {
         if (serverStore.grammar.length > 0) {
-          setGrammar(cleanDeduplicateGrammar(serverStore.grammar));
+          const cleanGram = cleanDeduplicateGrammar(serverStore.grammar);
+          setGrammar(cleanGram);
+          idbSet('grammar', cleanGram).catch(() => {});
         } else if (grammar.length > 0) {
           hasLocalItems = true;
         }
@@ -749,7 +848,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Update Decks
       if (Array.isArray(serverStore.decks)) {
         if (serverStore.decks.length > 0) {
-          setDecks(cleanDeduplicateDecks(serverStore.decks));
+          const cleanDks = cleanDeduplicateDecks(serverStore.decks);
+          setDecks(cleanDks);
+          idbSet('decks', cleanDks).catch(() => {});
         } else if (decks.length > 0) {
           hasLocalItems = true;
         }
@@ -773,7 +874,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return { success: true, message: 'Đã đồng bộ dữ liệu đám mây thành công!' };
     } catch (e: any) {
-      console.error('Error in syncWithCloudServer:', e);
+      if (!silent) {
+        console.warn('Sync cloud notice:', e?.message || e);
+      }
       return { success: false, message: e?.message || 'Lỗi kết nối máy chủ Cloud' };
     } finally {
       if (!silent) setIsCloudSyncing(false);
@@ -781,28 +884,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const pushToCloudServer = async () => {
+    if (isPushingRef.current) return;
     try {
-      const res = await fetch('/api/sync/store', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          store: {
-            vocabulary,
-            grammar,
-            decks,
-            reviewSessions,
-            mockTests,
-            listeningExercises,
-            progressLogs,
-            journalEntries,
-            notifications,
-            chatHistory,
-            currentUser,
-            currentLanguage,
-            sheetsConfig,
-          },
-        }),
-      });
+      isPushingRef.current = true;
+      const res = await safeFetchWithTimeout(
+        '/api/sync/store',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            store: {
+              vocabulary,
+              grammar,
+              decks,
+              reviewSessions,
+              mockTests,
+              listeningExercises,
+              progressLogs,
+              journalEntries,
+              notifications,
+              chatHistory,
+              currentUser,
+              currentLanguage,
+              sheetsConfig,
+            },
+          }),
+        },
+        25000
+      );
       if (res.ok) {
         const json = await res.json();
         if (json.lastUpdated) {
@@ -811,7 +920,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setLastCloudSyncedAt(new Date().toISOString());
       }
     } catch (e) {
-      console.error('Error in pushToCloudServer:', e);
+      // Soft failure without uncaught error
+    } finally {
+      isPushingRef.current = false;
     }
   };
 
@@ -830,11 +941,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleInitialSync();
   }, []);
 
-  // 2. Real-time background polling every 3 seconds for instant cross-device updates
+  // 2. Real-time background polling every 12 seconds with lightweight status checks
   useEffect(() => {
     const interval = setInterval(() => {
       syncWithCloudServer(true);
-    }, 3000);
+    }, 12000);
     return () => clearInterval(interval);
   }, []);
 
@@ -863,7 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (sheetsConfig.scriptUrl) {
         pushToGoogleSheetsAuto();
       }
-    }, 500);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [
     vocabulary,

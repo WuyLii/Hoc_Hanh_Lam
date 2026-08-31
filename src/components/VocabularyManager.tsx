@@ -21,6 +21,7 @@ import {
   Table as TableIcon,
   CopyCheck,
   RotateCw,
+  Languages,
 } from 'lucide-react';
 
 export const VocabularyManager: React.FC = () => {
@@ -48,6 +49,15 @@ export const VocabularyManager: React.FC = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical' | 'srs'>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
+  // Pagination for 10,000 items
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(60);
+
+  // Reset pagination on filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedTopic, selectedLevel, selectedSrsBox, showOnlyDuplicates, sortBy]);
+
   // Modal States
   const [isTextbookModalOpen, setIsTextbookModalOpen] = useState(false);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
@@ -68,6 +78,8 @@ export const VocabularyManager: React.FC = () => {
   const [formWord, setFormWord] = useState('');
   const [formMeaning, setFormMeaning] = useState('');
   const [formPhonetic, setFormPhonetic] = useState('');
+  const [formNghiaTiengHan, setFormNghiaTiengHan] = useState('');
+  const [formNghiaTiengAnh, setFormNghiaTiengAnh] = useState('');
   const [formType, setFormType] = useState('Danh từ');
   const [formExample, setFormExample] = useState('');
   const [formExampleVi, setFormExampleVi] = useState('');
@@ -82,6 +94,8 @@ export const VocabularyManager: React.FC = () => {
     setFormWord('');
     setFormMeaning('');
     setFormPhonetic('');
+    setFormNghiaTiengHan('');
+    setFormNghiaTiengAnh('');
     setFormType('Danh từ');
     setFormExample('');
     setFormExampleVi('');
@@ -102,6 +116,8 @@ export const VocabularyManager: React.FC = () => {
     setFormWord(item.tu);
     setFormMeaning(item.nghia);
     setFormPhonetic(item.phien_am);
+    setFormNghiaTiengHan(item.nghia_tieng_han || '');
+    setFormNghiaTiengAnh(item.nghia_tieng_anh || '');
     setFormType(item.loai_tu);
     setFormExample(item.vi_du);
     setFormExampleVi(item.vi_du_dich);
@@ -141,6 +157,8 @@ export const VocabularyManager: React.FC = () => {
       const data = await response.json();
       if (data.meaning && !formMeaning) setFormMeaning(data.meaning);
       if (data.phonetic) setFormPhonetic(data.phonetic);
+      if (data.nghia_tieng_han) setFormNghiaTiengHan(data.nghia_tieng_han);
+      if (data.nghia_tieng_anh) setFormNghiaTiengAnh(data.nghia_tieng_anh);
       if (data.type) setFormType(data.type);
       if (data.example) setFormExample(data.example);
       if (data.exampleVi) setFormExampleVi(data.exampleVi);
@@ -167,6 +185,8 @@ export const VocabularyManager: React.FC = () => {
         tu: formWord.trim(),
         nghia: formMeaning.trim(),
         phien_am: formPhonetic.trim(),
+        nghia_tieng_han: formNghiaTiengHan.trim(),
+        nghia_tieng_anh: formNghiaTiengAnh.trim(),
         loai_tu: formType,
         vi_du: formExample.trim(),
         vi_du_dich: formExampleVi.trim(),
@@ -179,6 +199,8 @@ export const VocabularyManager: React.FC = () => {
         tu: formWord.trim(),
         nghia: formMeaning.trim(),
         phien_am: formPhonetic.trim(),
+        nghia_tieng_han: formNghiaTiengHan.trim(),
+        nghia_tieng_anh: formNghiaTiengAnh.trim(),
         loai_tu: formType,
         vi_du: formExample.trim(),
         vi_du_dich: formExampleVi.trim(),
@@ -216,6 +238,8 @@ export const VocabularyManager: React.FC = () => {
             tu: r.tu || r.word || r.vocabulary || '',
             nghia: r.nghia || r.meaning || '',
             phien_am: r.phien_am || r.phonetic || '',
+            nghia_tieng_han: r.nghia_tieng_han || r.korean || '',
+            nghia_tieng_anh: r.nghia_tieng_anh || r.english || '',
             loai_tu: r.loai_tu || r.type || 'Từ vựng',
             vi_du: r.vi_du || r.example || '',
             vi_du_dich: r.vi_du_dich || r.example_meaning || '',
@@ -245,17 +269,21 @@ export const VocabularyManager: React.FC = () => {
     return dups;
   }, [currentLangVocabulary]);
 
-  // Filtered & Sorted Vocabulary
+  // Filtered & Sorted Vocabulary with Korean <-> English cross search
   const filteredWords = currentLangVocabulary.filter((w) => {
     const normWord = (w.tu || '').trim().toLowerCase();
     const isDuplicate = duplicateWordSet.has(normWord);
 
     if (showOnlyDuplicates && !isDuplicate) return false;
 
+    const q = searchQuery.toLowerCase().trim();
     const matchQuery =
-      w.tu.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.nghia.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (w.phien_am && w.phien_am.toLowerCase().includes(searchQuery.toLowerCase()));
+      !q ||
+      w.tu.toLowerCase().includes(q) ||
+      w.nghia.toLowerCase().includes(q) ||
+      (w.phien_am && w.phien_am.toLowerCase().includes(q)) ||
+      (w.nghia_tieng_han && w.nghia_tieng_han.toLowerCase().includes(q)) ||
+      (w.nghia_tieng_anh && w.nghia_tieng_anh.toLowerCase().includes(q));
 
     const matchTopic = selectedTopic === 'ALL' || w.chu_de === selectedTopic;
     const matchLevel =
@@ -279,6 +307,81 @@ export const VocabularyManager: React.FC = () => {
     if (sortBy === 'srs') return (a.srs_box || 0) - (b.srs_box || 0);
     return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
   });
+
+  const totalItems = sortedWords.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const validPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (validPage - 1) * pageSize;
+  const paginatedWords = sortedWords.slice(startIndex, startIndex + pageSize);
+
+  const renderPaginationBar = () => {
+    if (totalItems <= pageSize) return null;
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white border-2 border-[#1A1A1A] font-mono text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-[#1A1A1A]">
+            Hiển thị {startIndex + 1}–{Math.min(startIndex + pageSize, totalItems)} / {totalItems} từ
+          </span>
+          <span className="text-stone-400">|</span>
+          <label className="flex items-center gap-1.5 text-stone-600">
+            <span>Mỗi trang:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 border border-[#1A1A1A] bg-[#F9F7F2] font-bold font-mono text-xs focus:outline-none"
+            >
+              <option value={30}>30</option>
+              <option value={60}>60</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+              <option value={500}>500</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setCurrentPage(1)}
+            disabled={validPage === 1}
+            className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
+            title="Trang đầu"
+          >
+            « Đầu
+          </button>
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={validPage === 1}
+            className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
+            title="Trang trước"
+          >
+            ‹ Trước
+          </button>
+          <span className="px-3 py-1 bg-[#1A1A1A] text-[#F9F7F2] font-bold">
+            Trang {validPage} / {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={validPage === totalPages}
+            className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
+            title="Trang sau"
+          >
+            Sau ›
+          </button>
+          <button
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={validPage === totalPages}
+            className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
+            title="Trang cuối"
+          >
+            Cuối »
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -506,6 +609,8 @@ export const VocabularyManager: React.FC = () => {
       </div>
 
       {/* Vocabulary Display (Grid or Table) */}
+      {renderPaginationBar()}
+
       {sortedWords.length === 0 ? (
         <div className="p-12 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-3">
           <BookOpen className="w-8 h-8 mx-auto text-stone-400" />
@@ -521,7 +626,9 @@ export const VocabularyManager: React.FC = () => {
               <tr className="bg-[#1A1A1A] text-[#F9F7F2] font-mono text-xs uppercase">
                 <th className="p-3.5 border-b border-[#1A1A1A]">Term</th>
                 <th className="p-3.5 border-b border-[#1A1A1A]">Phonetic</th>
-                <th className="p-3.5 border-b border-[#1A1A1A]">Meaning</th>
+                <th className="p-3.5 border-b border-[#1A1A1A]">Meaning (VI)</th>
+                {currentLanguage === 'en' && <th className="p-3.5 border-b border-[#1A1A1A]">Korean (KR 🇰🇷)</th>}
+                {currentLanguage === 'ko' && <th className="p-3.5 border-b border-[#1A1A1A]">English (EN 🇬🇧)</th>}
                 <th className="p-3.5 border-b border-[#1A1A1A]">Type / Level</th>
                 <th className="p-3.5 border-b border-[#1A1A1A]">Topic</th>
                 <th className="p-3.5 border-b border-[#1A1A1A]">SRS</th>
@@ -529,7 +636,7 @@ export const VocabularyManager: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1A1A1A]/20 font-serif text-sm">
-              {sortedWords.map((word) => {
+              {paginatedWords.map((word) => {
                 const accuracy = word.times_reviewed > 0 ? Math.round((word.times_correct / word.times_reviewed) * 100) : 0;
                 return (
                   <tr key={word.word_id} className="hover:bg-stone-50 transition">
@@ -550,6 +657,28 @@ export const VocabularyManager: React.FC = () => {
                     </td>
                     <td className="p-3.5 font-mono text-xs text-stone-600">{word.phien_am || '—'}</td>
                     <td className="p-3.5 text-[#1A1A1A] font-medium">{word.nghia}</td>
+                    {currentLanguage === 'en' && (
+                      <td className="p-3.5 font-sans text-xs text-indigo-900 font-semibold">
+                        {word.nghia_tieng_han ? (
+                          <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200">
+                            {word.nghia_tieng_han}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    )}
+                    {currentLanguage === 'ko' && (
+                      <td className="p-3.5 font-sans text-xs text-blue-900 font-semibold">
+                        {word.nghia_tieng_anh ? (
+                          <span className="px-2 py-0.5 bg-blue-50 border border-blue-200">
+                            {word.nghia_tieng_anh}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    )}
                     <td className="p-3.5 font-mono text-xs">
                       <span className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] mr-1">{word.loai_tu}</span>
                       <span className="text-stone-500">{word.cap_do}</span>
@@ -597,7 +726,7 @@ export const VocabularyManager: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedWords.map((word) => {
+          {paginatedWords.map((word) => {
             const accuracy = word.times_reviewed > 0 ? Math.round((word.times_correct / word.times_reviewed) * 100) : 0;
             return (
               <div
@@ -660,9 +789,28 @@ export const VocabularyManager: React.FC = () => {
                     {word.nghia}
                   </p>
 
+                  {/* Cross-Language Link (English <-> Korean) */}
+                  {word.nghia_tieng_han && (
+                    <div className="mt-2.5 p-2 bg-indigo-50/80 border border-indigo-200 text-xs font-serif flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-bold text-indigo-900 uppercase">
+                        🇰🇷 Tiếng Hàn:
+                      </span>
+                      <span className="font-bold text-indigo-950">{word.nghia_tieng_han}</span>
+                    </div>
+                  )}
+
+                  {word.nghia_tieng_anh && (
+                    <div className="mt-2.5 p-2 bg-blue-50/80 border border-blue-200 text-xs font-serif flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-bold text-blue-900 uppercase">
+                        🇬🇧 Tiếng Anh:
+                      </span>
+                      <span className="font-bold text-blue-950">{word.nghia_tieng_anh}</span>
+                    </div>
+                  )}
+
                   {/* Context Example */}
                   {word.vi_du && (
-                    <div className="mt-4 p-3 bg-[#F9F7F2] border-l-2 border-[#1A1A1A] border-y border-r border-[#1A1A1A]/20 text-xs">
+                    <div className="mt-3 p-3 bg-[#F9F7F2] border-l-2 border-[#1A1A1A] border-y border-r border-[#1A1A1A]/20 text-xs">
                       <p className="font-serif italic text-[#1A1A1A]">"{word.vi_du}"</p>
                       {word.vi_du_dich && (
                         <p className="text-stone-600 font-mono text-[10px] mt-1">
@@ -708,6 +856,8 @@ export const VocabularyManager: React.FC = () => {
           })}
         </div>
       )}
+
+      {renderPaginationBar()}
 
       {/* Add / Edit Vocabulary Modal (Editorial Style) */}
       {isModalOpen && (
@@ -790,6 +940,34 @@ export const VocabularyManager: React.FC = () => {
                   onChange={(e) => setFormMeaning(e.target.value)}
                   className="w-full px-3.5 py-2 bg-white border border-[#1A1A1A] text-[#1A1A1A] font-serif text-sm focus:outline-none focus:ring-2 focus:ring-[#1A1A1A]"
                 />
+              </div>
+
+              {/* Cross-Language Translation (English <-> Korean) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white border border-[#1A1A1A]">
+                <div>
+                  <label className="block text-[9px] font-mono uppercase font-bold text-indigo-900 mb-1 flex items-center gap-1">
+                    <span>🇰🇷 Nghĩa Tiếng Hàn (Korean)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 회복력 있는, 사과..."
+                    value={formNghiaTiengHan}
+                    onChange={(e) => setFormNghiaTiengHan(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-[#F9F7F2] border border-indigo-300 text-xs font-serif text-[#1A1A1A] focus:bg-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-mono uppercase font-bold text-blue-900 mb-1 flex items-center gap-1">
+                    <span>🇬🇧 Nghĩa Tiếng Anh (English)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. resilient, apple..."
+                    value={formNghiaTiengAnh}
+                    onChange={(e) => setFormNghiaTiengAnh(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-[#F9F7F2] border border-blue-300 text-xs font-serif text-[#1A1A1A] focus:bg-white focus:outline-none"
+                  />
+                </div>
               </div>
 
               {/* Phonetic & Word Type */}

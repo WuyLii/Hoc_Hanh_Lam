@@ -337,6 +337,8 @@ Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trú
   "type": "Loại từ (Danh từ, Động từ, Tính từ, Trạng từ, Cụm từ, Liên từ...)",
   "example": "Câu ví dụ thực tế, tự nhiên sử dụng từ trên",
   "exampleVi": "Dịch nghĩa câu ví dụ sang tiếng Việt",
+  "nghia_tieng_han": "Từ / Nghĩa tương đương trong tiếng Hàn kèm Romaja nếu từ gốc là tiếng Anh (ví dụ: 포기하다 [po-gi-ha-da])",
+  "nghia_tieng_anh": "Từ / Nghĩa tương đương trong tiếng Anh nếu từ gốc là tiếng Hàn (ví dụ: birthday, to give up)",
   "level": "Cấp độ đề xuất (A1, A2, B1, B2, C1, C2 cho tiếng Anh; TOPIK 1 - TOPIK 6 cho tiếng Hàn; HSK 1 - HSK 6 cho tiếng Trung)",
   "topic": "Chủ đề phù hợp (Giao tiếp, Du lịch, Công việc, Ẩm thực, Đời sống, Cảm xúc, Học thuật...)",
   "collocations": ["Cụm từ hay đi kèm 1", "Cụm từ 2"],

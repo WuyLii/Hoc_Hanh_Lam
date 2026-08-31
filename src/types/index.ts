@@ -71,6 +71,9 @@ export interface VocabularyItem {
   loai_tu: string; // Danh từ, Động từ, Tính từ, Cụm từ, v.v.
   vi_du: string;
   vi_du_dich: string;
+  nghia_tieng_han?: string; // Nghĩa & từ tương đương trong tiếng Hàn (Hangul + Romaja)
+  nghia_tieng_anh?: string; // Nghĩa & từ tương đương trong tiếng Anh
+  phien_am_tieng_han?: string;
   audio_url?: string;
   hinh_url?: string;
   ngon_ngu: LanguageCode;

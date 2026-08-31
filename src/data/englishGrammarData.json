@@ -1,0 +1,555 @@
+[
+  {
+    "grammar_id": "en_gram_01",
+    "cau_truc": "Present Simple (Hiện tại đơn)",
+    "giai_thich": "Diễn tả thói quen, chân lý hiển nhiên, sự thật bất biến hoặc lịch trình cố định.",
+    "vi_du": "She reads scientific journals every morning before work.",
+    "vi_du_dich": "Cô ấy đọc các tạp chí khoa học mỗi sáng trước khi đi làm.",
+    "ngon_ngu": "en",
+    "cap_do": "A1 - Cơ bản",
+    "ghi_chu": "Khẳng định: S + V(s/es) | Phủ định: S + do/does not + V_bare | Nghi vấn: Do/Does + S + V_bare?",
+    "tags": [
+      "12 Thì",
+      "Cơ bản",
+      "Hiện tại"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_02",
+    "cau_truc": "Present Continuous (Hiện tại tiếp diễn)",
+    "giai_thich": "Hành động đang xảy ra tại thời điểm nói, xu hướng biến đổi, hoặc phàn nàn (với always).",
+    "vi_du": "Global temperatures are rising rapidly due to greenhouse gas emissions.",
+    "vi_du_dich": "Nhiệt độ toàn cầu đang gia tăng nhanh chóng do khí thải nhà kính.",
+    "ngon_ngu": "en",
+    "cap_do": "A1 - Cơ bản",
+    "ghi_chu": "S + am/is/are + V-ing | Không dùng với stative verbs (know, believe, understand, love...).",
+    "tags": [
+      "12 Thì",
+      "Hiện tại",
+      "Tiếp diễn"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_03",
+    "cau_truc": "Present Perfect (Hiện tại hoàn thành)",
+    "giai_thich": "Hành động bắt đầu trong quá khứ kéo dài đến hiện tại, hoặc kinh nghiệm, kết quả còn lưu lại.",
+    "vi_du": "They have developed a breakthrough algorithm for language comprehension.",
+    "vi_du_dich": "Họ đã phát triển một thuật toán đột phá cho việc đọc hiểu ngôn ngữ.",
+    "ngon_ngu": "en",
+    "cap_do": "A2 - Sơ cấp",
+    "ghi_chu": "S + have/has + V3/ed | Dấu hiệu: since, for, already, yet, ever, never, just, so far, recently.",
+    "tags": [
+      "12 Thì",
+      "Hoàn thành"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_04",
+    "cau_truc": "Present Perfect Continuous (Hiện tại hoàn thành tiếp diễn)",
+    "giai_thich": "Nhấn mạnh tính liên tục và độ dài thời gian của hành động bắt đầu từ quá khứ đến nay.",
+    "vi_du": "The research team has been investigating this phenomenon for over five months.",
+    "vi_du_dich": "Nhóm nghiên cứu đã và đang điều tra hiện tượng này liên tục hơn năm tháng qua.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "S + have/has + been + V-ing | Nhấn mạnh quá trình (duration) hơn là kết quả (achievement).",
+    "tags": [
+      "12 Thì",
+      "Hoàn thành tiếp diễn"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_05",
+    "cau_truc": "Past Simple (Quá khứ đơn)",
+    "giai_thich": "Hành động đã xảy ra và kết thúc hoàn toàn tại một thời điểm xác định trong quá khứ.",
+    "vi_du": "The company launched its flagship artificial intelligence model yesterday.",
+    "vi_du_dich": "Công ty đã ra mắt mô hình trí tuệ nhân tạo chủ lực của họ vào ngày hôm qua.",
+    "ngon_ngu": "en",
+    "cap_do": "A1 - Cơ bản",
+    "ghi_chu": "S + V2/ed | Dấu hiệu: yesterday, ago, in 1999, last week/month/year.",
+    "tags": [
+      "12 Thì",
+      "Quá khứ"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_06",
+    "cau_truc": "Past Continuous (Quá khứ tiếp diễn)",
+    "giai_thich": "Hành động đang diễn ra tại một thời điểm cụ thể trong quá khứ hoặc bị hành động khác xen vào.",
+    "vi_du": "While the analyst was reviewing the financial report, the market experienced a sharp surge.",
+    "vi_du_dich": "Trong khi chuyên viên phân tích đang xem lại báo cáo tài chính thì thị trường chứng kiến sự tăng vọt mạnh.",
+    "ngon_ngu": "en",
+    "cap_do": "A2 - Sơ cấp",
+    "ghi_chu": "S + was/were + V-ing | Phối hợp: When + Past Simple, Past Continuous / While + Past Continuous.",
+    "tags": [
+      "12 Thì",
+      "Quá khứ tiếp diễn"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_07",
+    "cau_truc": "Past Perfect (Quá khứ hoàn thành)",
+    "giai_thich": "Hành động xảy ra và hoàn tất trước một hành động hoặc mốc thời gian khác trong quá khứ.",
+    "vi_du": "By the time the keynote speech started, all delegates had taken their seats.",
+    "vi_du_dich": "Vào lúc bài phát biểu chính bắt đầu, toàn bộ các đại biểu đã ổn định chỗ ngồi.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "S + had + V3/ed | Phối hợp thì: By the time + Past Simple, S + had + V3/ed.",
+    "tags": [
+      "12 Thì",
+      "Quá khứ hoàn thành"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_08",
+    "cau_truc": "Past Perfect Continuous (Quá khứ hoàn thành tiếp diễn)",
+    "giai_thich": "Nhấn mạnh tính liên tục của hành động kéo dài đến trước một thời điểm hoặc sự kiện quá khứ khác.",
+    "vi_du": "They had been negotiating the merger contract for hours before reaching a consensus.",
+    "vi_du_dich": "Họ đã đàm phán hợp đồng sáp nhập suốt nhiều giờ đồng hồ trước khi đạt được sự đồng thuận.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "S + had been + V-ing | Dùng để làm rõ nguyên nhân/tiến trình của một tình huống quá khứ.",
+    "tags": [
+      "12 Thì",
+      "Nâng cao"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_09",
+    "cau_truc": "Future Simple & Near Future (Tương lai đơn & Tương lai gần)",
+    "giai_thich": "Will: Quyết định tức thì, dự đoán chủ quan | Be going to: Dự định có trước, dự đoán có căn cứ.",
+    "vi_du": "Look at the quarterly balance sheet; our profits are going to expand significantly.",
+    "vi_du_dich": "Hãy nhìn vào bảng cân đối kế toán quý này; lợi nhuận của chúng ta chắc chắn sẽ mở rộng đáng kể.",
+    "ngon_ngu": "en",
+    "cap_do": "A1 - Cơ bản",
+    "ghi_chu": "Will + V_bare vs. S + am/is/are + going to + V_bare.",
+    "tags": [
+      "12 Thì",
+      "Tương lai"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_10",
+    "cau_truc": "Future Continuous (Tương lai tiếp diễn)",
+    "giai_thich": "Hành động sẽ đang diễn ra tại một thời điểm xác định trong tương lai.",
+    "vi_du": "This time next week, we will be presenting our research at the international summit.",
+    "vi_du_dich": "Giờ này tuần sau, chúng tôi sẽ đang thuyết trình công trình nghiên cứu tại hội nghị thượng đỉnh quốc tế.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "S + will be + V-ing | Dấu hiệu: At this time tomorrow, this time next month/year.",
+    "tags": [
+      "12 Thì",
+      "Tương lai tiếp diễn"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_11",
+    "cau_truc": "Future Perfect (Tương lai hoàn thành)",
+    "giai_thich": "Hành động sẽ hoàn tất trước một thời điểm hoặc sự kiện cụ thể trong tương lai.",
+    "vi_du": "By December, our team will have finalized the comprehensive database architecture.",
+    "vi_du_dich": "Trước tháng Mười Hai, đội ngũ chúng tôi sẽ hoàn thành dứt điểm cấu trúc cơ sở dữ liệu toàn diện.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "S + will have + V3/ed | Dấu hiệu: By + mốc thời gian tương lai, By the time + Hiện tại đơn.",
+    "tags": [
+      "12 Thì",
+      "Hoàn thành"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_12",
+    "cau_truc": "Future Perfect Continuous (Tương lai hoàn thành tiếp diễn)",
+    "giai_thich": "Nhấn mạnh thời lượng kéo dài liên tục của hành động tính đến một mốc trong tương lai.",
+    "vi_du": "By the end of this year, she will have been teaching English for exactly ten years.",
+    "vi_du_dich": "Tính đến cuối năm nay, cô ấy sẽ có tròn đúng mười năm liên tục giảng dạy tiếng Anh.",
+    "ngon_ngu": "en",
+    "cap_do": "C1 - Cao cấp",
+    "ghi_chu": "S + will have been + V-ing | Nhấn mạnh tính liên tục kéo dài.",
+    "tags": [
+      "12 Thì",
+      "Nâng cao"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_13",
+    "cau_truc": "Passive Voice (Bị động các thì chuẩn & Modals)",
+    "giai_thich": "Dùng khi đối tượng chịu tác động quan trọng hơn người thực hiện hoặc khi chủ thể không xác định.",
+    "vi_du": "The new environmental policy was approved by the board of directors yesterday.",
+    "vi_du_dich": "Chính sách môi trường mới đã được ban giám đốc phê duyệt vào ngày hôm qua.",
+    "ngon_ngu": "en",
+    "cap_do": "A2 - Sơ cấp",
+    "ghi_chu": "S + be (chia theo thì) + V3/ed + (by O) | Modals: S + modal + be + V3/ed.",
+    "tags": [
+      "Bị động",
+      "Cốt lõi"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_14",
+    "cau_truc": "Causative Form (Thể truyền khiến: Have / Get something done)",
+    "giai_thich": "Thuê hoặc nhờ người khác làm một việc gì đó cho mình.",
+    "vi_du": "We will have our software architecture audited by external cybersecurity specialists.",
+    "vi_du_dich": "Chúng tôi sẽ nhờ các chuyên gia an ninh mạng độc lập kiểm toán kiến trúc phần mềm.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "Have sb do sth / Get sb to do sth -> Have/Get sth done (by sb).",
+    "tags": [
+      "Bị động",
+      "Truyền khiến"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_15",
+    "cau_truc": "Impersonal Passive (Bị động khách quan: It is said that / S is said to V)",
+    "giai_thich": "Diễn tả ý kiến, quan điểm hoặc tin đồn của số đông người trong xã hội.",
+    "vi_du": "The new renewable energy source is reported to reduce operating expenses by 40%.",
+    "vi_du_dich": "Nguồn năng lượng tái tạo mới được báo cáo là làm giảm chi phí vận hành tới 40%.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "It is + V3/ed + that + Clause HOẶC S + be + V3/ed + to V / to have V3.",
+    "tags": [
+      "Bị động",
+      "Báo chí",
+      "IELTS"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_16",
+    "cau_truc": "Zero & First Conditionals (Điều kiện Loại 0 & Loại 1)",
+    "giai_thich": "Loại 0: Sự thật hiển nhiên, quy luật khoa học. Loại 1: Sự việc có thật hoặc có thể xảy ra ở hiện tại/tương lai.",
+    "vi_du": "If you optimize the caching layer, the website load time decreases immediately.",
+    "vi_du_dich": "Nếu bạn tối ưu tầng bộ nhớ đệm, thời gian tải trang web sẽ giảm ngay lập tức.",
+    "ngon_ngu": "en",
+    "cap_do": "A2 - Sơ cấp",
+    "ghi_chu": "Type 0: If + Present, Present | Type 1: If + Present, Future (will/can/may + V_bare).",
+    "tags": [
+      "Điều kiện",
+      "Cơ bản"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_17",
+    "cau_truc": "Second & Third Conditionals (Điều kiện Loại 2 & Loại 3)",
+    "giai_thich": "Loại 2: Giả định trái với hiện tại. Loại 3: Giả định trái với quá khứ và bày tỏ sự tiếc nuối.",
+    "vi_du": "If we had implemented the security patch earlier, the system would not have been compromised.",
+    "vi_du_dich": "Nếu chúng ta triển khai bản vá bảo mật sớm hơn, hệ thống đã không bị xâm nhập.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "Type 2: If + Past Simple (to be: were), would + V_bare | Type 3: If + Past Perfect, would have + V3/ed.",
+    "tags": [
+      "Điều kiện",
+      "Trung cấp"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_18",
+    "cau_truc": "Mixed Conditionals (Câu điều kiện hỗn hợp Loại 2-3 & 3-2)",
+    "giai_thich": "Kết hợp giữa giả định quá khứ tác động tới hiện tại (3-2) hoặc bản chất hiện tại chi phối quá khứ (2-3).",
+    "vi_du": "If he were more fluent in English, he would have accepted the overseas promotion last year.",
+    "vi_du_dich": "Nếu anh ấy thành thạo tiếng Anh hơn (hiện tại), anh ấy đã nhận lời thăng chức ra nước ngoài năm ngoái (quá khứ).",
+    "ngon_ngu": "en",
+    "cap_do": "C1 - Cao cấp",
+    "ghi_chu": "Loại 3-2: If + had V3, would + V_bare (now) | Loại 2-3: If + Past Simple, would have V3.",
+    "tags": [
+      "Điều kiện",
+      "Nâng cao",
+      "IELTS 7.0+"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_19",
+    "cau_truc": "Inversion in Conditionals (Đảo ngữ câu điều kiện)",
+    "giai_thich": "Lược bỏ liên từ \"If\" và đảo trợ động từ lên trước chủ ngữ để tăng tính trang trọng, học thuật.",
+    "vi_du": "Had the stakeholders known about the regulatory hurdles, they might have reconsidered their investment.",
+    "vi_du_dich": "Nếu các bên liên quan biết trước về các rào cản pháp lý, họ có thể đã cân nhắc lại khoản đầu tư.",
+    "ngon_ngu": "en",
+    "cap_do": "C1 - Cao cấp",
+    "ghi_chu": "Type 1: Should + S + V_bare... | Type 2: Were + S + to V / Were S... | Type 3: Had + S + V3/ed...",
+    "tags": [
+      "Đảo ngữ",
+      "Điều kiện",
+      "TOEIC 800+"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_20",
+    "cau_truc": "Defining & Non-defining Relative Clauses (Mệnh đề quan hệ xác định & không xác định)",
+    "giai_thich": "Bổ nghĩa cho danh từ. Mệnh đề xác định không có dấu phẩy; mệnh đề không xác định có dấu phẩy và không dùng \"that\".",
+    "vi_du": "Dr. Nguyen, whose recent paper was published in Nature, will deliver the keynote address.",
+    "vi_du_dich": "Tiến sĩ Nguyễn, người mà bài báo gần đây được xuất bản trên tạp chí Nature, sẽ trình bày bài diễn văn chính.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "Who (người - S), Whom (người - O), Which (vật), Whose (sở hữu), That (người/vật thay who/which).",
+    "tags": [
+      "Mệnh đề quan hệ",
+      "Cốt lõi"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_21",
+    "cau_truc": "Reduced Relative Clauses (Rút gọn mệnh đề quan hệ)",
+    "giai_thich": "Rút gọn bằng V-ing (chủ động), V3/ed (bị động), To-infinitive (sau first/only/next/so sánh nhất), hoặc Cụm danh từ.",
+    "vi_du": "The candidates selected for the final interview demonstrate exceptional analytical capability.",
+    "vi_du_dich": "Những ứng viên được chọn vào vòng phỏng vấn cuối cùng đều thể hiện năng lực phân tích vượt trội.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "Who were selected -> Selected | The boy who is standing -> The boy standing...",
+    "tags": [
+      "Mệnh đề quan hệ",
+      "Rút gọn",
+      "TOEIC/IELTS"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_22",
+    "cau_truc": "Present Subjunctive with Mandative Verbs (Thể giả định hiện tại)",
+    "giai_thich": "Dùng sau các động từ/tính từ chỉ yêu cầu, đề xuất, tính thiết yếu: demand, recommend, insist, essential, vital.",
+    "vi_du": "It is imperative that every researcher adhere strictly to the established safety protocols.",
+    "vi_du_dich": "Điều bắt buộc là mọi nhà nghiên cứu phải tuân thủ nghiêm ngặt các quy trình an toàn đã thiết lập.",
+    "ngon_ngu": "en",
+    "cap_do": "C1 - Cao cấp",
+    "ghi_chu": "S + recommend/insist/suggest that S + (should) + V_bare | It is essential that S + V_bare.",
+    "tags": [
+      "Giả định",
+      "Học thuật",
+      "IELTS 7.5+"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_23",
+    "cau_truc": "Unreal Past Structures: Wish, If only, Would rather, It is high time",
+    "giai_thich": "Diễn tả mong ước hoặc thúc giục một việc đáng lẽ phải xảy ra.",
+    "vi_du": "It is high time governments took decisive action against environmental degradation.",
+    "vi_du_dich": "Đã đến lúc các chính phủ cần phải có hành động dứt khoát ngăn chặn sự suy thoái môi trường.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "Wish (hiện tại) -> Past Simple | Wish (quá khứ) -> Past Perfect | It is (high) time + S + Past Simple.",
+    "tags": [
+      "Câu ước",
+      "Unreal Past"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_24",
+    "cau_truc": "Inversion with Negative Adverbials (Đảo ngữ với trạng từ phủ định)",
+    "giai_thich": "Đưa các phó từ phủ định hoặc bán phủ định (Never, Seldom, Rarely, Hardly, Barely, No sooner) lên đầu câu để nhấn mạnh.",
+    "vi_du": "Seldom have we witnessed such remarkable transformation within the global technology sector.",
+    "vi_du_dich": "Hiếm khi nào chúng ta được chứng kiến sự chuyển biến ngoạn mục đến vậy trong ngành công nghệ toàn cầu.",
+    "ngon_ngu": "en",
+    "cap_do": "C1 - Cao cấp",
+    "ghi_chu": "Negative Adverb + Trợ động từ + S + V_main | Hardly/Scarcely... when... | No sooner... than...",
+    "tags": [
+      "Đảo ngữ",
+      "Văn phong cao cấp"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_25",
+    "cau_truc": "Cleft Sentences (Câu chẻ nhấn mạnh: It is/was... that...)",
+    "giai_thich": "Tách câu thành hai vế để nhấn mạnh một thành phần trọng tâm (chủ ngữ, tân ngữ, hoặc trạng ngữ).",
+    "vi_du": "It was through relentless experimentation that the engineering team cracked the optimization puzzle.",
+    "vi_du_dich": "Chính nhờ vào quá trình thử nghiệm không ngừng nghỉ mà đội ngũ kỹ sư đã giải mã được bài toán tối ưu hóa.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "It is/was + [Thành phần nhấn mạnh] + that/who + Mệnh đề | Wh-cleft: What we need is...",
+    "tags": [
+      "Câu chẻ",
+      "Nhấn mạnh",
+      "Viết luận"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_26",
+    "cau_truc": "Modal Verbs in the Past (Must / Should / Could / Might have + V3/ed)",
+    "giai_thich": "Must have V3: Chắc chắn đã (suy đoán chắc chắn) | Should have V3: Lẽ ra nên làm nhưng không làm | Could have V3: Có khả năng làm được trong quá khứ.",
+    "vi_du": "They must have completed the clinical trials because the regulatory authority granted immediate approval.",
+    "vi_du_dich": "Họ chắc chắn đã hoàn tất các thử nghiệm lâm sàng bởi vì cơ quan quản lý đã cấp phép ngay lập tức.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "Must have V3 (suy đoán 95%+) | Can't/Couldn't have V3 (chắc chắn không thể) | Should have V3 (trách móc/hối tiếc).",
+    "tags": [
+      "Modal Verbs",
+      "Suy đoán quá khứ"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_27",
+    "cau_truc": "Gerunds vs. Infinitives with Meaning Shift (Đổi nghĩa giữa V-ing và To-V)",
+    "giai_thich": "Các động từ thay đổi nghĩa hoàn toàn khi đi cùng V-ing hoặc To-V: Remember, Forget, Regret, Try, Stop, Mean.",
+    "vi_du": "Please remember to calibrate the measuring instruments before conducting the experiment.",
+    "vi_du_dich": "Xin hãy nhớ hiệu chuẩn các thiết bị đo lường trước khi tiến hành thí nghiệm.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "Stop to V (dừng lại để làm) vs. Stop V-ing (từ bỏ hành động) | Remember to V (nhớ phải làm) vs. Remember V-ing (nhớ đã làm).",
+    "tags": [
+      "Động từ",
+      "V-ing / To-V"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_28",
+    "cau_truc": "Reported Speech with Special Reporting Verbs (Câu tường thuật nâng cao)",
+    "giai_thich": "Sử dụng động từ tường thuật cụ thể kèm giới từ thay vì chỉ dùng \"said/told\": accuse of, apologize for, warn against, insist on, urge to.",
+    "vi_du": "The auditor warned the financial committee against ignoring the inflation forecast.",
+    "vi_du_dich": "Kiểm toán viên đã cảnh báo ủy ban tài chính không được phớt lờ dự báo lạm phát.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "S + warn + O + against + V-ing | S + accuse + O + of + V-ing | S + urge + O + to V.",
+    "tags": [
+      "Tường thuật",
+      "Học thuật"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_29",
+    "cau_truc": "Advanced Subject-Verb Agreement (Sự hòa hợp Chủ - Vị nâng cao)",
+    "giai_thich": "Quy tắc chia động từ với Neither... nor, Either... or, Not only... but also, As well as, Together with, Đại từ bất định và Danh từ tập hợp.",
+    "vi_du": "Neither the executive director nor the board members are willing to compromise on safety standards.",
+    "vi_du_dich": "Cả giám đốc điều hành lẫn các thành viên hội đồng quản trị đều không sẵn sàng thỏa hiệp về tiêu chuẩn an toàn.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "Neither A nor B / Either A or B -> Động từ chia theo B | A as well as B / A together with B -> Động từ chia theo A.",
+    "tags": [
+      "Chủ ngữ - Động từ",
+      "TOEIC"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_30",
+    "cau_truc": "Double Comparative (So sánh kép: The more... the more...)",
+    "giai_thich": "Hai vế cùng tăng hoặc giảm tỷ lệ thuận/nghịch theo nhau.",
+    "vi_du": "The more comprehensively we train the neural network, the more precise its predictions become.",
+    "vi_du_dich": "Chúng ta huấn luyện mạng nơ-ron càng toàn diện thì các dự đoán của nó càng trở nên chuẩn xác hơn.",
+    "ngon_ngu": "en",
+    "cap_do": "B2 - Trung cao",
+    "ghi_chu": "The + Comparative + S + V, The + Comparative + S + V.",
+    "tags": [
+      "So sánh",
+      "Viết học thuật"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_31",
+    "cau_truc": "Adjective Order (Quy tắc trật tự tính từ OSASCOMP)",
+    "giai_thich": "Trật tự tính từ trước danh từ: Opinion (Ý kiến) - Size (Kích cỡ) - Age (Tuổi thọ) - Shape (Hình dáng) - Color (Màu sắc) - Origin (Nguồn gốc) - Material (Chất liệu) - Purpose (Mục đích).",
+    "vi_du": "She purchased a gorgeous antique Italian leather briefcase.",
+    "vi_du_dich": "Cô ấy đã mua một chiếc cặp da Ý kiểu cổ tuyệt đẹp.",
+    "ngon_ngu": "en",
+    "cap_do": "A2 - Sơ cấp",
+    "ghi_chu": "Ghi nhớ công thức OSASCOMP: Op - S - A - Sh - C - O - M - P + Noun.",
+    "tags": [
+      "Tính từ",
+      "Quy tắc"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_32",
+    "cau_truc": "Definite vs. Zero Article (Quy tắc mạo từ The và Không mạo từ)",
+    "giai_thich": "Dùng The cho danh từ duy nhất, đã xác định, đại dương, dãy núi, nhạc cụ. Không mạo từ với danh từ số nhiều nói chung, bữa ăn, thể thao, đỉnh núi đơn lẻ.",
+    "vi_du": "The Himalayas form a natural geographical barrier between the Indian subcontinent and the Tibetan Plateau.",
+    "vi_du_dich": "Dãy Himalaya tạo nên một bức tường địa lý tự nhiên giữa tiểu lục địa Ấn Độ và Cao nguyên Tây Tạng.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "The Alps (dãy núi) vs. Mount Everest (ngọn núi đơn lẻ không dùng the).",
+    "tags": [
+      "Mạo từ",
+      "Ngữ pháp cơ bản"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_33",
+    "cau_truc": "Concessive & Causal Clauses (Mệnh đề nhượng bộ và nguyên nhân: In spite of / Although / Due to)",
+    "giai_thich": "Although/Even though/Though + Clause vs. Despite/In spite of + Noun phrase/V-ing. Because/Since + Clause vs. Due to/Because of + Noun phrase.",
+    "vi_du": "Despite experiencing severe logistical disruptions, the manufacturer delivered the shipment on schedule.",
+    "vi_du_dich": "Mặc dù gặp phải sự gián đoạn nghiêm trọng về hậu cần, nhà sản xuất vẫn giao hàng đúng lịch trình.",
+    "ngon_ngu": "en",
+    "cap_do": "B1 - Trung cấp",
+    "ghi_chu": "Despite + Noun/V-ing = In spite of + Noun/V-ing = Although + S + V.",
+    "tags": [
+      "Liên từ",
+      "Câu phức",
+      "Viết"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  },
+  {
+    "grammar_id": "en_gram_34",
+    "cau_truc": "Special Tag Questions (Câu hỏi đuôi các trường hợp đặc biệt)",
+    "giai_thich": "Quy tắc với I am (aren't I?), Let's (shall we?), Mệnh lệnh (will you?), Nobody/No one (they), Nothing (it), Rarely/Seldom (đuôi khẳng định).",
+    "vi_du": "Nobody had anticipated such a rapid technological leap, had they?",
+    "vi_du_dich": "Chẳng có ai lường trước được một bước nhảy vọt công nghệ nhanh chóng đến vậy, phải không?",
+    "ngon_ngu": "en",
+    "cap_do": "A2 - Sơ cấp",
+    "ghi_chu": "Chủ ngữ Nobody/No one/Everyone/Somebody -> Đại từ câu hỏi đuôi là \"they\" | Câu chứa từ phủ định (rarely, seldom, hardly) -> đuôi khẳng định.",
+    "tags": [
+      "Câu hỏi đuôi",
+      "Giao tiếp"
+    ],
+    "user_id": "system",
+    "created_at": "2026-08-31"
+  }
+]
