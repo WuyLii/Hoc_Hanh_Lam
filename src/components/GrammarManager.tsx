@@ -121,10 +121,21 @@ export const GrammarManager: React.FC = () => {
 
   // Filter Grammar Items
   const filteredGrammar = currentLangGrammar.filter((g) => {
-    const matchQuery =
-      g.cau_truc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.giai_thich.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (g.vi_du && g.vi_du.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = searchQuery.toLowerCase().trim();
+    let matchQuery = !q;
+    if (q) {
+      const searchFields = [
+        g.cau_truc,
+        g.giai_thich,
+        g.vi_du,
+        g.vi_du_dich,
+        g.ghi_chu,
+        g.cap_do,
+        g.tags?.join(' '),
+      ].map((f) => (f || '').toLowerCase());
+
+      matchQuery = searchFields.some((f) => f.includes(q));
+    }
     const matchLevel =
       selectedLevel === 'ALL' ||
       g.cap_do === selectedLevel ||

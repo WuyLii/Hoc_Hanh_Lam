@@ -68,16 +68,24 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
   const filteredGroups = useMemo(() => {
     if (!searchQuery.trim()) return duplicateGroups;
     const q = searchQuery.toLowerCase().trim();
-    return duplicateGroups.filter(
-      (g) =>
-        g.key.includes(q) ||
-        g.items.some(
-          (item) =>
-            item.nghia.toLowerCase().includes(q) ||
-            item.phien_am.toLowerCase().includes(q) ||
-            (item.chu_de || '').toLowerCase().includes(q)
-        )
-    );
+    const tokens = q.split(/\s+/).filter(Boolean);
+
+    return duplicateGroups.filter((g) => {
+      const groupText = [
+        g.key,
+        ...g.items.flatMap((item) => [
+          item.tu,
+          item.nghia,
+          item.phien_am,
+          item.chu_de,
+          item.cap_do,
+        ]),
+      ]
+        .map((f) => (f || '').toLowerCase())
+        .join(' ');
+
+      return groupText.includes(q);
+    });
   }, [duplicateGroups, searchQuery]);
 
   // Total excess items (number of items to delete if keeping 1 per group)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { RecallQuality } from '../../services/srsEngine';
@@ -9,6 +9,13 @@ import {
   ChevronLeft,
   Filter,
   SlidersHorizontal,
+  CheckCircle2,
+  Check,
+  Shuffle,
+  Search,
+  RefreshCw,
+  Sparkles,
+  X,
 } from 'lucide-react';
 
 interface FlashcardGameProps {
@@ -26,37 +33,100 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   onRecordSRS,
   onExit,
 }) => {
+  // Candidate Filter Controls
   const [selectedLimit, setSelectedLimit] = useState<string>('ALL');
   const [selectedPos, setSelectedPos] = useState<string>('ALL');
   const [selectedContext, setSelectedContext] = useState<string>('ALL');
+  const [selectedLevel, setSelectedLevel] = useState<string>('ALL');
+  const [selectedSrsStatus, setSelectedSrsStatus] = useState<string>('ALL');
+  const [searchKeyword, setSearchKeyword] = useState<string>('');
+  
   const [showFilterBar, setShowFilterBar] = useState<boolean>(false);
+  const [reloadNotice, setReloadNotice] = useState<string | null>(null);
 
-  const availablePos = Array.from(new Set(words.map((w) => w.loai_tu || 'Khác'))).filter(Boolean);
-  const availableContexts = Array.from(new Set(words.map((w) => w.chu_de || 'Tổng hợp'))).filter(Boolean);
+  // Available options derived from full input words
+  const availablePos = useMemo(() => Array.from(new Set(words.map((w) => w.loai_tu || 'Khác'))).filter(Boolean), [words]);
+  const availableContexts = useMemo(() => Array.from(new Set(words.map((w) => w.chu_de || 'Tổng hợp'))).filter(Boolean), [words]);
+  const availableLevels = useMemo(() => Array.from(new Set(words.map((w) => w.cap_do || 'Cơ bản'))).filter(Boolean), [words]);
 
-  const activeWords = React.useMemo(() => {
+  // Candidate words matching current filter criteria
+  const candidateWords = useMemo(() => {
     let list = words.filter((w) => {
       if (selectedPos !== 'ALL' && w.loai_tu !== selectedPos) return false;
       if (selectedContext !== 'ALL' && w.chu_de !== selectedContext) return false;
+      if (selectedLevel !== 'ALL' && w.cap_do !== selectedLevel) return false;
+
+      if (selectedSrsStatus === 'due') {
+        const now = new Date();
+        const isDue = !w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0;
+        if (!isDue) return false;
+      } else if (selectedSrsStatus === 'new') {
+        if (w.srs_box !== 0 && w.times_reviewed) return false;
+      } else if (selectedSrsStatus === 'difficult') {
+        const isDifficult = (w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1;
+        if (!isDifficult) return false;
+      } else if (selectedSrsStatus === 'mastered') {
+        if ((w.srs_box || 0) < 4) return false;
+      }
+
+      if (searchKeyword.trim()) {
+        const q = searchKeyword.toLowerCase().trim();
+        const searchFields = [
+          w.tu,
+          w.nghia,
+          w.phien_am,
+          w.nghia_tieng_han,
+          w.nghia_tieng_anh,
+          w.vi_du,
+          w.vi_du_dich,
+          w.loai_tu,
+          w.chu_de,
+          w.cap_do,
+        ].map((f) => (f || '').toLowerCase());
+
+        const match = searchFields.some((f) => f.includes(q));
+        if (!match) return false;
+      }
+
       return true;
     });
+
     if (selectedLimit !== 'ALL') {
       const lim = parseInt(selectedLimit, 10);
       list = list.slice(0, lim);
     }
     return list;
-  }, [words, selectedPos, selectedContext, selectedLimit]);
+  }, [words, selectedPos, selectedContext, selectedLevel, selectedSrsStatus, searchKeyword, selectedLimit]);
+
+  // Pending selected word IDs for checkbox selection inside drawer
+  const [pendingWordIds, setPendingWordIds] = useState<Set<string>>(() => {
+    return new Set(words.map((w) => w.word_id));
+  });
+
+  // Keep pendingWordIds synced when candidateWords change if user hasn't manually customized
+  useEffect(() => {
+    if (candidateWords.length > 0) {
+      setPendingWordIds(new Set(candidateWords.map((w) => w.word_id)));
+    }
+  }, [candidateWords]);
+
+  // Applied words array currently rendered in the Flashcard deck
+  const [activeWords, setActiveWords] = useState<VocabularyItem[]>(() => {
+    return words.length > 0 ? words : [];
+  });
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionResults, setSessionResults] = useState<{ wordId: string; rating: RecallQuality }[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  // Reset index if filtered words change
+  // When words prop changes initially, sync activeWords
   useEffect(() => {
-    setCurrentIndex(0);
-    setIsFlipped(false);
-  }, [selectedLimit, selectedPos, selectedContext]);
+    if (words.length > 0 && activeWords.length === 0) {
+      setActiveWords(words);
+      setPendingWordIds(new Set(words.map((w) => w.word_id)));
+    }
+  }, [words]);
 
   const currentWord = activeWords[currentIndex];
 
@@ -101,25 +171,94 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     }
   };
 
+  // Checkbox toggle helpers inside drawer
+  const handleToggleWord = (wordId: string) => {
+    setPendingWordIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(wordId)) {
+        next.delete(wordId);
+      } else {
+        next.add(wordId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllCandidates = () => {
+    const allIds = candidateWords.map((w) => w.word_id);
+    setPendingWordIds(new Set(allIds));
+  };
+
+  const handleDeselectAllCandidates = () => {
+    setPendingWordIds(new Set());
+  };
+
+  const handleSelectRandomCandidates = (count: number) => {
+    const shuffled = [...candidateWords].sort(() => Math.random() - 0.5);
+    const chosen = shuffled.slice(0, count).map((w) => w.word_id);
+    setPendingWordIds(new Set(chosen));
+  };
+
+  // CONFIRMATION & RELOAD HANDLER: Apply filter selection and reload cards!
+  const handleApplySelectionAndReload = () => {
+    let finalChosen = candidateWords.filter((w) => pendingWordIds.has(w.word_id));
+    
+    // Fallback if none checked: use candidateWords or entire words list
+    if (finalChosen.length === 0) {
+      if (candidateWords.length > 0) {
+        finalChosen = candidateWords;
+        setPendingWordIds(new Set(candidateWords.map((w) => w.word_id)));
+      } else {
+        finalChosen = words;
+        setPendingWordIds(new Set(words.map((w) => w.word_id)));
+      }
+    }
+
+    // Shuffle slightly for fresh practice
+    const shuffledDeck = [...finalChosen].sort(() => Math.random() - 0.3);
+
+    setActiveWords(shuffledDeck);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setSessionResults([]);
+    setIsCompleted(false);
+    setShowFilterBar(false);
+
+    // Toast notice
+    setReloadNotice(`✓ Đã nạp lại ${shuffledDeck.length} thẻ flashcard theo lựa chọn của bạn!`);
+    setTimeout(() => {
+      setReloadNotice(null);
+    }, 4000);
+  };
+
   if (!activeWords || activeWords.length === 0) {
     return (
-      <div className="p-8 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-4 max-w-md mx-auto">
-        <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">Không tìm thấy từ theo bộ lọc này</h3>
-        <p className="text-xs font-mono text-stone-500">Vui lòng điều chỉnh lại số từ, từ loại hoặc ngữ cảnh để ôn tập.</p>
-        <div className="flex gap-2 justify-center">
+      <div className="p-8 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-4 max-w-md mx-auto my-8">
+        <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">Không tìm thấy từ vựng nào</h3>
+        <p className="text-xs font-mono text-stone-500">Vui lòng chọn hoặc đặt lại bộ lọc để tải thẻ flashcard.</p>
+        <div className="flex gap-2 justify-center pt-2">
           <button
             onClick={() => {
               setSelectedLimit('ALL');
               setSelectedPos('ALL');
               setSelectedContext('ALL');
+              setSelectedLevel('ALL');
+              setSelectedSrsStatus('ALL');
+              setSearchKeyword('');
+              const allIds = new Set(words.map((w) => w.word_id));
+              setPendingWordIds(allIds);
+              setActiveWords(words);
+              setCurrentIndex(0);
+              setIsCompleted(false);
             }}
-            className="px-3 py-1.5 border border-[#1A1A1A] bg-stone-100 text-[#1A1A1A] text-xs font-mono uppercase font-bold"
+            className="px-4 py-2 border border-[#1A1A1A] bg-stone-100 hover:bg-[#1A1A1A] hover:text-white text-[#1A1A1A] text-xs font-mono uppercase font-bold transition flex items-center gap-1.5"
           >
-            ĐẶT LẠI BỘ LỌC
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>ĐẶT LẠI TẤT CẢ BỘ LỌC</span>
           </button>
           <button
             onClick={onExit}
-            className="px-3 py-1.5 border border-[#1A1A1A] bg-[#1A1A1A] text-white text-xs font-mono uppercase font-bold"
+            className="px-4 py-2 border border-[#1A1A1A] bg-[#1A1A1A] text-white text-xs font-mono uppercase font-bold"
           >
             QUAY LẠI
           </button>
@@ -131,7 +270,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   if (isCompleted) {
     const correctCount = sessionResults.filter((r) => r.rating === 'good' || r.rating === 'easy').length;
     return (
-      <div className="p-8 max-w-lg mx-auto text-center bg-white border-4 border-[#1A1A1A] editorial-shadow-lg space-y-6 animate-in zoom-in-95">
+      <div className="p-8 max-w-lg mx-auto text-center bg-white border-4 border-[#1A1A1A] editorial-shadow-lg space-y-6 animate-in zoom-in-95 my-8">
         <div className="w-16 h-16 border-2 border-[#1A1A1A] bg-[#F9F7F2] text-[#1A1A1A] flex items-center justify-center mx-auto text-2xl font-bold font-mono">
           ✓
         </div>
@@ -180,9 +319,25 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* Toast Notification Banner when Cards reloaded */}
+      {reloadNotice && (
+        <div className="p-3 bg-emerald-900 text-emerald-100 border-2 border-[#1A1A1A] text-xs font-mono font-bold flex items-center justify-between animate-in slide-in-from-top-2 duration-200 editorial-shadow-sm">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{reloadNotice}</span>
+          </div>
+          <button
+            onClick={() => setReloadNotice(null)}
+            className="p-1 hover:bg-emerald-800 rounded transition"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Top Controls & Progress */}
-      <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3">
+      <div className="flex items-center justify-between border-b-2 border-[#1A1A1A] pb-3">
         <button
           onClick={onExit}
           className="flex items-center gap-1 text-xs font-mono uppercase font-bold text-stone-600 hover:text-[#1A1A1A] transition"
@@ -191,20 +346,24 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
           <span>THOÁT RA</span>
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setShowFilterBar(!showFilterBar)}
-            className="flex items-center gap-1 px-2.5 py-1 border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white text-[11px] font-mono uppercase font-bold transition"
-            title="Tùy chỉnh số từ, từ loại, ngữ cảnh"
+            className={`flex items-center gap-1.5 px-3 py-1.5 border-2 text-xs font-mono uppercase font-bold transition editorial-shadow-sm ${
+              showFilterBar
+                ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                : 'bg-white hover:bg-[#1A1A1A] hover:text-white border-[#1A1A1A] text-[#1A1A1A]'
+            }`}
+            title="Lọc & chọn từng từ cần ôn flashcard"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>BỘ LỌC SRS ({activeWords.length})</span>
+            <Filter className="w-3.5 h-3.5" />
+            <span>BỘ LỌC SRS & CHỌN TỪ ({activeWords.length})</span>
           </button>
 
           <span className="text-xs font-mono font-bold text-[#1A1A1A]">
             THẺ {currentIndex + 1} / {activeWords.length}
           </span>
-          <div className="w-24 h-2 border border-[#1A1A1A] bg-[#F9F7F2] overflow-hidden">
+          <div className="w-20 sm:w-28 h-2 border border-[#1A1A1A] bg-[#F9F7F2] overflow-hidden">
             <div
               className="h-full bg-[#1A1A1A] transition-all duration-200"
               style={{ width: `${((currentIndex + 1) / activeWords.length) * 100}%` }}
@@ -213,41 +372,113 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
         </div>
       </div>
 
-      {/* Inline SRS Customization Filter Bar */}
+      {/* Interactive Expandable Filter Drawer & Individual Word Selector */}
       {showFilterBar && (
-        <div className="p-4 bg-[#F9F7F2] border border-[#1A1A1A] space-y-3 animate-in fade-in duration-150">
-          <div className="text-[11px] font-mono font-bold uppercase text-[#1A1A1A] flex items-center justify-between">
-            <span>TÙY CHỈNH THẺ THỜI GIAN THỰC (SRS SM-2)</span>
-            <span className="text-stone-500 font-normal">{activeWords.length} từ phù hợp</span>
+        <div className="p-5 bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-700" />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A1A1A]">
+                BỘ LỌC TÙY CHỈNH & CHỌN TỪ ÔN FLASHCARD
+              </span>
+            </div>
+
+            {/* TOP RELOAD BUTTON FOR QUICK ACCESS */}
+            <button
+              onClick={handleApplySelectionAndReload}
+              className="px-4 py-2 border-2 border-[#1A1A1A] bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm flex items-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              <span>CHỌN XONG (NẠP LẠI {pendingWordIds.size} CARD)</span>
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Filter Select Controls Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {/* Search Keyword */}
+            <div className="col-span-2 sm:col-span-1 md:col-span-2 relative">
+              <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
+                Tìm từ vựng:
+              </label>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Lọc từ, nghĩa..."
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  className="w-full pl-8 pr-2 py-1.5 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* SRS Status Filter */}
             <div>
               <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
-                Số từ ôn tập:
+                Trạng thái SRS:
+              </label>
+              <select
+                value={selectedSrsStatus}
+                onChange={(e) => setSelectedSrsStatus(e.target.value)}
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white"
+              >
+                <option value="ALL">Tất cả từ</option>
+                <option value="due">🔴 Cần ôn ngay</option>
+                <option value="new">🆕 Từ mới chưa học</option>
+                <option value="difficult">⚠️ Từ cần củng cố</option>
+                <option value="mastered">✅ Từ đã thuộc</option>
+              </select>
+            </div>
+
+            {/* Limit */}
+            <div>
+              <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
+                Số từ giới hạn:
               </label>
               <select
                 value={selectedLimit}
                 onChange={(e) => setSelectedLimit(e.target.value)}
-                className="w-full py-1.5 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A]"
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white"
               >
-                <option value="ALL">Tất cả từ</option>
+                <option value="ALL">Tất cả</option>
                 <option value="5">5 từ</option>
                 <option value="10">10 từ</option>
                 <option value="15">15 từ</option>
                 <option value="20">20 từ</option>
                 <option value="30">30 từ</option>
+                <option value="50">50 từ</option>
+                <option value="100">100 từ</option>
               </select>
             </div>
 
+            {/* Level */}
             <div>
               <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
-                Chọn Từ Loại:
+                Cấp độ:
+              </label>
+              <select
+                value={selectedLevel}
+                onChange={(e) => setSelectedLevel(e.target.value)}
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white"
+              >
+                <option value="ALL">Tất cả cấp độ</option>
+                {availableLevels.map((lvl) => (
+                  <option key={lvl} value={lvl}>
+                    {lvl}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* POS */}
+            <div>
+              <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
+                Từ Loại:
               </label>
               <select
                 value={selectedPos}
                 onChange={(e) => setSelectedPos(e.target.value)}
-                className="w-full py-1.5 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A]"
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white"
               >
                 <option value="ALL">Tất cả từ loại</option>
                 {availablePos.map((pos) => (
@@ -258,16 +489,17 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               </select>
             </div>
 
+            {/* Context/Topic */}
             <div>
               <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
-                Ngữ Cảnh / Chủ Đề:
+                Chủ Đề / Context:
               </label>
               <select
                 value={selectedContext}
                 onChange={(e) => setSelectedContext(e.target.value)}
-                className="w-full py-1.5 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A]"
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white"
               >
-                <option value="ALL">Tất cả ngữ cảnh</option>
+                <option value="ALL">Tất cả chủ đề</option>
                 {availableContexts.map((ctx) => (
                   <option key={ctx} value={ctx}>
                     {ctx}
@@ -275,6 +507,115 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Quick Word Selection Toolbar */}
+          <div className="pt-2 border-t border-[#1A1A1A]/20 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-[#1A1A1A] uppercase">
+                DANH SÁCH TỪ PHÙ HỢP ({candidateWords.length}):
+              </span>
+              <span className="bg-[#1A1A1A] text-[#F9F7F2] px-2 py-0.5 font-bold">
+                ĐÃ CHỌN {pendingWordIds.size} TỪ
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleSelectAllCandidates}
+                className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-[11px] font-bold text-[#1A1A1A]"
+              >
+                ✓ Chọn tất cả ({candidateWords.length})
+              </button>
+              <button
+                type="button"
+                onClick={handleDeselectAllCandidates}
+                className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-[11px] font-bold text-[#1A1A1A]"
+              >
+                ✗ Bỏ chọn tất cả
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectRandomCandidates(10)}
+                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-800 text-[11px] font-bold text-amber-950 flex items-center gap-1"
+              >
+                <Shuffle className="w-3 h-3 text-amber-700" />
+                <span>🎲 Ngẫu nhiên 10 từ</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectRandomCandidates(20)}
+                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-800 text-[11px] font-bold text-amber-950 flex items-center gap-1"
+              >
+                <Shuffle className="w-3 h-3 text-amber-700" />
+                <span>🎲 20 từ</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Checkbox Table / Grid List of Candidate Words */}
+          <div className="max-h-56 overflow-y-auto border border-[#1A1A1A] bg-[#F9F7F2] p-2 space-y-1 divide-y divide-stone-200 text-xs font-mono">
+            {candidateWords.length === 0 ? (
+              <div className="p-4 text-center text-stone-500 font-serif italic">
+                Không tìm thấy từ vựng khớp với bộ lọc hiện tại. Vui lòng thay đổi các tùy chọn lọc ở trên.
+              </div>
+            ) : (
+              candidateWords.map((word) => {
+                const isChecked = pendingWordIds.has(word.word_id);
+                return (
+                  <label
+                    key={word.word_id}
+                    className={`flex items-center justify-between p-2 cursor-pointer transition ${
+                      isChecked ? 'bg-white font-bold text-[#1A1A1A]' : 'opacity-60 hover:opacity-100 hover:bg-stone-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleWord(word.word_id)}
+                        className="w-4 h-4 accent-[#1A1A1A] cursor-pointer"
+                      />
+                      <span className="font-serif text-sm font-bold text-[#1A1A1A] truncate">
+                        {word.tu}
+                      </span>
+                      {word.phien_am && (
+                        <span className="text-stone-500 text-[11px] font-normal truncate">
+                          [{word.phien_am}]
+                        </span>
+                      )}
+                      <span className="text-stone-700 font-normal truncate">
+                        — {word.nghia}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 text-[9px] uppercase">
+                        {word.loai_tu || 'Từ vựng'}
+                      </span>
+                      <span className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 text-[9px]">
+                        Box {word.srs_box || 0}
+                      </span>
+                    </div>
+                  </label>
+                );
+              })
+            )}
+          </div>
+
+          {/* MAIN PROMINENT 'CHỌN XONG (NẠP LẠI BỘ THẺ)' BUTTON */}
+          <div className="pt-2 border-t-2 border-[#1A1A1A] flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span className="text-xs font-mono text-stone-600">
+              Nhấn nút bên cạnh để áp dụng danh sách từ đã chọn và tải lại các thẻ Flashcard.
+            </span>
+            <button
+              onClick={handleApplySelectionAndReload}
+              className="w-full sm:w-auto px-6 py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-emerald-950 hover:border-emerald-900 text-xs font-mono font-bold uppercase tracking-widest editorial-shadow transition flex items-center justify-center gap-2"
+            >
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>CHỌN XONG — TẢI LẠI CARD ({pendingWordIds.size} THẺ) →</span>
+            </button>
           </div>
         </div>
       )}
@@ -394,3 +735,4 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     </div>
   );
 };
+

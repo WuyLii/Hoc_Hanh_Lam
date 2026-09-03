@@ -35,6 +35,8 @@ export const VocabularyManager: React.FC = () => {
     batchAddVocabulary,
     selectedLevelFilter,
     setSelectedLevelFilter,
+    setActiveNav,
+    setSelectedGameMode,
   } = useApp();
 
   const currentLangInfo = LANGUAGES[currentLanguage];
@@ -277,13 +279,23 @@ export const VocabularyManager: React.FC = () => {
     if (showOnlyDuplicates && !isDuplicate) return false;
 
     const q = searchQuery.toLowerCase().trim();
-    const matchQuery =
-      !q ||
-      w.tu.toLowerCase().includes(q) ||
-      w.nghia.toLowerCase().includes(q) ||
-      (w.phien_am && w.phien_am.toLowerCase().includes(q)) ||
-      (w.nghia_tieng_han && w.nghia_tieng_han.toLowerCase().includes(q)) ||
-      (w.nghia_tieng_anh && w.nghia_tieng_anh.toLowerCase().includes(q));
+    let matchQuery = !q;
+    if (q) {
+      const searchFields = [
+        w.tu,
+        w.nghia,
+        w.phien_am,
+        w.nghia_tieng_han,
+        w.nghia_tieng_anh,
+        w.vi_du,
+        w.vi_du_dich,
+        w.loai_tu,
+        w.chu_de,
+        w.cap_do,
+      ].map((f) => (f || '').toLowerCase());
+
+      matchQuery = searchFields.some((f) => f.includes(q));
+    }
 
     const matchTopic = selectedTopic === 'ALL' || w.chu_de === selectedTopic;
     const matchLevel =
@@ -552,6 +564,19 @@ export const VocabularyManager: React.FC = () => {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
+            {/* Flashcard Quick Launch Button for Filtered Words */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedGameMode('flashcard');
+                setActiveNav('games');
+              }}
+              className="px-3 py-1.5 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-[11px] font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm flex items-center gap-1.5"
+              title="Mở ngay thẻ Flashcard cho bộ từ vựng đã lọc"
+            >
+              <span>🎴 ÔN FLASHCARD BỘ TỪ NÀY ({sortedWords.length})</span>
+            </button>
+
             {/* View Mode Toggle */}
             <div className="flex items-center gap-1 border border-[#1A1A1A] p-0.5 bg-[#F9F7F2]">
               <button
