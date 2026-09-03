@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import confetti from 'canvas-confetti';
@@ -67,13 +68,16 @@ export const MatchingPairsGame: React.FC<MatchingPairsGameProps> = ({
     initGame();
   }, [words]);
 
+  const { activeNav } = useApp();
+  const isPaused = activeNav !== 'games';
+
   useEffect(() => {
-    if (isCompleted) return;
+    if (isCompleted || isPaused) return;
     const interval = setInterval(() => {
       setTimerSeconds((t) => t + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [isCompleted]);
+  }, [isCompleted, isPaused]);
 
   const handleTileClick = (tile: Tile) => {
     if (tile.isMatched || wrongMatchPair) return;

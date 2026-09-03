@@ -12,6 +12,7 @@ import { StrokeGuideView } from './components/StrokeGuideView';
 import { NumbersView } from './components/NumbersView';
 import { GoogleSheetsSettings } from './components/GoogleSheetsSettings';
 import { OcrScannerModal } from './components/OcrScannerModal';
+import { ActiveGamePersistentBar } from './components/games/ActiveGamePersistentBar';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -69,33 +70,6 @@ const AppContent: React.FC = () => {
   const { activeNav } = useApp();
   const [isOcrModalOpen, setIsOcrModalOpen] = useState(false);
 
-  const renderActiveView = () => {
-    switch (activeNav) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'levels':
-        return <ProficiencyLevelView />;
-      case 'vocabulary':
-        return <VocabularyManager />;
-      case 'grammar':
-        return <GrammarManager />;
-      case 'games':
-        return <GameReviewHub />;
-      case 'mocktest':
-        return <MockTestView />;
-      case 'aichat':
-        return <AiChatboxView />;
-      case 'stroke':
-        return <StrokeGuideView />;
-      case 'numbers':
-        return <NumbersView />;
-      case 'sheets':
-        return <GoogleSheetsSettings />;
-      default:
-        return <Dashboard />;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#F9F7F2] text-[#1A1A1A] font-sans selection:bg-[#1A1A1A] selection:text-[#F9F7F2] flex flex-col overflow-x-hidden w-full max-w-full">
       {/* Top Sticky Editorial Header & Navigation */}
@@ -105,8 +79,25 @@ const AppContent: React.FC = () => {
 
       {/* Main Workspace Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 md:pb-8 overflow-x-hidden">
-        {renderActiveView()}
+        {/* Persistent Game Review Hub: kept mounted in DOM so active game session, question index, flipped state and scores are NEVER lost */}
+        <div style={{ display: activeNav === 'games' ? 'block' : 'none' }}>
+          <GameReviewHub />
+        </div>
+
+        {/* Dynamic Views: rendered when activeNav is matched */}
+        {activeNav === 'dashboard' && <Dashboard />}
+        {activeNav === 'levels' && <ProficiencyLevelView />}
+        {activeNav === 'vocabulary' && <VocabularyManager />}
+        {activeNav === 'grammar' && <GrammarManager />}
+        {activeNav === 'mocktest' && <MockTestView />}
+        {activeNav === 'aichat' && <AiChatboxView />}
+        {activeNav === 'stroke' && <StrokeGuideView />}
+        {activeNav === 'numbers' && <NumbersView />}
+        {activeNav === 'sheets' && <GoogleSheetsSettings />}
       </main>
+
+      {/* Persistent floating indicator when a game is in progress and user browses other sections */}
+      <ActiveGamePersistentBar />
 
       {/* Editorial Newspaper Footer */}
       <footer className="border-t border-[#1A1A1A] bg-[#F3EFE6] py-6 text-[#1A1A1A] mb-14 md:mb-0">

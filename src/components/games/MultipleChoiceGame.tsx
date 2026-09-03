@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useApp } from '../../context/AppContext';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { SpeakButton } from '../SpeakButton';
@@ -65,9 +66,12 @@ export const MultipleChoiceGame: React.FC<MultipleChoiceGameProps> = ({
     return combined.sort(() => 0.5 - Math.random());
   }, [currentWord, allWords]);
 
-  // Timer per question
+  const { activeNav } = useApp();
+  const isPaused = activeNav !== 'games';
+
+  // Timer per question (paused when user is browsing other sections)
   useEffect(() => {
-    if (isAnswered || isCompleted) return;
+    if (isAnswered || isCompleted || isPaused) return;
 
     if (timeLeft <= 0) {
       handleChoose(null);
@@ -79,7 +83,7 @@ export const MultipleChoiceGame: React.FC<MultipleChoiceGameProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, isAnswered, isCompleted]);
+  }, [timeLeft, isAnswered, isCompleted, isPaused]);
 
   const isChoosingRef = React.useRef(false);
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useApp } from '../../context/AppContext';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { SpeakButton } from '../SpeakButton';
@@ -55,9 +56,12 @@ export const TypingPracticeGame: React.FC<TypingPracticeGameProps> = ({
     setIsCompleted(false);
   }, [words]);
 
-  // Countdown timer effect per word
+  const { activeNav } = useApp();
+  const isPaused = activeNav !== 'games';
+
+  // Countdown timer effect per word (paused when user browses other sections)
   useEffect(() => {
-    if (!isTimerRunning || isCompleted || !currentWord) return;
+    if (!isTimerRunning || isCompleted || !currentWord || isPaused) return;
 
     if (timeLeft <= 0) {
       handleTimeout();
@@ -69,7 +73,7 @@ export const TypingPracticeGame: React.FC<TypingPracticeGameProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, isTimerRunning, isCompleted, currentWord]);
+  }, [timeLeft, isTimerRunning, isCompleted, currentWord, isPaused]);
 
   // Reset round state when index changes
   useEffect(() => {

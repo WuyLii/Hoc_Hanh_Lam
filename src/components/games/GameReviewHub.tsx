@@ -80,6 +80,28 @@ export const GameReviewHub: React.FC = () => {
     return shuffled;
   }, [filteredPool, activeLimitFilter, shuffleKey]);
 
+  // Stable words for active game session: persists across navigation so words don't reshuffle mid-game
+  const [sessionWords, setSessionWords] = React.useState<VocabularyItem[] | null>(null);
+
+  React.useEffect(() => {
+    if (selectedGameMode) {
+      if (!sessionWords || sessionWords.length === 0) {
+        setSessionWords(finalWordsToPlay.length > 0 ? finalWordsToPlay : currentLangVocabulary);
+      }
+    } else {
+      if (sessionWords) {
+        setSessionWords(null);
+      }
+    }
+  }, [selectedGameMode]);
+
+  const activeWordsForGame = sessionWords && sessionWords.length > 0 ? sessionWords : finalWordsToPlay;
+
+  const handleExitGame = () => {
+    setSelectedGameMode(null);
+    setSessionWords(null);
+  };
+
   const handleFinishGame = (correctCount: number, totalCount: number, score: number) => {
     if (selectedGameMode) {
       addReviewSession({
@@ -90,7 +112,7 @@ export const GameReviewHub: React.FC = () => {
         so_cau_dung: correctCount,
         so_cau_sai: totalCount - correctCount,
         diem: score,
-        danh_sach_word_id: finalWordsToPlay.map((w) => w.word_id),
+        danh_sach_word_id: activeWordsForGame.map((w) => w.word_id),
       });
       addStudyTime(2, score);
     }
@@ -169,40 +191,40 @@ export const GameReviewHub: React.FC = () => {
       case 'flashcard':
         return (
           <FlashcardGame
-            words={finalWordsToPlay}
+            words={activeWordsForGame}
             language={currentLanguage}
             onFinish={handleFinishGame}
             onRecordSRS={recordSRSRating}
-            onExit={() => setSelectedGameMode(null)}
+            onExit={handleExitGame}
           />
         );
       case 'multiple_choice':
         return (
           <MultipleChoiceGame
-            words={finalWordsToPlay}
+            words={activeWordsForGame}
             allWords={currentLangVocabulary}
             language={currentLanguage}
             onFinish={handleFinishGame}
-            onExit={() => setSelectedGameMode(null)}
+            onExit={handleExitGame}
           />
         );
       case 'matching':
         return (
           <MatchingPairsGame
-            words={finalWordsToPlay}
+            words={activeWordsForGame}
             language={currentLanguage}
             onFinish={handleFinishGame}
-            onExit={() => setSelectedGameMode(null)}
+            onExit={handleExitGame}
           />
         );
       case 'fill_blank':
         return (
           <FillInBlankGame
-            words={finalWordsToPlay}
+            words={activeWordsForGame}
             allWords={currentLangVocabulary}
             language={currentLanguage}
             onFinish={handleFinishGame}
-            onExit={() => setSelectedGameMode(null)}
+            onExit={handleExitGame}
           />
         );
       case 'scramble':
@@ -212,34 +234,34 @@ export const GameReviewHub: React.FC = () => {
             vocabularyItems={currentLangVocabulary}
             language={currentLanguage}
             onFinish={handleFinishGame}
-            onExit={() => setSelectedGameMode(null)}
+            onExit={handleExitGame}
           />
         );
       case 'picture_guess':
         return (
           <PictureGuessGame
-            words={finalWordsToPlay}
+            words={activeWordsForGame}
             language={currentLanguage}
             onFinish={handleFinishGame}
-            onExit={() => setSelectedGameMode(null)}
+            onExit={handleExitGame}
           />
         );
       case 'hangman':
         return (
           <HangmanGame
-            words={finalWordsToPlay}
+            words={activeWordsForGame}
             language={currentLanguage}
             onFinish={handleFinishGame}
-            onExit={() => setSelectedGameMode(null)}
+            onExit={handleExitGame}
           />
         );
       case 'typing':
         return (
           <TypingPracticeGame
-            words={finalWordsToPlay}
+            words={activeWordsForGame}
             language={currentLanguage}
             onFinish={handleFinishGame}
-            onExit={() => setSelectedGameMode(null)}
+            onExit={handleExitGame}
           />
         );
       default:

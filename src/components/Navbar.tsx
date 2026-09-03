@@ -40,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
     isSyncing,
     isCloudSyncing,
     sheetsConfig,
+    selectedGameMode,
   } = useApp();
 
   const [showLangMenu, setShowLangMenu] = useState(false);
@@ -205,6 +206,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
                   </span>
                   <Icon className="w-3.5 h-3.5" />
                   <span className="font-semibold">{item.label}</span>
+                  {item.id === 'games' && selectedGameMode && (
+                    <span className="inline-flex items-center gap-1 bg-amber-400 text-stone-950 text-[9px] font-mono font-black px-1.5 py-0.5 rounded shadow-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-stone-950 animate-ping" />
+                      ĐANG CHƠI
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -335,12 +342,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
 
           <button
             onClick={() => handleMobileNavClick('games')}
-            className={`flex flex-col items-center justify-center py-1 rounded transition ${
+            className={`flex flex-col items-center justify-center py-1 rounded transition relative ${
               activeNav === 'games' ? 'text-[#1A1A1A] font-bold' : 'text-stone-500'
             }`}
           >
-            <Gamepad2 className={`w-5 h-5 ${activeNav === 'games' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
-            <span className="text-[10px] font-mono uppercase mt-0.5">Luyện tập</span>
+            <div className="relative">
+              <Gamepad2 className={`w-5 h-5 ${activeNav === 'games' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
+              {selectedGameMode && (
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-mono uppercase mt-0.5 font-semibold">
+              {selectedGameMode ? 'Đang chơi' : 'Luyện tập'}
+            </span>
           </button>
 
           <button
@@ -392,10 +409,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
-                    <div className="truncate">
+                    <div className="truncate flex-1 min-w-0">
                       <div className="text-[9px] opacity-60">{item.num}</div>
                       <div className="font-bold truncate text-[11px]">{item.label}</div>
                     </div>
+                    {item.id === 'games' && selectedGameMode && (
+                      <span className="shrink-0 text-[8px] bg-amber-400 text-stone-950 font-black px-1.5 py-0.5 rounded">
+                        ĐANG CHƠI
+                      </span>
+                    )}
                   </button>
                 );
               })}
