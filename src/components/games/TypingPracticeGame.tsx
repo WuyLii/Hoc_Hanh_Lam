@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
+import { SpeakButton } from '../SpeakButton';
 import confetti from 'canvas-confetti';
 import { ChevronLeft, Volume2, Timer, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
@@ -231,13 +232,15 @@ export const TypingPracticeGame: React.FC<TypingPracticeGameProps> = ({
             <span className="font-serif font-bold text-base text-[#1A1A1A] ml-1">{currentWord.tu}</span>
             {currentWord.phien_am && <span className="font-mono text-stone-600 ml-2">({currentWord.phien_am})</span>}
           </div>
-          <button
-            type="button"
-            onClick={() => ttsService.speak(currentWord.tu, language)}
-            className="p-1 border border-stone-800 bg-white hover:bg-stone-100"
-          >
-            <Volume2 className="w-4 h-4" />
-          </button>
+          <SpeakButton
+            text={currentWord.tu}
+            language={language}
+            variant="ghost"
+            position="left"
+            buttonClassName="p-1 border border-stone-800 bg-white hover:bg-stone-100"
+            iconClassName="w-4 h-4"
+            title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+          />
         </div>
 
         {/* Next Question Button */}
@@ -337,12 +340,14 @@ export const TypingPracticeGame: React.FC<TypingPracticeGameProps> = ({
             <span className="text-[9px] font-mono uppercase px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A]">
               {currentWord.loai_tu}
             </span>
-            <button
-              onClick={() => ttsService.speak(currentWord.tu, language)}
-              className="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
-            >
-              <Volume2 className="w-3.5 h-3.5" />
-            </button>
+            <SpeakButton
+              text={currentWord.tu}
+              language={language}
+              variant="ghost"
+              position="left"
+              buttonClassName="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white"
+              title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+            />
           </div>
 
           <h2 className="text-4xl sm:text-5xl font-serif font-black text-[#1A1A1A] tracking-tight">

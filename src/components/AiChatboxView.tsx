@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { ChatMessage, ChatConversation, LANGUAGES } from '../types';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import { compressImageForAI } from '../utils/imageCompressor';
 import {
   Sparkles,
@@ -400,14 +401,16 @@ export const AiChatboxView: React.FC = () => {
                   {/* Audio reader & Vocab suggestion badges */}
                   {isAi && (
                     <div className="pt-3 border-t border-[#1A1A1A]/15 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-                      <button
-                        onClick={() => ttsService.speak(msg.text, currentLanguage)}
-                        className="flex items-center gap-1.5 text-stone-600 hover:text-[#1A1A1A] transition"
-                        title="Nghe giọng phát âm"
-                      >
-                        <Volume2 className="w-3.5 h-3.5 text-[#1A1A1A]" />
-                        <span className="font-bold">NGHE PHÁT ÂM</span>
-                      </button>
+                      <SpeakButton
+                        text={msg.text}
+                        language={currentLanguage}
+                        variant="ghost"
+                        showLabel
+                        label="NGHE PHÁT ÂM"
+                        position="right"
+                        buttonClassName="font-mono font-bold text-xs text-stone-600 hover:text-[#1A1A1A]"
+                        title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                      />
 
                       {msg.suggested_words && msg.suggested_words.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GrammarItem, VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
+import { SpeakButton } from '../SpeakButton';
 import confetti from 'canvas-confetti';
 import { ChevronLeft, Volume2, RotateCcw, Check, ArrowRight } from 'lucide-react';
 
@@ -276,13 +277,15 @@ export const SentenceScrambleGame: React.FC<SentenceScrambleGameProps> = ({
                   Đáp án chuẩn: <strong>"{currentPuzzle.originalSentence}"</strong>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => ttsService.speak(currentPuzzle.originalSentence, language)}
-                className="p-1 border border-current hover:bg-black hover:text-white"
-              >
-                <Volume2 className="w-4 h-4" />
-              </button>
+              <SpeakButton
+                text={currentPuzzle.originalSentence}
+                language={language}
+                variant="ghost"
+                position="left"
+                buttonClassName="p-1 border border-current hover:bg-black hover:text-white"
+                iconClassName="w-4 h-4"
+                title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+              />
             </div>
 
             <button

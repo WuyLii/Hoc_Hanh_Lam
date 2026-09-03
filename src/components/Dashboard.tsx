@@ -4,8 +4,8 @@ import { LANGUAGES, LanguageCode } from '../types';
 import { LANGUAGE_LEVEL_MAP } from '../data/levelData';
 import { getDueWords, categorizeRetention } from '../services/srsEngine';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import {
-  Volume2,
   ArrowRight,
   TrendingUp,
   Award,
@@ -56,10 +56,6 @@ export const Dashboard: React.FC = () => {
     return { date: dateStr, minutes };
   });
 
-  const handlePlayAudio = (text: string, lang: LanguageCode) => {
-    ttsService.speak(text, lang);
-  };
-
   const startReviewSession = (mode: string = 'flashcard') => {
     setSelectedGameMode(mode);
     setActiveNav('games');
@@ -93,13 +89,15 @@ export const Dashboard: React.FC = () => {
                   <h2 className="text-3xl sm:text-6xl lg:text-8xl font-serif font-black leading-none tracking-tighter text-[#1A1A1A] break-words max-w-full">
                     {wordOfTheDay.tu}
                   </h2>
-                  <button
-                    onClick={() => handlePlayAudio(wordOfTheDay.tu, wordOfTheDay.ngon_ngu)}
-                    className="p-2.5 sm:p-3 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition shrink-0"
-                    title="Nghe phát âm chuẩn"
-                  >
-                    <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </button>
+                  <SpeakButton
+                    text={wordOfTheDay.tu}
+                    language={wordOfTheDay.ngon_ngu}
+                    variant="card"
+                    position="right"
+                    buttonClassName="p-2.5 sm:p-3 shrink-0"
+                    iconClassName="w-4 h-4 sm:w-5 sm:h-5"
+                    title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                  />
                 </div>
 
                 <div className="flex flex-wrap gap-4 items-baseline text-[#1A1A1A]">

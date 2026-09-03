@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
+import { SpeakButton } from '../SpeakButton';
 import confetti from 'canvas-confetti';
 import { ChevronLeft, Volume2, ArrowRight, Eye } from 'lucide-react';
 
@@ -221,13 +222,15 @@ export const PictureGuessGame: React.FC<PictureGuessGameProps> = ({
                     Từ đúng: {currentWord.tu} {currentWord.phien_am ? `(${currentWord.phien_am})` : ''}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => ttsService.speak(currentWord.tu, language)}
-                  className="p-1 border border-current hover:bg-black hover:text-white"
-                >
-                  <Volume2 className="w-4 h-4" />
-                </button>
+                <SpeakButton
+                  text={currentWord.tu}
+                  language={language}
+                  variant="ghost"
+                  position="left"
+                  buttonClassName="p-1 border border-current hover:bg-black hover:text-white"
+                  iconClassName="w-4 h-4"
+                  title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                />
               </div>
 
               <button

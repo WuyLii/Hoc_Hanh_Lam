@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { RecallQuality } from '../../services/srsEngine';
+import { SpeakButton } from '../SpeakButton';
 import confetti from 'canvas-confetti';
 import {
   RotateCcw,
@@ -237,13 +238,6 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleFlip, handleRate, isFlipped]);
-
-  const handlePlayAudio = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (currentWord) {
-      ttsService.speak(currentWord.tu, language);
-    }
-  };
 
   // Checkbox toggle helpers inside drawer
   const handleToggleWord = (wordId: string) => {
@@ -832,14 +826,16 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
 
             {/* Audio button */}
             {(!isMeaningFirst || isFlipped) ? (
-              <button
-                onClick={handlePlayAudio}
-                className="p-2 border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition flex items-center gap-1"
-                title="Nghe phát âm từ vựng"
-              >
-                <Volume2 className="w-4 h-4" />
-                <span className="text-[10px] font-mono hidden sm:inline">Phát âm</span>
-              </button>
+              <SpeakButton
+                text={currentWord.tu}
+                language={language}
+                variant="card"
+                showLabel={true}
+                label="Phát âm"
+                position="left"
+                buttonClassName="bg-white"
+                title="Nhấn để phát âm 1x • Giữ để chọn tốc độ"
+              />
             ) : (
               <span
                 className="text-[10px] font-mono text-stone-400 italic px-2 py-1 bg-stone-50 border border-stone-200"
@@ -961,13 +957,16 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                   )}
 
                   <div className="pt-1">
-                    <button
-                      onClick={handlePlayAudio}
-                      className="px-3 py-1 bg-stone-100 hover:bg-[#1A1A1A] hover:text-white border border-[#1A1A1A] text-xs font-mono transition inline-flex items-center gap-1.5"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span>Nghe phát âm native</span>
-                    </button>
+                    <SpeakButton
+                      text={currentWord.tu}
+                      language={language}
+                      variant="outline"
+                      showLabel={true}
+                      label="Nghe phát âm native"
+                      position="right"
+                      buttonClassName="bg-stone-100"
+                      title="Nhấn để phát âm 1x • Giữ để chọn tốc độ"
+                    />
                   </div>
                 </div>
 

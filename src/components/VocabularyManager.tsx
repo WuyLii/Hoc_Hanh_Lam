@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { VocabularyItem, LANGUAGES } from '../types';
 import { GoogleSheetsService } from '../services/googleSheetsService';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import { TextbookExtractorModal } from './TextbookExtractorModal';
 import { DuplicateVocabModal } from './DuplicateVocabModal';
 import {
@@ -666,13 +667,13 @@ export const VocabularyManager: React.FC = () => {
                 return (
                   <tr key={word.word_id} className="hover:bg-stone-50 transition">
                     <td className="p-3.5 font-bold text-[#1A1A1A] flex items-center gap-2">
-                      <button
-                        onClick={() => ttsService.speak(word.tu, word.ngon_ngu)}
-                        className="p-1 text-stone-600 hover:text-[#1A1A1A] transition"
-                        title="Pronounce"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                      </button>
+                      <SpeakButton
+                        text={word.tu}
+                        language={word.ngon_ngu}
+                        variant="table"
+                        position="right"
+                        title="Nhấn để phát âm 1x • Giữ để chọn tốc độ"
+                      />
                       <span>{word.tu}</span>
                       {duplicateWordSet.has(word.tu.trim().toLowerCase()) && (
                         <span className="px-1.5 py-0.5 bg-rose-100 text-rose-900 border border-rose-800 text-[9px] font-mono font-bold">
@@ -800,13 +801,13 @@ export const VocabularyManager: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => ttsService.speak(word.tu, word.ngon_ngu)}
-                      className="p-2 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition"
-                      title="Pronunciation Audio"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                    </button>
+                    <SpeakButton
+                      text={word.tu}
+                      language={word.ngon_ngu}
+                      variant="card"
+                      position="left"
+                      title="Nhấn để phát âm 1x • Giữ để chọn tốc độ"
+                    />
                   </div>
 
                   {/* Vietnamese Definition */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
+import { SpeakButton } from '../SpeakButton';
 import confetti from 'canvas-confetti';
 import { Volume2, ChevronLeft, Check, X, Clock } from 'lucide-react';
 
@@ -197,13 +198,14 @@ export const MultipleChoiceGame: React.FC<MultipleChoiceGameProps> = ({
           <span className="text-[9px] font-mono uppercase px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A]">
             {currentWord.loai_tu}
           </span>
-          <button
-            onClick={() => ttsService.speak(currentWord.tu, language)}
-            className="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
-            title="Nghe phát âm"
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-          </button>
+          <SpeakButton
+            text={currentWord.tu}
+            language={language}
+            variant="ghost"
+            position="left"
+            buttonClassName="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white"
+            title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+          />
         </div>
 
         <h2 className="text-4xl font-serif font-black text-[#1A1A1A]">{currentWord.tu}</h2>

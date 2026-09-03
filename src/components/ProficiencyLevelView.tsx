@@ -8,6 +8,7 @@ import {
   DiagnosticQuestion,
 } from '../data/levelData';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import {
   Award,
   CheckCircle2,
@@ -657,13 +658,13 @@ export const ProficiencyLevelView: React.FC = () => {
                         <div className="text-lg font-serif font-black text-[#1A1A1A]">
                           {word.word}
                         </div>
-                        <button
-                          onClick={() => ttsService.speak(word.word, currentLanguage)}
-                          className="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
-                          title="Nghe phát âm chuẩn"
-                        >
-                          <Volume2 className="w-3.5 h-3.5" />
-                        </button>
+                        <SpeakButton
+                          text={word.word}
+                          language={currentLanguage}
+                          variant="ghost"
+                          position="left"
+                          title="Nhấn để phát âm 1x • Giữ để chọn tốc độ"
+                        />
                       </div>
 
                       <div className="text-xs font-mono text-stone-600">

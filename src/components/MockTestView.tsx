@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { MockTestRecord, LANGUAGES } from '../types';
 import { INITIAL_MOCK_TESTS } from '../data/seedData';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import confetti from 'canvas-confetti';
 import {
   Award,
@@ -207,13 +208,14 @@ export const MockTestView: React.FC = () => {
                     <span className="text-xs font-mono font-bold uppercase text-stone-500">Câu hỏi {idx + 1}:</span>
                     <h3 className="text-lg font-serif font-bold text-[#1A1A1A] leading-snug">{q.cau_hoi}</h3>
                   </div>
-                  <button
-                    onClick={() => ttsService.speak(q.cau_hoi, currentLanguage)}
-                    className="p-2 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition shrink-0"
-                    title="Nghe phát âm"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
+                  <SpeakButton
+                    text={q.cau_hoi}
+                    language={currentLanguage}
+                    variant="card"
+                    position="left"
+                    buttonClassName="p-2 shrink-0"
+                    title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                  />
                 </div>
 
                 {/* 4 Choices */}

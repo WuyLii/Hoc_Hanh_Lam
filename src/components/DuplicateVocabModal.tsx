@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { VocabularyItem, LanguageCode, LANGUAGES } from '../types';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import {
   X,
   Trash2,
@@ -428,17 +429,13 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
 
                                 {/* Right Controls */}
                                 <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      ttsService.speak(item.tu, currentLanguage);
-                                    }}
-                                    className="p-1.5 border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition"
-                                    title="Nghe phát âm"
-                                  >
-                                    <Volume2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  <SpeakButton
+                                    text={item.tu}
+                                    language={currentLanguage}
+                                    variant="outline"
+                                    position="left"
+                                    title="Nhấn để phát âm 1x • Giữ để chọn tốc độ"
+                                  />
 
                                   <div className="flex items-center gap-2">
                                     {isMarkedForDelete ? (

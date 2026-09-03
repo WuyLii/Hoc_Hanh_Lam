@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
+import { SpeakButton } from '../SpeakButton';
 import confetti from 'canvas-confetti';
 import { ChevronLeft, Volume2, Check, X, HelpCircle, ArrowRight } from 'lucide-react';
 
@@ -240,14 +241,15 @@ export const FillInBlankGame: React.FC<FillInBlankGameProps> = ({
                     Đáp án đúng: <strong>{currentWord.tu}</strong> ({currentWord.nghia})
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => ttsService.speak(currentWord.tu, language)}
-                  className="p-1 border border-current hover:bg-black hover:text-white"
-                  title="Nghe phát âm"
-                >
-                  <Volume2 className="w-4 h-4" />
-                </button>
+                <SpeakButton
+                  text={currentWord.tu}
+                  language={language}
+                  variant="ghost"
+                  position="left"
+                  buttonClassName="p-1 border border-current hover:bg-black hover:text-white"
+                  iconClassName="w-4 h-4"
+                  title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                />
               </div>
 
               <button

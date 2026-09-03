@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { LanguageCode, LANGUAGES } from '../types';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import {
   Calculator,
   Volume2,
@@ -362,13 +363,15 @@ export const NumbersView: React.FC = () => {
                     <span className="text-[11px] font-mono uppercase font-bold text-stone-700">
                       1. Số Hán-Hàn (Sino-Korean - 한자어 수)
                     </span>
-                    <button
-                      onClick={() => handleSpeak(koSino)}
-                      className="p-1.5 bg-white border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition flex items-center gap-1 text-xs font-mono font-bold"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                      <span>Nghe</span>
-                    </button>
+                    <SpeakButton
+                      text={koSino}
+                      language="ko"
+                      variant="outline"
+                      showLabel
+                      label="Nghe"
+                      position="left"
+                      title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                    />
                   </div>
                   <div className="text-2xl sm:text-3xl font-serif font-black text-[#1A1A1A] break-words">
                     {koSino}
@@ -385,13 +388,15 @@ export const NumbersView: React.FC = () => {
                       2. Số Thuần Hàn (Native Korean - 고유어 수)
                     </span>
                     {numericVal <= 99 && numericVal >= 1 && (
-                      <button
-                        onClick={() => handleSpeak(koNative)}
-                        className="p-1.5 bg-white border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition flex items-center gap-1 text-xs font-mono font-bold"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                        <span>Nghe</span>
-                      </button>
+                      <SpeakButton
+                        text={koNative}
+                        language="ko"
+                        variant="outline"
+                        showLabel
+                        label="Nghe"
+                        position="left"
+                        title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                      />
                     )}
                   </div>
                   <div className="text-2xl sm:text-3xl font-serif font-black text-[#1A1A1A] break-words">
@@ -433,13 +438,16 @@ export const NumbersView: React.FC = () => {
                     <div className="text-2xl font-serif font-bold text-amber-950">
                       {koWithCounter}
                     </div>
-                    <button
-                      onClick={() => handleSpeak(koWithCounter)}
-                      className="p-1.5 bg-amber-900 text-white hover:bg-black transition flex items-center gap-1 text-xs font-mono font-bold"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                      <span>Phát âm cụm từ</span>
-                    </button>
+                    <SpeakButton
+                      text={koWithCounter}
+                      language="ko"
+                      variant="custom"
+                      showLabel
+                      label="Phát âm cụm từ"
+                      position="left"
+                      buttonClassName="p-1.5 bg-amber-900 text-white hover:bg-black transition flex items-center gap-1 text-xs font-mono font-bold"
+                      title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                    />
                   </div>
                 </div>
               </div>
@@ -454,13 +462,15 @@ export const NumbersView: React.FC = () => {
                     <span className="text-[11px] font-mono uppercase font-bold text-stone-700">
                       1. Chữ Hán Giản Thể & Bính Âm (简体与拼音)
                     </span>
-                    <button
-                      onClick={() => handleSpeak(zhResult.char)}
-                      className="p-1.5 bg-white border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition flex items-center gap-1 text-xs font-mono font-bold"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                      <span>Nghe</span>
-                    </button>
+                    <SpeakButton
+                      text={zhResult.char}
+                      language="zh"
+                      variant="outline"
+                      showLabel
+                      label="Nghe"
+                      position="left"
+                      title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                    />
                   </div>
                   <div className="text-3xl font-serif font-black text-[#1A1A1A] break-words">
                     {zhResult.char}
@@ -496,13 +506,15 @@ export const NumbersView: React.FC = () => {
                     <span className="text-[11px] font-mono uppercase font-bold text-stone-700">
                       1. Số Đếm (Cardinal Numbers - Đếm số lượng)
                     </span>
-                    <button
-                      onClick={() => handleSpeak(enCardinal)}
-                      className="p-1.5 bg-white border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition flex items-center gap-1 text-xs font-mono font-bold"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                      <span>Nghe</span>
-                    </button>
+                    <SpeakButton
+                      text={enCardinal}
+                      language="en"
+                      variant="outline"
+                      showLabel
+                      label="Nghe"
+                      position="left"
+                      title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                    />
                   </div>
                   <div className="text-2xl sm:text-3xl font-serif font-black text-[#1A1A1A] capitalize break-words">
                     {enCardinal}
@@ -518,13 +530,15 @@ export const NumbersView: React.FC = () => {
                     <span className="text-[11px] font-mono uppercase font-bold text-stone-700">
                       2. Số Thứ Tự (Ordinal Numbers - Thứ hạng, Ngày, Tầng)
                     </span>
-                    <button
-                      onClick={() => handleSpeak(enOrdinal)}
-                      className="p-1.5 bg-white border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition flex items-center gap-1 text-xs font-mono font-bold"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                      <span>Nghe</span>
-                    </button>
+                    <SpeakButton
+                      text={enOrdinal}
+                      language="en"
+                      variant="outline"
+                      showLabel
+                      label="Nghe"
+                      position="left"
+                      title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                    />
                   </div>
                   <div className="text-2xl sm:text-3xl font-serif font-black text-[#1A1A1A] capitalize break-words">
                     {enOrdinal}
@@ -590,12 +604,14 @@ export const NumbersView: React.FC = () => {
                           <span className="text-xs font-mono font-bold text-stone-800">
                             {ex.numberOrExpression}
                           </span>
-                          <button
-                            onClick={() => handleSpeak(ex.reading)}
-                            className="p-1 border border-stone-400 hover:bg-[#1A1A1A] hover:text-white transition"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                          </button>
+                          <SpeakButton
+                            text={ex.reading}
+                            language={currentLanguage}
+                            variant="ghost"
+                            position="left"
+                            buttonClassName="p-1 border border-stone-400 hover:bg-[#1A1A1A] hover:text-white"
+                            title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                          />
                         </div>
                         <div className="text-sm font-serif font-bold text-[#1A1A1A]">{ex.reading}</div>
                         <div className="text-[11px] font-mono text-stone-600">{ex.phonetic}</div>
@@ -689,12 +705,14 @@ export const NumbersView: React.FC = () => {
                           <div className="font-bold text-[#1A1A1A]">{ex.fullPhrase}</div>
                           <div className="text-[11px] font-serif text-stone-600">{ex.meaning}</div>
                         </div>
-                        <button
-                          onClick={() => handleSpeak(ex.fullPhrase)}
-                          className="p-1 text-stone-600 hover:text-black hover:bg-stone-100 transition"
-                        >
-                          <Volume2 className="w-3.5 h-3.5" />
-                        </button>
+                        <SpeakButton
+                          text={ex.fullPhrase}
+                          language={currentLanguage}
+                          variant="ghost"
+                          position="left"
+                          buttonClassName="p-1 text-stone-600 hover:text-black hover:bg-stone-100"
+                          title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                        />
                       </div>
                     ))}
                   </div>
@@ -802,20 +820,20 @@ export const NumbersView: React.FC = () => {
                       </td>
 
                       <td className="p-3 border border-stone-300 text-center">
-                        <button
-                          onClick={() => {
-                            const textToSpeak =
-                              currentLanguage === 'ko'
-                                ? row.koreanSino?.split(' ')[0]
-                                : currentLanguage === 'zh'
-                                ? row.chineseSimp?.split(' ')[0]
-                                : row.englishCardinal;
-                            if (textToSpeak) handleSpeak(textToSpeak);
-                          }}
-                          className="p-1 border border-stone-400 hover:bg-[#1A1A1A] hover:text-white transition"
-                        >
-                          <Volume2 className="w-3.5 h-3.5" />
-                        </button>
+                        <SpeakButton
+                          text={
+                            (currentLanguage === 'ko'
+                              ? row.koreanSino?.split(' ')[0]
+                              : currentLanguage === 'zh'
+                              ? row.chineseSimp?.split(' ')[0]
+                              : row.englishCardinal) || ''
+                          }
+                          language={currentLanguage}
+                          variant="ghost"
+                          position="left"
+                          buttonClassName="p-1 border border-stone-400 hover:bg-[#1A1A1A] hover:text-white"
+                          title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                        />
                       </td>
                     </tr>
                   ))}

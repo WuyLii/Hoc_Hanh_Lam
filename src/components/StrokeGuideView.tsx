@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { LanguageCode, LANGUAGES } from '../types';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import {
   PenTool,
   Volume2,
@@ -351,13 +352,14 @@ export const StrokeGuideView: React.FC = () => {
                       <span className="text-xl font-mono font-bold text-[#1A1A1A]">
                         {selectedPracticeChar.phonetic}
                       </span>
-                      <button
-                        onClick={() => handleSpeak(selectedPracticeChar.char)}
-                        className="p-1.5 bg-[#F9F7F2] border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
-                        title="Nghe phát âm"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                      </button>
+                      <SpeakButton
+                        text={selectedPracticeChar.char}
+                        language={currentLanguage}
+                        variant="card"
+                        position="left"
+                        buttonClassName="p-1.5 shrink-0"
+                        title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                      />
                     </div>
                     <p className="text-sm font-serif text-stone-700">{selectedPracticeChar.meaning}</p>
                   </div>

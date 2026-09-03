@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { GrammarItem, LANGUAGES } from '../types';
 import { ttsService } from '../services/ttsService';
+import { SpeakButton } from './SpeakButton';
 import { TextbookExtractorModal } from './TextbookExtractorModal';
 import {
   Plus,
@@ -389,13 +390,14 @@ export const GrammarManager: React.FC = () => {
                       <p className="text-xs font-mono text-stone-600">→ {item.vi_du_dich}</p>
                     )}
                   </div>
-                  <button
-                    onClick={() => ttsService.speak(item.vi_du, item.ngon_ngu)}
-                    className="p-2 border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition shrink-0"
-                    title="Audio"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
+                  <SpeakButton
+                    text={item.vi_du}
+                    language={item.ngon_ngu}
+                    variant="card"
+                    position="left"
+                    buttonClassName="bg-white p-2 shrink-0"
+                    title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
+                  />
                 </div>
               )}
 
