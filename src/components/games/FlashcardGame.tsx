@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { VocabularyItem, LanguageCode } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { RecallQuality } from '../../services/srsEngine';
@@ -16,7 +16,13 @@ import {
   RefreshCw,
   Sparkles,
   X,
+  ArrowLeftRight,
+  HelpCircle,
+  Eye,
 } from 'lucide-react';
+
+export type FlashcardDirectionMode = 'random_alternate' | 'term_to_meaning' | 'meaning_to_term';
+export type CardDirection = 'term_to_meaning' | 'meaning_to_term';
 
 interface FlashcardGameProps {
   words: VocabularyItem[];
@@ -33,6 +39,9 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   onRecordSRS,
   onExit,
 }) => {
+  // Mode: Alternating random 2-way (Default), Term-first, or Meaning-first
+  const [directionMode, setDirectionMode] = useState<FlashcardDirectionMode>('random_alternate');
+
   // Candidate Filter Controls
   const [selectedLimit, setSelectedLimit] = useState<string>('ALL');
   const [selectedPos, setSelectedPos] = useState<string>('ALL');
@@ -115,6 +124,37 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     return words.length > 0 ? words : [];
   });
 
+  // Array of directions for each card in activeWords
+  const [deckDirections, setDeckDirections] = useState<CardDirection[]>([]);
+
+  // Function to generate balanced/shuffled directions for a word list
+  const generateDirections = useCallback((wordList: VocabularyItem[], mode: FlashcardDirectionMode): CardDirection[] => {
+    if (wordList.length === 0) return [];
+    if (mode === 'term_to_meaning') {
+      return wordList.map(() => 'term_to_meaning');
+    }
+    if (mode === 'meaning_to_term') {
+      return wordList.map(() => 'meaning_to_term');
+    }
+    // Random alternating: create balanced mix of ~50% each and shuffle
+    const half = Math.ceil(wordList.length / 2);
+    const pool: CardDirection[] = [];
+    for (let i = 0; i < wordList.length; i++) {
+      pool.push(i % 2 === 0 ? 'term_to_meaning' : 'meaning_to_term');
+    }
+    // Shuffle pool
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool;
+  }, []);
+
+  // Update directions when activeWords or directionMode changes
+  useEffect(() => {
+    setDeckDirections(generateDirections(activeWords, directionMode));
+  }, [activeWords, directionMode, generateDirections]);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionResults, setSessionResults] = useState<{ wordId: string; rating: RecallQuality }[]>([]);
@@ -129,18 +169,20 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   }, [words]);
 
   const currentWord = activeWords[currentIndex];
+  const currentDirection: CardDirection = deckDirections[currentIndex] || 'term_to_meaning';
+  const isMeaningFirst = currentDirection === 'meaning_to_term';
 
   useEffect(() => {
     setIsFlipped(false);
   }, [currentIndex]);
 
-  const handleFlip = () => {
-    setIsFlipped(!isFlipped);
-  };
+  const handleFlip = useCallback(() => {
+    setIsFlipped((prev) => !prev);
+  }, []);
 
   const isAdvancingRef = useRef(false);
 
-  const handleRate = (rating: RecallQuality) => {
+  const handleRate = useCallback((rating: RecallQuality) => {
     if (!currentWord || isAdvancingRef.current) return;
     isAdvancingRef.current = true;
 
@@ -162,7 +204,39 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     setTimeout(() => {
       isAdvancingRef.current = false;
     }, 350);
-  };
+  }, [currentWord, onRecordSRS, sessionResults, currentIndex, activeWords.length, onFinish]);
+
+  // Keyboard shortcut listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input
+      if (['input', 'textarea', 'select'].includes((e.target as HTMLElement)?.tagName?.toLowerCase())) {
+        return;
+      }
+
+      if (e.code === 'Space' || e.key === 'Enter') {
+        e.preventDefault();
+        handleFlip();
+      } else if (isFlipped) {
+        if (e.key === '1') {
+          e.preventDefault();
+          handleRate('again');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          handleRate('hard');
+        } else if (e.key === '3') {
+          e.preventDefault();
+          handleRate('good');
+        } else if (e.key === '4') {
+          e.preventDefault();
+          handleRate('easy');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleFlip, handleRate, isFlipped]);
 
   const handlePlayAudio = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -393,6 +467,57 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
             </button>
           </div>
 
+          {/* Direction Mode in Drawer */}
+          <div className="p-3 bg-[#F9F7F2] border border-[#1A1A1A] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <ArrowLeftRight className="w-4 h-4 text-amber-800" />
+              <div>
+                <span className="text-xs font-mono font-bold uppercase text-[#1A1A1A] block">
+                  CHẾ ĐỘ HIỂN THỊ THẺ FLASHCARD:
+                </span>
+                <span className="text-[11px] font-mono text-stone-500">
+                  Tùy chỉnh chiều ôn tập giữa Từ vựng và Nghĩa tiếng Việt
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setDirectionMode('random_alternate')}
+                className={`px-3 py-1.5 text-xs font-mono font-bold uppercase border transition ${
+                  directionMode === 'random_alternate'
+                    ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                    : 'bg-white text-[#1A1A1A] border-stone-300 hover:border-[#1A1A1A]'
+                }`}
+              >
+                🔀 Luân phiên ngẫu nhiên (Mặc định)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectionMode('term_to_meaning')}
+                className={`px-3 py-1.5 text-xs font-mono font-bold uppercase border transition ${
+                  directionMode === 'term_to_meaning'
+                    ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                    : 'bg-white text-[#1A1A1A] border-stone-300 hover:border-[#1A1A1A]'
+                }`}
+              >
+                🔤 Nhìn Từ → Đoán Nghĩa
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectionMode('meaning_to_term')}
+                className={`px-3 py-1.5 text-xs font-mono font-bold uppercase border transition ${
+                  directionMode === 'meaning_to_term'
+                    ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                    : 'bg-white text-[#1A1A1A] border-stone-300 hover:border-[#1A1A1A]'
+                }`}
+              >
+                💡 Nhìn Nghĩa → Đoán Từ
+              </button>
+            </div>
+          </div>
+
           {/* Filter Select Controls Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {/* Search Keyword */}
@@ -620,70 +745,255 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
         </div>
       )}
 
+      {/* Quick Direction Selector */}
+      <div className="p-2.5 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <ArrowLeftRight className="w-4 h-4 text-amber-800" />
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A1A1A]">
+            HƯỚNG THẺ:
+          </span>
+          <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase border border-[#1A1A1A] bg-[#F9F7F2]">
+            {directionMode === 'random_alternate'
+              ? '🔀 Luân phiên 2 chiều'
+              : directionMode === 'term_to_meaning'
+              ? '🔤 Từ → Nghĩa'
+              : '💡 Nghĩa → Từ'}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setDirectionMode('random_alternate')}
+            className={`px-2.5 py-1 text-[11px] font-mono font-bold uppercase transition border ${
+              directionMode === 'random_alternate'
+                ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                : 'bg-white text-stone-700 border-stone-300 hover:border-[#1A1A1A]'
+            }`}
+            title="Ngẫu nhiên luân phiên giữa nhìn từ đoán nghĩa và nhìn nghĩa đoán từ"
+          >
+            🔀 Luân phiên (Mặc định)
+          </button>
+          <button
+            type="button"
+            onClick={() => setDirectionMode('term_to_meaning')}
+            className={`px-2.5 py-1 text-[11px] font-mono font-bold uppercase transition border ${
+              directionMode === 'term_to_meaning'
+                ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                : 'bg-white text-stone-700 border-stone-300 hover:border-[#1A1A1A]'
+            }`}
+            title="Chỉ nhìn Từ vựng để đoán Nghĩa"
+          >
+            🔤 Từ → Nghĩa
+          </button>
+          <button
+            type="button"
+            onClick={() => setDirectionMode('meaning_to_term')}
+            className={`px-2.5 py-1 text-[11px] font-mono font-bold uppercase transition border ${
+              directionMode === 'meaning_to_term'
+                ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                : 'bg-white text-stone-700 border-stone-300 hover:border-[#1A1A1A]'
+            }`}
+            title="Chỉ nhìn Nghĩa để đoán Từ vựng"
+          >
+            💡 Nghĩa → Từ
+          </button>
+        </div>
+      </div>
+
       {/* Interactive Flip Flashcard (Editorial Paper Style) */}
       <div
         onClick={handleFlip}
-        className="relative h-80 sm:h-96 w-full cursor-pointer select-none"
+        className="relative min-h-[22rem] sm:min-h-[26rem] w-full cursor-pointer select-none"
       >
         <div
-          className={`w-full h-full p-8 transition-all duration-200 border-2 border-[#1A1A1A] editorial-shadow flex flex-col justify-between ${
+          className={`w-full h-full p-6 sm:p-8 transition-all duration-200 border-2 border-[#1A1A1A] editorial-shadow flex flex-col justify-between ${
             isFlipped ? 'bg-[#F9F7F2]' : 'bg-white hover:editorial-shadow-lg'
           }`}
         >
           {/* Top metadata */}
           <div className="flex items-center justify-between border-b border-[#1A1A1A]/15 pb-3">
-            <span className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-[9px] font-mono font-bold uppercase text-[#1A1A1A]">
-              {currentWord.loai_tu} • {currentWord.cap_do}
-            </span>
-            <button
-              onClick={handlePlayAudio}
-              className="p-2 border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition"
-              title="Nghe phát âm"
-            >
-              <Volume2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`px-2 py-0.5 border text-[9px] font-mono font-bold uppercase ${
+                  currentDirection === 'meaning_to_term'
+                    ? 'bg-amber-100 text-amber-900 border-amber-800'
+                    : 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                }`}
+              >
+                {currentDirection === 'meaning_to_term'
+                  ? '💡 NHÌN NGHĨA → ĐOÁN TỪ'
+                  : '🔤 NHÌN TỪ → ĐOÁN NGHĨA'}
+              </span>
+              <span className="px-2 py-0.5 bg-[#F9F7F2] border border-stone-300 text-[9px] font-mono uppercase text-stone-700">
+                {currentWord.loai_tu || 'Từ vựng'} • {currentWord.cap_do || 'Cơ bản'}
+              </span>
+            </div>
+
+            {/* Audio button */}
+            {(!isMeaningFirst || isFlipped) ? (
+              <button
+                onClick={handlePlayAudio}
+                className="p-2 border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition flex items-center gap-1"
+                title="Nghe phát âm từ vựng"
+              >
+                <Volume2 className="w-4 h-4" />
+                <span className="text-[10px] font-mono hidden sm:inline">Phát âm</span>
+              </button>
+            ) : (
+              <span
+                className="text-[10px] font-mono text-stone-400 italic px-2 py-1 bg-stone-50 border border-stone-200"
+                title="Phát âm sẽ hiển thị sau khi bạn lật thẻ"
+              >
+                🔊 Lật để nghe
+              </span>
+            )}
           </div>
 
           {/* Card Body */}
           {!isFlipped ? (
-            // Front Face (Target Term)
-            <div className="text-center space-y-4 my-auto">
-              <h2 className="text-4xl sm:text-5xl font-serif font-black tracking-tight text-[#1A1A1A]">
-                {currentWord.tu}
-              </h2>
-              {currentWord.phien_am && (
-                <p className="text-lg font-mono text-stone-600 tracking-widest">{currentWord.phien_am}</p>
-              )}
-              <p className="text-xs font-mono uppercase tracking-widest text-stone-400 mt-6 flex items-center justify-center gap-1.5">
-                <span>NHẤN ĐỂ LẬT XEM NGHĨA</span>
-                <RotateCcw className="w-3.5 h-3.5" />
-              </p>
-            </div>
-          ) : (
-            // Back Face (Meaning & Example)
-            <div className="space-y-4 my-auto animate-in fade-in duration-150">
-              <div className="text-center">
-                <h3 className="text-2xl sm:text-3xl font-serif font-bold text-[#1A1A1A]">
-                  {currentWord.nghia}
-                </h3>
-              </div>
-
-              {currentWord.vi_du && (
-                <div className="p-4 bg-white border border-[#1A1A1A] text-left space-y-1">
-                  <p className="text-sm font-serif italic text-[#1A1A1A]">
-                    "{currentWord.vi_du}"
+            // ================= FRONT FACE =================
+            !isMeaningFirst ? (
+              // Case 1: Term -> Guess Meaning
+              <div className="text-center space-y-4 my-auto py-4">
+                <h2 className="text-4xl sm:text-5xl font-serif font-black tracking-tight text-[#1A1A1A]">
+                  {currentWord.tu}
+                </h2>
+                {currentWord.phien_am && (
+                  <p className="text-lg font-mono text-stone-600 tracking-widest">{currentWord.phien_am}</p>
+                )}
+                {currentWord.nghia_tieng_han && (
+                  <p className="text-xs font-mono text-stone-500">
+                    Âm Hán: <span className="font-bold text-stone-700">{currentWord.nghia_tieng_han}</span>
                   </p>
-                  {currentWord.vi_du_dich && (
-                    <p className="text-xs font-mono text-stone-600">→ {currentWord.vi_du_dich}</p>
+                )}
+                <p className="text-xs font-mono uppercase tracking-widest text-stone-400 pt-4 flex items-center justify-center gap-1.5">
+                  <span>NHẤN ĐỂ LẬT XEM NGHĨA (SPACEBAR)</span>
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </p>
+              </div>
+            ) : (
+              // Case 2: Meaning -> Guess Term
+              <div className="text-center space-y-4 my-auto py-4">
+                <div className="space-y-2">
+                  <span className="text-[11px] font-mono uppercase tracking-widest text-amber-800 font-bold">
+                    [Hãy nhớ và đoán từ gốc]
+                  </span>
+                  <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight text-[#1A1A1A] max-w-lg mx-auto">
+                    {currentWord.nghia}
+                  </h2>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  {currentWord.chu_de && (
+                    <span className="px-2.5 py-0.5 bg-stone-100 border border-stone-300 text-xs font-mono text-stone-700">
+                      Chủ đề: <strong className="text-[#1A1A1A]">{currentWord.chu_de}</strong>
+                    </span>
+                  )}
+                  {currentWord.loai_tu && (
+                    <span className="px-2.5 py-0.5 bg-stone-100 border border-stone-300 text-xs font-mono text-stone-700">
+                      Loại từ: <strong className="text-[#1A1A1A]">{currentWord.loai_tu}</strong>
+                    </span>
                   )}
                 </div>
-              )}
-            </div>
+
+                {currentWord.vi_du_dich && (
+                  <div className="p-2.5 bg-amber-50/70 border border-amber-800/30 text-xs font-serif italic text-amber-950 max-w-md mx-auto">
+                    Gợi ý ngữ cảnh: "{currentWord.vi_du_dich}"
+                  </div>
+                )}
+
+                <p className="text-xs font-mono uppercase tracking-widest text-stone-400 pt-4 flex items-center justify-center gap-1.5">
+                  <span>NHẤN ĐỂ LẬT XEM TỪ GỐC & PHÁT ÂM (SPACEBAR)</span>
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </p>
+              </div>
+            )
+          ) : (
+            // ================= BACK FACE =================
+            !isMeaningFirst ? (
+              // Case 1 Back: Revealed Meaning
+              <div className="space-y-4 my-auto py-4 animate-in fade-in duration-150">
+                <div className="text-center space-y-2">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 border border-emerald-300 inline-block">
+                    ✓ KẾT QUẢ NGHĨA
+                  </span>
+                  <h3 className="text-2xl sm:text-3xl font-serif font-bold text-[#1A1A1A]">
+                    {currentWord.nghia}
+                  </h3>
+                  {currentWord.nghia_tieng_anh && (
+                    <p className="text-xs font-mono text-stone-500">
+                      English: {currentWord.nghia_tieng_anh}
+                    </p>
+                  )}
+                </div>
+
+                {currentWord.vi_du && (
+                  <div className="p-4 bg-white border border-[#1A1A1A] text-left space-y-1">
+                    <p className="text-sm font-serif italic text-[#1A1A1A]">
+                      "{currentWord.vi_du}"
+                    </p>
+                    {currentWord.vi_du_dich && (
+                      <p className="text-xs font-mono text-stone-600">→ {currentWord.vi_du_dich}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Case 2 Back: Revealed Target Word
+              <div className="space-y-4 my-auto py-4 animate-in fade-in duration-150">
+                <div className="text-center space-y-2">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 border border-emerald-300 inline-block">
+                    ✓ TỪ VỰNG CHÍNH XÁC
+                  </span>
+                  <h3 className="text-3xl sm:text-4xl font-serif font-black tracking-tight text-[#1A1A1A]">
+                    {currentWord.tu}
+                  </h3>
+                  {currentWord.phien_am && (
+                    <p className="text-lg font-mono text-stone-600 tracking-widest">
+                      [{currentWord.phien_am}]
+                    </p>
+                  )}
+                  {currentWord.nghia_tieng_han && (
+                    <p className="text-xs font-mono text-stone-500">
+                      Âm Hán: <span className="font-bold text-stone-700">{currentWord.nghia_tieng_han}</span>
+                    </p>
+                  )}
+
+                  <div className="pt-1">
+                    <button
+                      onClick={handlePlayAudio}
+                      className="px-3 py-1 bg-stone-100 hover:bg-[#1A1A1A] hover:text-white border border-[#1A1A1A] text-xs font-mono transition inline-flex items-center gap-1.5"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>Nghe phát âm native</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white border border-[#1A1A1A] text-left space-y-1">
+                  <div className="text-xs font-mono text-[#1A1A1A]">
+                    <span className="font-bold uppercase text-stone-500 text-[10px] block">Nghĩa tiếng Việt:</span>
+                    <span className="font-serif text-sm font-bold">{currentWord.nghia}</span>
+                  </div>
+                  {currentWord.vi_du && (
+                    <div className="pt-2 border-t border-stone-200">
+                      <p className="text-xs font-serif italic text-[#1A1A1A]">"{currentWord.vi_du}"</p>
+                      {currentWord.vi_du_dich && (
+                        <p className="text-[11px] font-mono text-stone-600">→ {currentWord.vi_du_dich}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
           )}
 
           {/* Bottom Card Footer */}
           <div className="text-center text-[10px] font-mono uppercase tracking-wider text-stone-500 border-t border-[#1A1A1A]/15 pt-2">
-            {isFlipped ? 'ĐÁNH GIÁ MỨC ĐỘ GHI NHỚ BÊN DƯỚI' : `MÃ TỪ #${currentWord.word_id.slice(-4)}`}
+            {isFlipped
+              ? 'ĐÁNH GIÁ MỨC ĐỘ GHI NHỚ: [1] QUÊN • [2] KHÓ • [3] NHỚ TỐT • [4] RẤT DỄ'
+              : `MÃ TỪ #${currentWord.word_id.slice(-4)} • [SPACEBAR / CHẠM ĐỂ LẬT]`}
           </div>
         </div>
       </div>
