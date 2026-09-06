@@ -14,6 +14,9 @@ import {
   CheckCircle2,
   KeyRound,
   Globe2,
+  Eye,
+  EyeOff,
+  HelpCircle,
 } from 'lucide-react';
 
 export const SupabaseSettings: React.FC = () => {
@@ -33,6 +36,7 @@ export const SupabaseSettings: React.FC = () => {
   } = useApp();
 
   const [config, setConfig] = useState<SupabaseConfig>(SupabaseService.getConfig());
+  const [showKey, setShowKey] = useState(false);
   const [hasCopiedSql, setHasCopiedSql] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -320,19 +324,57 @@ CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL
           </div>
 
           <div>
-            <label className="block text-xs font-mono font-bold uppercase text-[#1A1A1A] mb-1">
-              Anon API Key (public)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-mono font-bold uppercase text-[#1A1A1A]">
+                Anon API Key (public)
+              </label>
+              <span className={`text-[11px] font-mono ${config.anonKey.length < 30 ? 'text-amber-600' : 'text-emerald-700'}`}>
+                {config.anonKey ? `${config.anonKey.length} ký tự` : 'Chưa nhập'}
+              </span>
+            </div>
             <div className="relative">
               <KeyRound className="w-4 h-4 absolute left-3 top-3 text-stone-400" />
               <input
-                type="password"
+                type={showKey ? 'text' : 'password'}
                 value={config.anonKey}
-                onChange={(e) => setConfig({ ...config, anonKey: e.target.value.trim() })}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/['"\r\n\t ]/g, '').trim();
+                  setConfig({ ...config, anonKey: cleaned });
+                }}
                 placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                className="w-full pl-9 pr-4 py-2 bg-white border border-[#1A1A1A] font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full pl-9 pr-10 py-2 bg-white border border-[#1A1A1A] font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-2.5 top-2.5 text-stone-500 hover:text-stone-800 focus:outline-none"
+                title={showKey ? 'Ẩn khóa' : 'Xem khóa'}
+              >
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
+            {config.anonKey && config.anonKey.length < 50 && (
+              <p className="text-[11px] text-amber-700 font-mono mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>Chú ý: Anon Key thường là chuỗi JWT rất dài (bắt đầu bằng <code>eyJ...</code>). Hãy kiểm tra xem bạn có vô tình copy nhầm Project ID hoặc Password không.</span>
+              </p>
+            )}
+          </div>
+
+          {/* Quick guide for 401 error */}
+          <div className="bg-amber-50 border border-amber-300 p-3 rounded text-xs font-sans text-amber-900 space-y-1">
+            <div className="font-bold flex items-center gap-1.5 text-amber-950 font-mono">
+              <HelpCircle className="w-4 h-4 text-amber-700" />
+              <span>Hướng dẫn sửa lỗi 401 (Unauthorized):</span>
+            </div>
+            <p className="text-stone-700">
+              Lỗi <strong>401 Unauthorized</strong> xảy ra khi Anon API Key không khớp hoặc copy nhầm loại khóa. Cách lấy đúng:
+            </p>
+            <ol className="list-decimal pl-5 space-y-0.5 text-stone-700">
+              <li>Mở Supabase Dashboard &gt; chọn dự án của bạn &gt; vào <strong>Project Settings</strong> (bánh răng) &gt; chọn <strong>API</strong>.</li>
+              <li>Ở phần <strong>Project API keys</strong>, bấm nút <strong>Copy</strong> ở dòng <strong><code>anon</code> <code>public</code></strong> (chuỗi bắt đầu bằng <code>eyJ...</code>).</li>
+              <li><em>Không</em> copy <code>service_role</code>, <em>không</em> copy Database Password hay Project ID.</li>
+            </ol>
           </div>
 
           <div className="flex items-center gap-2 pt-2">

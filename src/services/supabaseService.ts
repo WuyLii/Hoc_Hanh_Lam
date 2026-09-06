@@ -24,14 +24,19 @@ const STORAGE_KEY = 'hoc_hanh_lam_supabase_config';
 export class SupabaseService {
   private static client: SupabaseClient | null = null;
 
+  public static cleanKey(key: string): string {
+    if (!key || typeof key !== 'string') return '';
+    return key.replace(/['"\r\n\t ]/g, '').trim();
+  }
+
   public static normalizeUrl(url: string): string {
     if (!url || typeof url !== 'string') return '';
-    let trimmed = url.trim();
+    let trimmed = url.replace(/['"\r\n\t ]/g, '').trim();
     if (!trimmed) return '';
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
       trimmed = 'https://' + trimmed;
     }
-    return trimmed;
+    return trimmed.replace(/\/+$/, '');
   }
 
   public static getConfig(): SupabaseConfig {
@@ -41,7 +46,7 @@ export class SupabaseService {
         const parsed = JSON.parse(saved);
         return {
           url: this.normalizeUrl(parsed.url || ''),
-          anonKey: (parsed.anonKey || '').trim(),
+          anonKey: this.cleanKey(parsed.anonKey || ''),
           autoSync: Boolean(parsed.autoSync),
         };
       } catch (e) {
@@ -55,7 +60,7 @@ export class SupabaseService {
 
     return {
       url: this.normalizeUrl(envUrl),
-      anonKey: envKey.trim(),
+      anonKey: this.cleanKey(envKey),
       autoSync: false,
     };
   }
@@ -81,14 +86,20 @@ export class SupabaseService {
 
   public static safeCreateClient(url: string, key: string): SupabaseClient | null {
     const normalizedUrl = this.normalizeUrl(url);
-    const trimmedKey = (key || '').trim();
+    const trimmedKey = this.cleanKey(key);
 
     if (!this.isValidUrl(normalizedUrl) || !trimmedKey || trimmedKey.includes('your-anon-key')) {
       return null;
     }
 
     try {
-      return createClient(normalizedUrl, trimmedKey);
+      return createClient(normalizedUrl, trimmedKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      });
     } catch {
       return null;
     }
@@ -103,7 +114,7 @@ export class SupabaseService {
     const normalizedConfig = {
       ...config,
       url: this.normalizeUrl(config.url),
-      anonKey: config.anonKey.trim(),
+      anonKey: this.cleanKey(config.anonKey),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedConfig));
     this.client = null; // reset client instance
@@ -125,7 +136,7 @@ export class SupabaseService {
     const rawKey = customKey !== undefined ? customKey : config.anonKey;
 
     const url = this.normalizeUrl(rawUrl);
-    const key = (rawKey || '').trim();
+    const key = this.cleanKey(rawKey);
 
     if (!url || !key) {
       return { success: false, message: 'Vui lòng nhập đầy đủ Supabase URL và Anon Key.' };
@@ -135,26 +146,38 @@ export class SupabaseService {
       return { success: false, message: 'Supabase URL không hợp lệ. Vui lòng nhập đúng định dạng URL (Ví dụ: https://yourproject.supabase.co).' };
     }
 
+    if (key.length < 30) {
+      return {
+        success: false,
+        message: 'Khóa Anon Key không hợp lệ hoặc quá ngắn. Anon Key của Supabase là chuỗi mã hóa dài (thường bắt đầu bằng "eyJ..."). Vui lòng kiểm tra lại.',
+      };
+    }
+
     const tempClient = this.safeCreateClient(url, key);
     if (!tempClient) {
       return { success: false, message: 'Không thể khởi tạo Supabase Client với thông tin URL và Key đã cung cấp.' };
     }
 
     try {
-      const { data, error } = await tempClient.from('vocabulary').select('word_id').limit(1);
+      const { error, status } = await tempClient.from('vocabulary').select('word_id').limit(1);
 
       if (error) {
-        // If error code is 42P01 (relation does not exist), database is reachable but table is missing
+        if (status === 401 || error.message?.toLowerCase().includes('api key') || error.message?.toLowerCase().includes('jwt')) {
+          return {
+            success: false,
+            message: '❌ Lỗi 401 (Unauthorized): Khóa "Anon API Key" không chính xác hoặc đã bị làm mới trong Supabase. Vui lòng vào Supabase Dashboard > Settings > API và copy lại khóa "anon public" (bắt đầu bằng eyJ...).',
+          };
+        }
         if (error.code === '42P01') {
           return {
             success: false,
-            message: 'Kết nối thành công nhưng chưa tạo Bảng (Tables). Vui lòng chạy đoạn mã SQL tạo bảng trong Supabase SQL Editor.',
+            message: '⚠️ Kết nối Supabase thành công nhưng chưa tạo Bảng (Tables). Vui lòng vào SQL Editor trên Supabase và bấm Run đoạn mã SQL tạo bảng.',
           };
         }
-        return { success: false, message: `Lỗi kết nối Supabase: ${error.message}` };
+        return { success: false, message: `Lỗi kết nối Supabase (${status || error.code || 'Error'}): ${error.message}` };
       }
 
-      return { success: true, message: 'Kết nối Supabase thành công và đã nhận diện được cấu trúc cơ sở dữ liệu!' };
+      return { success: true, message: '✅ Kết nối Supabase thành công và đã nhận diện được cấu trúc cơ sở dữ liệu!' };
     } catch (err: any) {
       return { success: false, message: `Không thể kết nối Supabase: ${err.message || err}` };
     }
@@ -183,62 +206,124 @@ export class SupabaseService {
     try {
       // 1. User profile
       if (payload.userProfile) {
-        await client.from('user_profiles').upsert([payload.userProfile], { onConflict: 'user_id' });
+        const cleanProfile = {
+          ...payload.userProfile,
+          ngay_tham_gia: payload.userProfile.ngay_tham_gia || new Date().toISOString(),
+          last_active_date: payload.userProfile.last_active_date || new Date().toISOString().split('T')[0],
+        };
+        const { error } = await client.from('user_profiles').upsert([cleanProfile], { onConflict: 'user_id' });
+        if (error) throw { table: 'user_profiles', error };
       }
 
       // 2. Vocabulary
       if (payload.vocabulary && payload.vocabulary.length > 0) {
-        await client.from('vocabulary').upsert(payload.vocabulary, { onConflict: 'word_id' });
+        const cleanVocab = payload.vocabulary.map((v) => ({
+          ...v,
+          last_reviewed: v.last_reviewed ? v.last_reviewed : null,
+          srs_next_review: v.srs_next_review || new Date().toISOString(),
+          created_at: v.created_at || new Date().toISOString(),
+        }));
+        const { error } = await client.from('vocabulary').upsert(cleanVocab, { onConflict: 'word_id' });
+        if (error) throw { table: 'vocabulary', error };
       }
 
       // 3. Decks
       if (payload.decks && payload.decks.length > 0) {
-        await client.from('decks').upsert(payload.decks, { onConflict: 'deck_id' });
+        const { error } = await client.from('decks').upsert(payload.decks, { onConflict: 'deck_id' });
+        if (error) throw { table: 'decks', error };
       }
 
       // 4. Grammar
       if (payload.grammar && payload.grammar.length > 0) {
-        await client.from('grammar').upsert(payload.grammar, { onConflict: 'grammar_id' });
+        const { error } = await client.from('grammar').upsert(payload.grammar, { onConflict: 'grammar_id' });
+        if (error) throw { table: 'grammar', error };
       }
 
       // 5. Review Sessions
       if (payload.reviewSessions && payload.reviewSessions.length > 0) {
-        await client.from('review_sessions').upsert(payload.reviewSessions, { onConflict: 'session_id' });
+        const cleanSessions = payload.reviewSessions.map((s) => ({
+          ...s,
+          thoi_gian_bat_dau: s.thoi_gian_bat_dau || new Date().toISOString(),
+          thoi_gian_ket_thuc: s.thoi_gian_ket_thuc || new Date().toISOString(),
+        }));
+        const { error } = await client.from('review_sessions').upsert(cleanSessions, { onConflict: 'session_id' });
+        if (error) throw { table: 'review_sessions', error };
       }
 
       // 6. Mock tests
       if (payload.mockTests && payload.mockTests.length > 0) {
-        await client.from('mock_test_records').upsert(payload.mockTests, { onConflict: 'test_id' });
+        const cleanTests = payload.mockTests.map((t) => ({
+          ...t,
+          ngay_lam: t.ngay_lam || new Date().toISOString(),
+        }));
+        const { error } = await client.from('mock_test_records').upsert(cleanTests, { onConflict: 'test_id' });
+        if (error) throw { table: 'mock_test_records', error };
       }
 
       // 7. Progress records
       if (payload.progressRecords && payload.progressRecords.length > 0) {
-        const mappedProgress = payload.progressRecords.map((r, idx) => ({
+        const mappedProgress = payload.progressRecords.map((r) => ({
           id: `${r.user_id}_${r.ngon_ngu}_${r.ngay}`,
           ...r,
+          ngay: r.ngay || new Date().toISOString().split('T')[0],
         }));
-        await client.from('progress_records').upsert(mappedProgress, { onConflict: 'user_id,ngon_ngu,ngay' });
+        const { error } = await client.from('progress_records').upsert(mappedProgress, { onConflict: 'id' });
+        if (error) throw { table: 'progress_records', error };
       }
 
       // 8. Journal entries
       if (payload.journalEntries && payload.journalEntries.length > 0) {
-        await client.from('journal_entries').upsert(payload.journalEntries, { onConflict: 'entry_id' });
+        const cleanJournal = payload.journalEntries.map((j) => ({
+          ...j,
+          ngay: j.ngay || new Date().toISOString(),
+        }));
+        const { error } = await client.from('journal_entries').upsert(cleanJournal, { onConflict: 'entry_id' });
+        if (error) throw { table: 'journal_entries', error };
       }
 
       // 9. Chat conversations
       if (payload.chatConversations && payload.chatConversations.length > 0) {
-        await client.from('chat_conversations').upsert(payload.chatConversations, { onConflict: 'chat_id' });
+        const { error } = await client.from('chat_conversations').upsert(payload.chatConversations, { onConflict: 'chat_id' });
+        if (error) throw { table: 'chat_conversations', error };
       }
 
       // 10. Notifications
       if (payload.notifications && payload.notifications.length > 0) {
-        await client.from('notifications').upsert(payload.notifications, { onConflict: 'noti_id' });
+        const cleanNoti = payload.notifications.map((n) => ({
+          ...n,
+          thoi_gian: n.thoi_gian || new Date().toISOString(),
+        }));
+        const { error } = await client.from('notifications').upsert(cleanNoti, { onConflict: 'noti_id' });
+        if (error) throw { table: 'notifications', error };
       }
 
-      return { success: true, message: 'Đã đồng bộ toàn bộ dữ liệu thành công lên Supabase Cloud!' };
+      return {
+        success: true,
+        message: `Đã đồng bộ thành công ${payload.vocabulary?.length || 0} từ vựng, ${payload.grammar?.length || 0} ngữ pháp lên Supabase Cloud!`,
+      };
     } catch (err: any) {
       console.error('Supabase Push Error:', err);
-      return { success: false, message: `Lỗi đồng bộ Supabase: ${err.message || err}` };
+      const table = err?.table;
+      const errorObj = err?.error || err;
+      const status = errorObj?.status || errorObj?.statusCode;
+      const message = errorObj?.message || String(err);
+
+      if (status === 401 || message.toLowerCase().includes('api key') || message.toLowerCase().includes('jwt')) {
+        return {
+          success: false,
+          message: '❌ Lỗi 401 (Unauthorized): Khóa "Anon API Key" không chính xác hoặc đã hết hạn. Vui lòng lấy lại Anon Public Key trong Supabase Settings > API.',
+        };
+      }
+      if (errorObj?.code === '42P01') {
+        return {
+          success: false,
+          message: `⚠️ Bảng "${table || 'dữ liệu'}" chưa được tạo trên Supabase. Vui lòng chạy đoạn mã SQL tạo bảng trong SQL Editor.`,
+        };
+      }
+      return {
+        success: false,
+        message: `Lỗi đồng bộ Supabase [Bảng ${table || ''}]: ${message}`,
+      };
     }
   }
 
@@ -310,7 +395,13 @@ export class SupabaseService {
         if (firstErr?.code === '42P01') {
           return {
             success: false,
-            message: 'Bảng (Table) chưa được tạo trên Supabase. Vui lòng vào SQL Editor trên Supabase và bấm Run đoạn mã SQL tạo bảng.',
+            message: '⚠️ Bảng (Table) chưa được tạo trên Supabase. Vui lòng vào SQL Editor trên Supabase và bấm Run đoạn mã SQL tạo bảng.',
+          };
+        }
+        if (firstErr?.message?.toLowerCase().includes('api key') || firstErr?.message?.toLowerCase().includes('jwt')) {
+          return {
+            success: false,
+            message: '❌ Lỗi 401 (Unauthorized): Khóa "Anon API Key" không chính xác hoặc đã hết hạn. Vui lòng lấy lại Anon Public Key trong Supabase Settings > API.',
           };
         }
         return {

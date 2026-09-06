@@ -840,6 +840,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (silent && lastServerTimestampRef.current) {
         try {
           const statusRes = await safeFetchWithTimeout('/api/sync/status', {}, 5000);
+          if (statusRes.status === 404) {
+            // Running on static host (e.g. Vercel) without Express backend
+            return { success: false, message: 'Môi trường static host, sử dụng Supabase' };
+          }
           if (statusRes.ok) {
             const statusJson = await statusRes.json();
             if (statusJson.lastUpdated && statusJson.lastUpdated === lastServerTimestampRef.current) {
@@ -852,7 +856,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      const res = await safeFetchWithTimeout('/api/sync/store', {}, 20000);
+      const res = await safeFetchWithTimeout('/api/sync/store', {}, 10000);
+      if (res.status === 404) {
+        return { success: false, message: 'Vercel static host (hãy đồng bộ bằng Supabase)' };
+      }
       if (!res.ok) throw new Error('Không thể kết nối máy chủ Cloud Sync');
       const json = await res.json();
       const serverStore = json.store || {};
