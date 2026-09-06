@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- RLS & POLICIES
+-- RLS & POLICIES (BẢO VỆ VÀ PHÂN QUYỀN TRUY CẬP)
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vocabulary ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.decks ENABLE ROW LEVEL SECURITY;
@@ -226,17 +226,64 @@ ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Public full access user_profiles" ON public.user_profiles FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access vocabulary" ON public.vocabulary FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access decks" ON public.decks FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access grammar" ON public.grammar FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access review_sessions" ON public.review_sessions FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access mock_test_records" ON public.mock_test_records FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access progress_records" ON public.progress_records FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access journal_entries" ON public.journal_entries FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access chat_conversations" ON public.chat_conversations FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public full access user_profiles" ON public.user_profiles;
+CREATE POLICY "Public full access user_profiles" ON public.user_profiles FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access vocabulary" ON public.vocabulary;
+CREATE POLICY "Public full access vocabulary" ON public.vocabulary FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access decks" ON public.decks;
+CREATE POLICY "Public full access decks" ON public.decks FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access grammar" ON public.grammar;
+CREATE POLICY "Public full access grammar" ON public.grammar FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access review_sessions" ON public.review_sessions;
+CREATE POLICY "Public full access review_sessions" ON public.review_sessions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access mock_test_records" ON public.mock_test_records;
+CREATE POLICY "Public full access mock_test_records" ON public.mock_test_records FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access progress_records" ON public.progress_records;
+CREATE POLICY "Public full access progress_records" ON public.progress_records FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access journal_entries" ON public.journal_entries;
+CREATE POLICY "Public full access journal_entries" ON public.journal_entries FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access chat_conversations" ON public.chat_conversations;
+CREATE POLICY "Public full access chat_conversations" ON public.chat_conversations FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access notifications" ON public.notifications;
+CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- ====================================================================
+-- CẤP QUYỀN TRUY CẬP (GRANT) CHO ROLE ANON & AUTHENTICATED
+-- (BẮT BUỘC ĐỂ KHÔNG BỊ LỖI 42501: permission denied for table)
+-- ====================================================================
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 `;
+
+  const grantOnlySqlScript = `-- SỬA LỖI 42501 (PERMISSION DENIED) TRÊN SUPABASE:
+-- Dán 3 dòng này vào Supabase SQL Editor và bấm Run:
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;`;
+
+  const [hasCopiedGrantSql, setHasCopiedGrantSql] = useState(false);
+
+  const handleCopyGrantSql = () => {
+    navigator.clipboard.writeText(grantOnlySqlScript);
+    setHasCopiedGrantSql(true);
+    setTimeout(() => setHasCopiedGrantSql(false), 2500);
+  };
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(sqlScriptContent);
@@ -408,6 +455,51 @@ CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL
               <span>{testingConnection ? 'Đang kiểm tra...' : 'Kiểm tra Kết nối'}</span>
             </button>
           </div>
+
+          {/* Feedback message banner */}
+          {feedback && (
+            <div
+              className={`p-3.5 border font-mono text-xs mt-3 flex flex-col gap-2 ${
+                feedback.success
+                  ? 'bg-emerald-50 border-emerald-400 text-emerald-950'
+                  : 'bg-rose-50 border-rose-400 text-rose-950'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                {feedback.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <span className="leading-relaxed whitespace-pre-wrap">{feedback.message}</span>
+              </div>
+
+              {/* Quick action button for 42501 error */}
+              {(feedback.message.includes('42501') || feedback.message.toLowerCase().includes('permission denied')) && (
+                <div className="mt-2 pt-2 border-t border-rose-200 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] text-rose-800 font-sans">
+                    👉 Bấm nút bên cạnh để copy mã sửa quyền, sau đó dán vào SQL Editor trên Supabase và bấm Run:
+                  </span>
+                  <button
+                    onClick={handleCopyGrantSql}
+                    className="px-3 py-1.5 bg-rose-700 text-white font-mono text-xs font-bold uppercase tracking-wider hover:bg-rose-800 transition flex items-center gap-1.5 shadow-sm shrink-0"
+                  >
+                    {hasCopiedGrantSql ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>Đã Sao Chép Lệnh GRANT!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Sao Chép Lệnh GRANT Sửa Lỗi 42501</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -463,6 +555,50 @@ CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL
             </button>
           </div>
         </div>
+
+        {/* Feedback inside Sync Operations Card */}
+        {feedback && (
+          <div
+            className={`p-3.5 border font-mono text-xs mt-4 flex flex-col gap-2 ${
+              feedback.success
+                ? 'bg-emerald-50 border-emerald-400 text-emerald-950'
+                : 'bg-rose-50 border-rose-400 text-rose-950'
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              {feedback.success ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              )}
+              <span className="leading-relaxed whitespace-pre-wrap">{feedback.message}</span>
+            </div>
+
+            {(feedback.message.includes('42501') || feedback.message.toLowerCase().includes('permission denied')) && (
+              <div className="mt-2 pt-2 border-t border-rose-200 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] text-rose-800 font-sans">
+                  👉 Lỗi 42501 do thiếu lệnh GRANT. Bấm để copy lệnh sửa quyền và chạy trong Supabase SQL Editor:
+                </span>
+                <button
+                  onClick={handleCopyGrantSql}
+                  className="px-3 py-1.5 bg-rose-700 text-white font-mono text-xs font-bold uppercase tracking-wider hover:bg-rose-800 transition flex items-center gap-1.5 shadow-sm shrink-0"
+                >
+                  {hasCopiedGrantSql ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>Đã Copy Lệnh GRANT!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Sao Chép Lệnh GRANT (Sửa 42501)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* SQL Setup Script Card */}
@@ -494,6 +630,40 @@ CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL
               </>
             )}
           </button>
+        </div>
+
+        {/* Quick Fix Box for Error 42501 */}
+        <div className="bg-rose-50/80 border-2 border-rose-300 p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="font-bold text-xs uppercase font-mono text-rose-950 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-rose-700" />
+                <span>Sửa Nhanh Lỗi 42501: "permission denied for table ..."</span>
+              </div>
+              <p className="text-xs text-stone-700 font-sans mt-1">
+                Nếu bạn đã tạo bảng rồi nhưng khi bấm <strong>"Đẩy Dữ Liệu Lên Cloud"</strong> bị báo lỗi <em>permission denied for table user_profiles (42501)</em>, chỉ cần chạy đoạn lệnh GRANT này trong SQL Editor:
+              </p>
+            </div>
+            <button
+              onClick={handleCopyGrantSql}
+              className="px-3.5 py-2 bg-rose-700 text-white font-mono text-xs font-bold uppercase tracking-wider hover:bg-rose-800 transition flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_0px_#000]"
+            >
+              {hasCopiedGrantSql ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Đã Copy Lệnh GRANT!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Sao Chép Lệnh GRANT (Sửa 42501)</span>
+                </>
+              )}
+            </button>
+          </div>
+          <pre className="p-3 bg-stone-900 text-amber-300 font-mono text-[11px] overflow-x-auto border border-stone-800 rounded-none leading-relaxed">
+            {grantOnlySqlScript}
+          </pre>
         </div>
 
         {/* Step by step guide */}

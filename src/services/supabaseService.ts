@@ -168,6 +168,12 @@ export class SupabaseService {
             message: '❌ Lỗi 401 (Unauthorized): Khóa "Anon API Key" không chính xác hoặc đã bị làm mới trong Supabase. Vui lòng vào Supabase Dashboard > Settings > API và copy lại khóa "anon public" (bắt đầu bằng eyJ...).',
           };
         }
+        if (error.code === '42501' || error.message?.toLowerCase().includes('permission denied')) {
+          return {
+            success: false,
+            message: '🔒 Lỗi 42501 (Permission Denied): Bảng chưa cấp quyền truy cập cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh: GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;',
+          };
+        }
         if (error.code === '42P01') {
           return {
             success: false,
@@ -314,6 +320,12 @@ export class SupabaseService {
           message: '❌ Lỗi 401 (Unauthorized): Khóa "Anon API Key" không chính xác hoặc đã hết hạn. Vui lòng lấy lại Anon Public Key trong Supabase Settings > API.',
         };
       }
+      if (errorObj?.code === '42501' || message.toLowerCase().includes('permission denied')) {
+        return {
+          success: false,
+          message: `🔒 Lỗi 42501 (Permission Denied) cho bảng "${table || 'dữ liệu'}": Bảng chưa cấp quyền truy cập (GRANT) cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh: GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;`,
+        };
+      }
       if (errorObj?.code === '42P01') {
         return {
           success: false,
@@ -392,6 +404,12 @@ export class SupabaseService {
 
       if (errors.length > 0) {
         const firstErr = errors[0];
+        if (firstErr?.code === '42501' || firstErr?.message?.toLowerCase().includes('permission denied')) {
+          return {
+            success: false,
+            message: '🔒 Lỗi 42501 (Permission Denied): Bảng chưa cấp quyền truy cập (GRANT) cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh: GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;',
+          };
+        }
         if (firstErr?.code === '42P01') {
           return {
             success: false,
