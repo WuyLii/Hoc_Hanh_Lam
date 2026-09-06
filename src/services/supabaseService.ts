@@ -50,8 +50,8 @@ export class SupabaseService {
     }
 
     // Fallback to environment variables if present
-    const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+    const envUrl = import.meta.env.VITE_SUPABASE_URL || (import.meta.env as any).SUPABASE_URL || '';
+    const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || (import.meta.env as any).SUPABASE_ANON_KEY || '';
 
     return {
       url: this.normalizeUrl(envUrl),

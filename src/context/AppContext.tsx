@@ -29,7 +29,7 @@ import {
   cleanDeduplicateGrammar,
   cleanDeduplicateDecks,
 } from '../utils/deduplicate';
-import { idbGet, idbSet } from '../utils/idbStorage';
+import { idbGet, idbSet, idbClear } from '../utils/idbStorage';
 
 interface AppContextType {
   currentUser: UserProfile;
@@ -97,6 +97,7 @@ interface AppContextType {
 
   // Cloud Cross-Device & Cross-Browser Sync (Safari, PWA, Chrome, Mobile)
   syncWithCloudServer: () => Promise<{ success: boolean; message: string }>;
+  clearAllData: () => Promise<{ success: boolean; message: string }>;
   isCloudSyncing: boolean;
   lastCloudSyncedAt: string;
 
@@ -277,9 +278,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig>(() =>
     loadFromStorage('sheets_config', {
       scriptUrl: '',
-      spreadsheetUrlOrId: 'https://docs.google.com/spreadsheets/d/1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY/edit?gid=0#gid=0',
-      spreadsheetId: '1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY',
-      autoSync: true,
+      spreadsheetUrlOrId: '',
+      spreadsheetId: '',
+      autoSync: false,
       syncIntervalHours: 24,
       lastSyncedAt: '',
     })
@@ -637,39 +638,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSheetsConfig = (cfg: Partial<GoogleSheetsConfig>) => {
-    setSheetsConfig((prev) => {
-      const updated = { ...prev, ...cfg };
-      if (cfg.spreadsheetUrlOrId || cfg.scriptUrl) {
-        setTimeout(() => {
-          pullGoogleSheets();
-        }, 200);
-      }
-      return updated;
-    });
+    setSheetsConfig((prev) => ({ ...prev, ...cfg }));
   };
 
   const pushToGoogleSheetsAuto = async () => {
-    if (!sheetsConfig.scriptUrl || !sheetsConfig.scriptUrl.startsWith('https://script.google.com/')) {
-      return;
-    }
-    try {
-      const payload: SheetsPayload = {
-        users: [currentUser],
-        vocabulary,
-        decks,
-        grammar,
-        reviewSessions,
-        tests: mockTests,
-        listening: listeningExercises,
-        progress: progressLogs,
-        journal: journalEntries,
-        notifications,
-        chatHistory,
-      };
-      await GoogleSheetsService.syncToGoogleSheets(sheetsConfig.scriptUrl, payload);
-    } catch (e) {
-      console.warn('Auto sync push to Google Sheets background status:', e);
-    }
+    // Disabled auto push to Google Sheets
+    return;
   };
 
   // Google Sheets Push & Pull
@@ -705,13 +679,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const pullGoogleSheets = async (): Promise<{ success: boolean; message: string }> => {
-    const targetUrl =
-      sheetsConfig.scriptUrl ||
-      sheetsConfig.spreadsheetUrlOrId ||
-      'https://docs.google.com/spreadsheets/d/1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY/edit?gid=0#gid=0';
+    const targetUrl = sheetsConfig.scriptUrl || sheetsConfig.spreadsheetUrlOrId || '';
 
     if (!targetUrl) {
-      return { success: false, message: 'Vui lòng nhập đường dẫn URL Google Sheets hoặc Web App Script URL' };
+      return { success: false, message: 'Google Sheets chưa được cấu hình. Vui lòng nhập đường dẫn URL Google Sheets hoặc Web App Script URL trong Cài đặt.' };
     }
 
     setIsSyncing(true);
@@ -887,6 +858,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const serverStore = json.store || {};
       const serverUpdated = json.lastUpdated || '';
 
+      if (serverStore.isCleared) {
+        setVocabulary([]);
+        setGrammar([]);
+        setDecks([]);
+        setReviewSessions([]);
+        setMockTests([]);
+        setListeningExercises([]);
+        setProgressLogs([]);
+        setJournalEntries([]);
+        setNotifications([]);
+        setChatHistory([]);
+        idbClear().catch(() => {});
+        localStorage.clear();
+        return { success: true, message: 'Dữ liệu đã được xóa sạch trên tất cả trình duyệt' };
+      }
+
       // Skip if server hasn't been updated since our last sync
       if (silent && serverUpdated && serverUpdated === lastServerTimestampRef.current) {
         return { success: true, message: 'Dữ liệu đã mới nhất' };
@@ -997,20 +984,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const clearAllData = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      setVocabulary([]);
+      setGrammar([]);
+      setDecks([]);
+      setReviewSessions([]);
+      setMockTests([]);
+      setListeningExercises([]);
+      setProgressLogs([]);
+      setJournalEntries([]);
+      setNotifications([]);
+      setChatHistory([]);
+
+      idbClear().catch(() => {});
+      localStorage.clear();
+
+      await safeFetchWithTimeout('/api/sync/clear-all', { method: 'POST' }, 10000);
+
+      return { success: true, message: 'Đã xóa sạch toàn bộ dữ liệu trên trang web và tất cả các trình duyệt!' };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Lỗi khi xóa dữ liệu' };
+    }
+  };
+
   // Ensure state is deduplicated on boot
   useEffect(() => {
     setVocabulary((prev) => cleanDeduplicateVocab(prev));
     setGrammar((prev) => cleanDeduplicateGrammar(prev));
   }, []);
 
-  // 1. On Mount (When Safari, Chrome or PWA on iPhone opens): Sync Cloud Store, Supabase & Pull Google Sheets
+  // 1. On Mount (When Safari, Chrome or PWA on iPhone opens): Sync Cloud Store & Supabase
   useEffect(() => {
     const handleInitialSync = async () => {
       await syncWithCloudServer(false);
       if (SupabaseService.isConfigured()) {
         await importFromSupabase();
       }
-      await pullGoogleSheets();
     };
     handleInitialSync();
   }, []);
@@ -1050,15 +1060,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // 4. Fast Auto-Save to Cloud Server, Supabase & Google Sheets whenever any state updates (Add / Edit / Delete / Progress)
+  // 4. Fast Auto-Save to Cloud Server & Supabase whenever any state updates
   useEffect(() => {
     const timer = setTimeout(() => {
       pushToCloudServer();
       if (SupabaseService.isConfigured()) {
         exportToSupabase();
-      }
-      if (sheetsConfig.scriptUrl) {
-        pushToGoogleSheetsAuto();
       }
     }, 2000);
     return () => clearTimeout(timer);
@@ -1075,33 +1082,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     chatHistory,
     currentUser,
     currentLanguage,
-    sheetsConfig.scriptUrl,
   ]);
-
-  // Automatic 24-hour sync check effect
-  useEffect(() => {
-    const targetUrl =
-      sheetsConfig.scriptUrl ||
-      sheetsConfig.spreadsheetUrlOrId ||
-      'https://docs.google.com/spreadsheets/d/1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY/edit?gid=0#gid=0';
-
-    if (!targetUrl || sheetsConfig.autoSync === false) return;
-
-    const intervalMs = (sheetsConfig.syncIntervalHours || 24) * 60 * 60 * 1000;
-
-    const checkAndSync = async () => {
-      const lastSync = sheetsConfig.lastSyncedAt ? new Date(sheetsConfig.lastSyncedAt).getTime() : 0;
-      const now = Date.now();
-      if (now - lastSync >= intervalMs) {
-        console.log('⏰ Executing 24-hour auto sync with Google Sheets...');
-        await pullGoogleSheets();
-      }
-    };
-
-    checkAndSync();
-    const timer = setInterval(checkAndSync, 30 * 60 * 1000); // Check every 30 mins
-    return () => clearInterval(timer);
-  }, [sheetsConfig.autoSync, sheetsConfig.scriptUrl, sheetsConfig.spreadsheetUrlOrId, sheetsConfig.lastSyncedAt]);
 
   return (
     <AppContext.Provider
@@ -1169,6 +1150,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         importFromSupabase,
 
         syncWithCloudServer,
+        clearAllData,
         isCloudSyncing,
         lastCloudSyncedAt,
 

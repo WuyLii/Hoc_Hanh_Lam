@@ -51,10 +51,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
   const currentLangInfo = LANGUAGES[currentLanguage];
 
   const handleManualSync = async () => {
-    setSyncStatusMsg('⏳ Đang đồng bộ Cloud đa thiết bị & Google Sheets...');
+    setSyncStatusMsg('⏳ Đang đồng bộ Cloud đa thiết bị...');
     const cloudRes = await syncWithCloudServer();
     let sheetsMsg = '';
-    if (sheetsConfig.scriptUrl || sheetsConfig.spreadsheetUrlOrId) {
+    if (sheetsConfig.scriptUrl) {
       const sheetsRes = await pullGoogleSheets();
       sheetsMsg = ` • Sheets: ${sheetsRes.message}`;
     }

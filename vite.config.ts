@@ -76,6 +76,7 @@ function apiDevPlugin(): Plugin {
 
 export default defineConfig(() => {
   return {
+    envPrefix: ['VITE_', 'SUPABASE_'],
     plugins: [react(), tailwindcss(), apiDevPlugin()],
     resolve: {
       alias: {

@@ -81,19 +81,28 @@ function serverDeduplicateGrammar(items: any[]): any[] {
   return Array.from(map.values());
 }
 
-let memoryStore: CloudStore = {};
-
-try {
-  if (fs.existsSync(STORE_FILE)) {
-    const raw = fs.readFileSync(STORE_FILE, 'utf-8');
-    memoryStore = JSON.parse(raw);
-    if (memoryStore.vocabulary) memoryStore.vocabulary = serverDeduplicateVocab(memoryStore.vocabulary);
-    if (memoryStore.grammar) memoryStore.grammar = serverDeduplicateGrammar(memoryStore.grammar);
-    console.log('📦 Loaded existing cloud_store.json with', Object.keys(memoryStore).length, 'keys');
-  }
-} catch (e) {
-  console.error('Failed to read cloud_store.json:', e);
-}
+let memoryStore: CloudStore & { isCleared?: boolean } = {
+  vocabulary: [],
+  grammar: [],
+  decks: [],
+  reviewSessions: [],
+  mockTests: [],
+  listeningExercises: [],
+  progressLogs: [],
+  journalEntries: [],
+  notifications: [],
+  chatHistory: [],
+  sheetsConfig: {
+    scriptUrl: '',
+    spreadsheetUrlOrId: '',
+    spreadsheetId: '',
+    autoSync: false,
+    syncIntervalHours: 24,
+    lastSyncedAt: '',
+  },
+  lastUpdated: new Date().toISOString(),
+  isCleared: true,
+};
 
 function saveMemoryStore() {
   try {
@@ -102,6 +111,9 @@ function saveMemoryStore() {
     console.error('Failed to save cloud_store.json:', e);
   }
 }
+
+// Reset cloud_store.json to clean state on startup
+saveMemoryStore();
 
 async function startServer() {
   const app = express();
@@ -194,7 +206,7 @@ async function startServer() {
     }
   });
 
-  // 8. Google Sheets Public / Shared URL Direct Fetch & Auto Sync
+  // 8. Google Sheets Public / Shared URL Direct Fetch
   app.post('/api/sheets/fetch-public', async (req, res) => {
     try {
       const { urlOrId } = req.body;
@@ -202,24 +214,6 @@ async function startServer() {
         return res.status(400).json({ error: 'Vui lòng cung cấp URL hoặc ID Google Sheets' });
       }
       const resData = await fetchPublicSpreadsheet(urlOrId);
-
-      // Merge Google Sheets data directly into cloud memoryStore so all devices get it immediately
-      if (resData && resData.data) {
-        const vocab = resData.data.vocabulary;
-        if (Array.isArray(vocab) && vocab.length > 0) {
-          memoryStore.vocabulary = serverDeduplicateVocab([...(memoryStore.vocabulary || []), ...vocab]);
-        }
-        const gram = resData.data.grammar;
-        if (Array.isArray(gram) && gram.length > 0) {
-          memoryStore.grammar = serverDeduplicateGrammar([...(memoryStore.grammar || []), ...gram]);
-        }
-        const dks = resData.data.decks;
-        if (Array.isArray(dks) && dks.length > 0) memoryStore.decks = dks;
-
-        memoryStore.lastUpdated = new Date().toISOString();
-        saveMemoryStore();
-      }
-
       res.json(resData);
     } catch (error: any) {
       console.error('Error in /api/sheets/fetch-public:', error);
@@ -230,6 +224,43 @@ async function startServer() {
   });
 
   // 9. Unified Cross-Device Cloud Store API (Safari, PWA, Chrome, Mobile Sync)
+  app.post('/api/sync/clear-all', (req, res) => {
+    try {
+      memoryStore = {
+        vocabulary: [],
+        grammar: [],
+        decks: [],
+        reviewSessions: [],
+        mockTests: [],
+        listeningExercises: [],
+        progressLogs: [],
+        journalEntries: [],
+        notifications: [],
+        chatHistory: [],
+        sheetsConfig: {
+          scriptUrl: '',
+          spreadsheetUrlOrId: '',
+          spreadsheetId: '',
+          autoSync: false,
+          syncIntervalHours: 24,
+          lastSyncedAt: '',
+        },
+        lastUpdated: new Date().toISOString(),
+        isCleared: true,
+      };
+      saveMemoryStore();
+      res.json({
+        success: true,
+        message: 'Đã xóa sạch toàn bộ dữ liệu trên hệ thống máy chủ Cloud',
+        isCleared: true,
+        lastUpdated: memoryStore.lastUpdated,
+      });
+    } catch (err: any) {
+      console.error('Error in /api/sync/clear-all:', err);
+      res.status(500).json({ error: 'Lỗi khi xóa dữ liệu trên máy chủ' });
+    }
+  });
+
   app.get('/api/sync/status', (req, res) => {
     res.json({
       success: true,

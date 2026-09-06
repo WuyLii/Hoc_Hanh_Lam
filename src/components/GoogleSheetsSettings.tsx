@@ -22,10 +22,7 @@ export const GoogleSheetsSettings: React.FC = () => {
   } = useApp();
 
   const [scriptUrlInput, setScriptUrlInput] = useState(sheetsConfig.scriptUrl || '');
-  const [sheetUrlInput, setSheetUrlInput] = useState(
-    sheetsConfig.spreadsheetUrlOrId ||
-      'https://docs.google.com/spreadsheets/d/1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY/edit?gid=0#gid=0'
-  );
+  const [sheetUrlInput, setSheetUrlInput] = useState(sheetsConfig.spreadsheetUrlOrId || '');
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(sheetsConfig.autoSync !== false);
   const [hasCopiedCode, setHasCopiedCode] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ success: boolean; message: string } | null>(null);
@@ -219,7 +216,7 @@ export const GoogleSheetsSettings: React.FC = () => {
             </label>
             <input
               type="text"
-              placeholder="https://docs.google.com/spreadsheets/d/1Zx6Mne01gn-FwXxei9Nn-Otcivo_WAueId6eesR23sY/edit"
+              placeholder="https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit"
               value={sheetUrlInput}
               onChange={(e) => setSheetUrlInput(e.target.value)}
               className="w-full p-3 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white focus:outline-none"
