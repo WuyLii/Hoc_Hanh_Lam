@@ -38,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
     syncGoogleSheets,
     pullGoogleSheets,
     syncWithCloudServer,
+    importFromSupabase,
     isSyncing,
     isCloudSyncing,
     sheetsConfig,
@@ -51,15 +52,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
   const currentLangInfo = LANGUAGES[currentLanguage];
 
   const handleManualSync = async () => {
-    setSyncStatusMsg('⏳ Đang đồng bộ Cloud đa thiết bị...');
+    setSyncStatusMsg('⏳ Đang đồng bộ Cloud & Supabase...');
     const cloudRes = await syncWithCloudServer();
+    let supaMsg = '';
+    const supaRes = await importFromSupabase();
+    if (supaRes.success) {
+      supaMsg = ` • Supabase: ${supaRes.message}`;
+    } else if (supaRes.message && !supaRes.message.includes('Chưa cấu hình')) {
+      supaMsg = ` • Supabase: ${supaRes.message}`;
+    }
     let sheetsMsg = '';
     if (sheetsConfig.scriptUrl) {
       const sheetsRes = await pullGoogleSheets();
       sheetsMsg = ` • Sheets: ${sheetsRes.message}`;
     }
-    setSyncStatusMsg(`✅ Cloud: ${cloudRes.message}${sheetsMsg}`);
-    setTimeout(() => setSyncStatusMsg(null), 4500);
+    setSyncStatusMsg(`✅ Cloud: ${cloudRes.message}${supaMsg}${sheetsMsg}`);
+    setTimeout(() => setSyncStatusMsg(null), 5500);
   };
 
   const navItems = [

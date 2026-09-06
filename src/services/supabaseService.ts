@@ -291,9 +291,41 @@ export class SupabaseService {
         client.from('notifications').select('*'),
       ]);
 
+      // Check for table or permission errors
+      const errors = [
+        vocabRes.error,
+        grammarRes.error,
+        decksRes.error,
+        profileRes.error,
+        reviewsRes.error,
+        testsRes.error,
+        progressRes.error,
+        journalRes.error,
+        chatRes.error,
+        notiRes.error,
+      ].filter(Boolean);
+
+      if (errors.length > 0) {
+        const firstErr = errors[0];
+        if (firstErr?.code === '42P01') {
+          return {
+            success: false,
+            message: 'Bảng (Table) chưa được tạo trên Supabase. Vui lòng vào SQL Editor trên Supabase và bấm Run đoạn mã SQL tạo bảng.',
+          };
+        }
+        return {
+          success: false,
+          message: `Lỗi Supabase (${firstErr?.code || 'Error'}): ${firstErr?.message || 'Không thể truy vấn bảng dữ liệu'}`,
+        };
+      }
+
+      const totalItems = (vocabRes.data?.length || 0) + (grammarRes.data?.length || 0) + (decksRes.data?.length || 0);
+
       return {
         success: true,
-        message: 'Tải dữ liệu từ Supabase thành công!',
+        message: totalItems > 0 
+          ? `Tải thành công ${vocabRes.data?.length || 0} từ vựng, ${grammarRes.data?.length || 0} ngữ pháp từ Supabase Cloud!`
+          : 'Kết nối Supabase thành công nhưng chưa có dữ liệu nào trên Cloud (Hãy bấm "Đẩy Dữ Liệu Lên Cloud" từ trình duyệt đã có từ vựng trước).',
         data: {
           userProfile: profileRes.data && profileRes.data.length > 0 ? profileRes.data[0] : undefined,
           vocabulary: vocabRes.data || [],
