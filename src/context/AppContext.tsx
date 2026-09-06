@@ -23,6 +23,7 @@ import {
 } from '../data/seedData';
 import { calculateNextSRS, RecallQuality } from '../services/srsEngine';
 import { GoogleSheetsService, SheetsPayload } from '../services/googleSheetsService';
+import { SupabaseService } from '../services/supabaseService';
 import {
   cleanDeduplicateVocab,
   cleanDeduplicateGrammar,
@@ -89,6 +90,10 @@ interface AppContextType {
   syncGoogleSheets: () => Promise<{ success: boolean; message: string }>;
   pullGoogleSheets: () => Promise<{ success: boolean; message: string }>;
   isSyncing: boolean;
+
+  // Supabase Database Cloud Sync
+  exportToSupabase: () => Promise<{ success: boolean; message: string }>;
+  importFromSupabase: () => Promise<{ success: boolean; message: string }>;
 
   // Cloud Cross-Device & Cross-Browser Sync (Safari, PWA, Chrome, Mobile)
   syncWithCloudServer: () => Promise<{ success: boolean; message: string }>;
@@ -773,6 +778,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const exportToSupabase = async (): Promise<{ success: boolean; message: string }> => {
+    setIsSyncing(true);
+    try {
+      const res = await SupabaseService.pushAllData({
+        userProfile: currentUser,
+        vocabulary,
+        decks,
+        grammar,
+        reviewSessions,
+        mockTests,
+        progressRecords: progressLogs,
+        journalEntries,
+        chatConversations: chatHistory,
+        notifications,
+      });
+      return res;
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Lỗi khi đẩy dữ liệu lên Supabase' };
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const importFromSupabase = async (): Promise<{ success: boolean; message: string }> => {
+    setIsSyncing(true);
+    try {
+      const res = await SupabaseService.pullAllData();
+      if (res.success && res.data) {
+        if (res.data.userProfile) setCurrentUser(res.data.userProfile);
+        if (res.data.vocabulary && res.data.vocabulary.length > 0) {
+          setVocabulary((prev) => cleanDeduplicateVocab([...res.data!.vocabulary!, ...prev]));
+        }
+        if (res.data.grammar && res.data.grammar.length > 0) {
+          setGrammar((prev) => cleanDeduplicateGrammar([...res.data!.grammar!, ...prev]));
+        }
+        if (res.data.decks && res.data.decks.length > 0) {
+          setDecks((prev) => cleanDeduplicateDecks([...res.data!.decks!, ...prev]));
+        }
+        if (res.data.reviewSessions && res.data.reviewSessions.length > 0) {
+          setReviewSessions(res.data.reviewSessions);
+        }
+        if (res.data.mockTests && res.data.mockTests.length > 0) {
+          setMockTests(res.data.mockTests);
+        }
+        if (res.data.progressRecords && res.data.progressRecords.length > 0) {
+          setProgressLogs(res.data.progressRecords);
+        }
+        if (res.data.journalEntries && res.data.journalEntries.length > 0) {
+          setJournalEntries(res.data.journalEntries);
+        }
+        if (res.data.chatConversations && res.data.chatConversations.length > 0) {
+          setChatHistory(res.data.chatConversations);
+        }
+        if (res.data.notifications && res.data.notifications.length > 0) {
+          setNotifications(res.data.notifications);
+        }
+        return { success: true, message: 'Đã nhập dữ liệu từ Supabase Cloud thành công!' };
+      }
+      return res;
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Lỗi khi tải dữ liệu từ Supabase' };
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [lastCloudSyncedAt, setLastCloudSyncedAt] = useState<string>('');
   const lastServerTimestampRef = useRef<string>('');
@@ -932,10 +1003,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setGrammar((prev) => cleanDeduplicateGrammar(prev));
   }, []);
 
-  // 1. On Mount (When Safari, Chrome or PWA on iPhone opens): Sync Cloud Store & Pull Google Sheets
+  // 1. On Mount (When Safari, Chrome or PWA on iPhone opens): Sync Cloud Store, Supabase & Pull Google Sheets
   useEffect(() => {
     const handleInitialSync = async () => {
       await syncWithCloudServer(false);
+      if (SupabaseService.isConfigured()) {
+        await importFromSupabase();
+      }
       await pullGoogleSheets();
     };
     handleInitialSync();
@@ -945,6 +1019,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const interval = setInterval(() => {
       syncWithCloudServer(true);
+      if (SupabaseService.isConfigured()) {
+        importFromSupabase();
+      }
     }, 12000);
     return () => clearInterval(interval);
   }, []);
@@ -953,11 +1030,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const handleAppFocus = () => {
       syncWithCloudServer(true);
+      if (SupabaseService.isConfigured()) {
+        importFromSupabase();
+      }
     };
     window.addEventListener('focus', handleAppFocus);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         syncWithCloudServer(true);
+        if (SupabaseService.isConfigured()) {
+          importFromSupabase();
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
@@ -967,10 +1050,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // 4. Fast Auto-Save to Cloud Server & Google Sheets whenever any state updates (Add / Edit / Delete / Progress)
+  // 4. Fast Auto-Save to Cloud Server, Supabase & Google Sheets whenever any state updates (Add / Edit / Delete / Progress)
   useEffect(() => {
     const timer = setTimeout(() => {
       pushToCloudServer();
+      if (SupabaseService.isConfigured()) {
+        exportToSupabase();
+      }
       if (sheetsConfig.scriptUrl) {
         pushToGoogleSheetsAuto();
       }
@@ -1078,6 +1164,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncGoogleSheets,
         pullGoogleSheets,
         isSyncing,
+
+        exportToSupabase,
+        importFromSupabase,
 
         syncWithCloudServer,
         isCloudSyncing,

@@ -9,6 +9,7 @@ import {
   Award,
   Sparkles,
   BarChart3,
+  Database,
   FileSpreadsheet,
   Edit3,
   RefreshCw,
@@ -71,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
     { id: 'aichat', label: 'Gia sư AI', num: '07', icon: Sparkles },
     { id: 'stroke', label: 'Tập viết nét chữ', num: '08', icon: PenTool },
     { id: 'numbers', label: 'Số & Lượng từ', num: '09', icon: Calculator },
-    { id: 'sheets', label: 'Google Sheets', num: '10', icon: FileSpreadsheet },
+    { id: 'sheets', label: 'CSDL Supabase / Sheets', num: '10', icon: Database },
   ];
 
   const handleMobileNavClick = (id: string) => {

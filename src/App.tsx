@@ -10,7 +10,7 @@ import { MockTestView } from './components/MockTestView';
 import { AiChatboxView } from './components/AiChatboxView';
 import { StrokeGuideView } from './components/StrokeGuideView';
 import { NumbersView } from './components/NumbersView';
-import { GoogleSheetsSettings } from './components/GoogleSheetsSettings';
+import { DatabaseSettingsHub } from './components/DatabaseSettingsHub';
 import { OcrScannerModal } from './components/OcrScannerModal';
 import { ActiveGamePersistentBar } from './components/games/ActiveGamePersistentBar';
 
@@ -93,7 +93,7 @@ const AppContent: React.FC = () => {
         {activeNav === 'aichat' && <AiChatboxView />}
         {activeNav === 'stroke' && <StrokeGuideView />}
         {activeNav === 'numbers' && <NumbersView />}
-        {activeNav === 'sheets' && <GoogleSheetsSettings />}
+        {activeNav === 'sheets' && <DatabaseSettingsHub />}
       </main>
 
       {/* Persistent floating indicator when a game is in progress and user browses other sections */}
