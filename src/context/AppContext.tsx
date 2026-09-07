@@ -348,7 +348,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Vocabulary Operations
+  const resolveWordLanguage = (tu: string, explicitLang?: LanguageCode): LanguageCode => {
+    if (/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/.test(tu || '')) return 'ko';
+    if (/[\u4E00-\u9FFF]/.test(tu || '')) return 'zh';
+    if (explicitLang) return explicitLang;
+    return currentLanguage;
+  };
+
   const addVocabulary = (item: Partial<VocabularyItem>): VocabularyItem => {
+    const wordLang = resolveWordLanguage(item.tu || '', item.ngon_ngu);
     const newWord: VocabularyItem = {
       word_id: `w_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       tu: item.tu || '',
@@ -357,9 +365,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       loai_tu: item.loai_tu || 'Từ vựng',
       vi_du: item.vi_du || '',
       vi_du_dich: item.vi_du_dich || '',
+      nghia_tieng_han: item.nghia_tieng_han || '',
+      nghia_tieng_anh: item.nghia_tieng_anh || '',
+      phien_am_tieng_han: item.phien_am_tieng_han || '',
       audio_url: item.audio_url,
       hinh_url: item.hinh_url,
-      ngon_ngu: item.ngon_ngu || currentLanguage,
+      ngon_ngu: wordLang,
       chu_de: item.chu_de || 'Tổng hợp',
       cap_do: item.cap_do || 'Cơ bản',
       nguon_goc: item.nguon_goc || 'Tự thêm',
@@ -410,6 +421,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     items.forEach((item) => {
       if (!item.tu || !item.nghia) return;
+      const wordLang = resolveWordLanguage(item.tu.trim(), item.ngon_ngu);
       newItems.push({
         word_id: `w_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
         tu: item.tu.trim(),
@@ -418,9 +430,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loai_tu: item.loai_tu || 'Từ vựng',
         vi_du: item.vi_du || '',
         vi_du_dich: item.vi_du_dich || '',
+        nghia_tieng_han: item.nghia_tieng_han || '',
+        nghia_tieng_anh: item.nghia_tieng_anh || '',
+        phien_am_tieng_han: item.phien_am_tieng_han || '',
         audio_url: item.audio_url,
         hinh_url: item.hinh_url,
-        ngon_ngu: item.ngon_ngu || currentLanguage,
+        ngon_ngu: wordLang,
         chu_de: item.chu_de || 'Nhập file',
         cap_do: item.cap_do || 'Tổng hợp',
         nguon_goc: item.nguon_goc || 'Import CSV/Excel',

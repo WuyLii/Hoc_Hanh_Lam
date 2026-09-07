@@ -511,4 +511,42 @@ export class SupabaseService {
       return false;
     }
   }
+
+  /**
+   * Delete / Wipe all application data currently stored in Supabase Cloud
+   */
+  public static async clearAllCloudData(): Promise<{ success: boolean; message: string }> {
+    const client = this.getClient();
+    if (!client) {
+      return { success: false, message: 'Chưa cấu hình Supabase URL & Anon Key.' };
+    }
+
+    const tables = [
+      { name: 'vocabulary', pk: 'word_id' },
+      { name: 'grammar', pk: 'grammar_id' },
+      { name: 'decks', pk: 'deck_id' },
+      { name: 'user_profiles', pk: 'user_id' },
+      { name: 'review_sessions', pk: 'session_id' },
+      { name: 'mock_test_records', pk: 'test_id' },
+      { name: 'progress_records', pk: 'id' },
+      { name: 'journal_entries', pk: 'entry_id' },
+      { name: 'chat_conversations', pk: 'chat_id' },
+      { name: 'notifications', pk: 'noti_id' },
+    ];
+
+    try {
+      for (const t of tables) {
+        await client.from(t.name).delete().neq(t.pk, '___nonexistent_id_for_delete_all___');
+      }
+      return {
+        success: true,
+        message: 'Đã dọn dẹp và xóa sạch toàn bộ dữ liệu học tập trên Supabase Cloud thành công!',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Lỗi khi xóa dữ liệu Supabase: ${err.message || err}`,
+      };
+    }
+  }
 }

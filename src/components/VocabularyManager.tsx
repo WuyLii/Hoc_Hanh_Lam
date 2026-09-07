@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { VocabularyItem, LANGUAGES } from '../types';
 import { GoogleSheetsService } from '../services/googleSheetsService';
@@ -219,6 +219,82 @@ export const VocabularyManager: React.FC = () => {
   };
 
   // CSV Import / Export
+  const [isEnrichingBilingual, setIsEnrichingBilingual] = useState(false);
+
+  // Words that need bilingual cross-translation (Korean for English words, or English for Korean words)
+  const wordsNeedingBilingual = useMemo(() => {
+    if (currentLanguage !== 'ko' && currentLanguage !== 'en') return [];
+    return currentLangVocabulary.filter((w) => {
+      if (currentLanguage === 'ko') {
+        return !w.nghia_tieng_anh || w.nghia_tieng_anh.trim() === '';
+      }
+      if (currentLanguage === 'en') {
+        return !w.nghia_tieng_han || w.nghia_tieng_han.trim() === '';
+      }
+      return false;
+    });
+  }, [currentLangVocabulary, currentLanguage]);
+
+  const handleEnrichBilingual = async () => {
+    if (wordsNeedingBilingual.length === 0) {
+      alert(
+        currentLanguage === 'ko'
+          ? 'Tất cả các từ tiếng Hàn hiện đã có đầy đủ nghĩa tiếng Anh tương ứng!'
+          : 'Tất cả các từ tiếng Anh hiện đã có đầy đủ nghĩa tiếng Hàn tương ứng!'
+      );
+      return;
+    }
+
+    const batch = wordsNeedingBilingual.slice(0, 30);
+    setIsEnrichingBilingual(true);
+    try {
+      const res = await fetch('/api/gemini/fill-missing-bilingual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: currentLanguage,
+          words: batch.map((w) => ({
+            word_id: w.word_id,
+            tu: w.tu,
+            nghia: w.nghia,
+            ngon_ngu: w.ngon_ngu,
+          })),
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Lỗi khi bổ sung nghĩa đối ứng bằng AI');
+      }
+
+      const data = await res.json();
+      const resultsMap = new Map<string, any>();
+      (data.results || []).forEach((r: any) => {
+        if (r.word_id) resultsMap.set(r.word_id, r);
+      });
+
+      let updatedCount = 0;
+      batch.forEach((w) => {
+        const enriched = resultsMap.get(w.word_id);
+        if (enriched) {
+          updateVocabulary({
+            ...w,
+            nghia_tieng_han: enriched.nghia_tieng_han || w.nghia_tieng_han || '',
+            nghia_tieng_anh: enriched.nghia_tieng_anh || w.nghia_tieng_anh || '',
+            phien_am: w.phien_am || enriched.phien_am || '',
+          });
+          updatedCount++;
+        }
+      });
+
+      alert(`🎉 Đã bổ sung thành công nghĩa đối ứng Anh ⇄ Hàn cho ${updatedCount} từ vựng bằng AI!`);
+    } catch (err: any) {
+      alert(err.message || 'Không thể bổ sung bằng AI');
+    } finally {
+      setIsEnrichingBilingual(false);
+    }
+  };
+
   const handleExportCSV = () => {
     GoogleSheetsService.exportToCSV(`PolyglotHub_Vocab_${currentLanguage.toUpperCase()}`, currentLangVocabulary);
   };
@@ -449,6 +525,32 @@ export const VocabularyManager: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5 text-amber-700" />
             <span>🤖 AI ĐỌC SÁCH & TRÍCH XUẤT</span>
           </button>
+
+          {(currentLanguage === 'ko' || currentLanguage === 'en') && (
+            <button
+              onClick={handleEnrichBilingual}
+              disabled={isEnrichingBilingual}
+              className={`flex items-center gap-1.5 px-3.5 py-2 border-2 text-xs font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm ${
+                wordsNeedingBilingual.length > 0
+                  ? 'border-indigo-800 bg-indigo-100 text-indigo-950 hover:bg-indigo-200'
+                  : 'border-stone-300 bg-stone-100 text-stone-600'
+              }`}
+              title={
+                currentLanguage === 'ko'
+                  ? 'Bổ sung nghĩa tiếng Anh tương ứng cho từ tiếng Hàn bằng AI'
+                  : 'Bổ sung nghĩa tiếng Hàn tương ứng cho từ tiếng Anh bằng AI'
+              }
+            >
+              <Languages className={`w-3.5 h-3.5 ${isEnrichingBilingual ? 'animate-spin' : 'text-indigo-700'}`} />
+              <span>
+                {isEnrichingBilingual
+                  ? 'ĐANG BỔ SUNG...'
+                  : wordsNeedingBilingual.length > 0
+                  ? `🇰🇷⇄🇬🇧 BỔ SUNG ĐỐI ỨNG (${wordsNeedingBilingual.length})`
+                  : '🇰🇷⇄🇬🇧 SONG NGỮ ĐỐI ỨNG ĐỦ'}
+              </span>
+            </button>
+          )}
 
           <button
             onClick={handleImportCSVClick}

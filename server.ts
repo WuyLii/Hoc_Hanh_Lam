@@ -7,6 +7,7 @@ import { createServer as createViteServer } from 'vite';
 import {
   handleOcrExtract,
   handleExtractTextbook,
+  handleFillMissingBilingual,
   handleChat,
   handleGenerateExample,
   handleRoleplay,
@@ -203,6 +204,17 @@ async function startServer() {
         ? 'Quá trình phân tích tài liệu mất quá nhiều thời gian hoặc tệp quá lớn (Lỗi 503: Quá thời gian chờ). Vui lòng thử lại với một phần chương ngắn hơn hoặc dán nội dung văn bản trực tiếp.'
         : (error?.message || 'Lỗi khi xử lý bóc tách sách');
       res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // 7b. AI Auto-fill Missing Bilingual Cross-meanings (Korean <-> English)
+  app.post('/api/gemini/fill-missing-bilingual', async (req, res) => {
+    try {
+      const result = await handleFillMissingBilingual(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error in /api/gemini/fill-missing-bilingual:', error);
+      res.status(500).json({ error: error?.message || 'Lỗi khi bổ sung nghĩa song ngữ đối ứng' });
     }
   });
 

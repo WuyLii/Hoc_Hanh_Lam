@@ -17,6 +17,7 @@ import {
   Eye,
   EyeOff,
   HelpCircle,
+  Trash2,
 } from 'lucide-react';
 
 export const SupabaseSettings: React.FC = () => {
@@ -340,6 +341,21 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authen
     setFeedback(res);
   };
 
+  const handleClearCloudData = async () => {
+    const ok = window.confirm(
+      '⚠️ CẢNH BÁO: Thao tác này sẽ xóa sạch TOÀN BỘ từ vựng, ngữ pháp và tiến độ học đang lưu trữ trên Cơ sở dữ liệu Supabase Cloud của bạn.\n\nBạn có chắc chắn muốn xóa hết không?'
+    );
+    if (!ok) return;
+
+    handleSaveConfig();
+    setIsSyncing(true);
+    setFeedback(null);
+
+    const res = await SupabaseService.clearAllCloudData();
+    setIsSyncing(false);
+    setFeedback(res);
+  };
+
   return (
     <div className="space-y-8">
       {/* Configuration Form Card */}
@@ -514,7 +530,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authen
           Chuyển đổi dữ liệu dễ dàng giữa ứng dụng học web và Cơ sở dữ liệu Supabase của bạn.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-4 border border-[#1A1A1A] flex flex-col justify-between space-y-3">
             <div>
               <div className="text-xs font-mono font-bold uppercase text-amber-800 flex items-center gap-1.5 mb-1">
@@ -528,7 +544,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authen
             <button
               onClick={handlePushToSupabase}
               disabled={isSyncing}
-              className="w-full py-2 bg-amber-600 text-white font-mono text-xs font-bold uppercase hover:bg-amber-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-2 bg-amber-600 text-white font-mono text-xs font-bold uppercase hover:bg-amber-700 transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Đẩy Dữ Liệu Lên Cloud</span>
@@ -548,10 +564,30 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authen
             <button
               onClick={handlePullFromSupabase}
               disabled={isSyncing}
-              className="w-full py-2 bg-blue-700 text-white font-mono text-xs font-bold uppercase hover:bg-blue-800 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-2 bg-blue-700 text-white font-mono text-xs font-bold uppercase hover:bg-blue-800 transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Tải Dữ Liệu Về Web</span>
+            </button>
+          </div>
+
+          <div className="bg-rose-50/50 p-4 border border-rose-300 flex flex-col justify-between space-y-3">
+            <div>
+              <div className="text-xs font-mono font-bold uppercase text-rose-800 flex items-center gap-1.5 mb-1">
+                <Trash2 className="w-4 h-4" />
+                <span>Xóa sạch Supabase Cloud</span>
+              </div>
+              <p className="text-xs text-stone-600">
+                Xóa toàn bộ các bản ghi từ vựng, ngữ pháp và tiến độ đang lưu trên Cơ sở dữ liệu Supabase để làm sạch hoàn toàn.
+              </p>
+            </div>
+            <button
+              onClick={handleClearCloudData}
+              disabled={isSyncing}
+              className="w-full py-2 bg-rose-700 text-white font-mono text-xs font-bold uppercase hover:bg-rose-800 transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Xóa Sạch Dữ Liệu Cloud</span>
             </button>
           </div>
         </div>

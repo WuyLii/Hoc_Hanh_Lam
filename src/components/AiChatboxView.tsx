@@ -198,11 +198,13 @@ export const AiChatboxView: React.FC = () => {
     }
   };
 
-  const handleSaveSuggestedWord = (item: { word: string; meaning: string; phonetic?: string }) => {
+  const handleSaveSuggestedWord = (item: { word: string; meaning: string; phonetic?: string; nghia_tieng_han?: string; nghia_tieng_anh?: string }) => {
     addVocabulary({
       tu: item.word,
       nghia: item.meaning,
       phien_am: item.phonetic || '',
+      nghia_tieng_han: item.nghia_tieng_han || '',
+      nghia_tieng_anh: item.nghia_tieng_anh || '',
       loai_tu: 'Từ vựng',
       cap_do: 'Gia sư AI',
       chu_de: 'Tư vấn AI',

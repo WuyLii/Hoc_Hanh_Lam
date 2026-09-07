@@ -1,4 +1,5 @@
 export type LanguageCode = 'en' | 'ko' | 'zh';
+export type Language = LanguageCode;
 
 export interface LanguageInfo {
   code: LanguageCode;
@@ -333,6 +334,8 @@ export interface ExtractedVocabItem {
   nghia: string;
   phien_am?: string;
   loai_tu?: string;
+  nghia_tieng_han?: string;
+  nghia_tieng_anh?: string;
   unit?: string;
   vi_du?: string;
   vi_du_dich?: string;

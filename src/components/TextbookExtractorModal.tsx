@@ -161,6 +161,9 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
           vi_du: v.vi_du || '',
           vi_du_dich: v.vi_du_dich || '',
           ngon_ngu: currentLanguage,
+          nghia_tieng_han: v.nghia_tieng_han || '',
+          nghia_tieng_anh: v.nghia_tieng_anh || '',
+          nguon_goc: `Sách: ${result.bookTitle || 'Giáo trình AI'}`,
         });
       }
     });
@@ -439,6 +442,17 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
                               {v.phien_am && <span className="mr-2 italic">[{v.phien_am}]</span>}
                               <strong className="text-emerald-900">{v.nghia}</strong>
                             </div>
+                            {/* Bilingual Cross Meaning */}
+                            {v.nghia_tieng_han && (
+                              <div className="text-[11px] font-mono text-indigo-950 bg-indigo-50 px-1.5 py-0.5 border border-indigo-200 mt-1">
+                                <span className="font-bold text-indigo-900">🇰🇷 Tiếng Hàn:</span> {v.nghia_tieng_han}
+                              </div>
+                            )}
+                            {v.nghia_tieng_anh && (
+                              <div className="text-[11px] font-mono text-sky-950 bg-sky-50 px-1.5 py-0.5 border border-sky-200 mt-1">
+                                <span className="font-bold text-sky-900">🇬🇧 Tiếng Anh:</span> {v.nghia_tieng_anh}
+                              </div>
+                            )}
                             {v.vi_du && (
                               <div className="text-[11px] font-serif italic text-stone-700 border-t border-stone-200 pt-1 mt-1">
                                 <div>"{v.vi_du}"</div>

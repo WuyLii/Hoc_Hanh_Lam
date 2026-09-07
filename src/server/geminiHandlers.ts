@@ -254,6 +254,8 @@ Nếu trong phản hồi có các từ vựng mới tiêu biểu đáng lưu và
     "meaning": "nghĩa tiếng Việt",
     "phonetic": "phiên âm",
     "type": "loại từ",
+    "nghia_tieng_han": "Từ/nghĩa tiếng Hàn tương ứng kèm Romaja nếu từ là tiếng Anh (ví dụ: 포기하다 [po-gi-ha-da])",
+    "nghia_tieng_anh": "Từ/nghĩa tiếng Anh tương ứng nếu từ là tiếng Hàn (ví dụ: to give up, abandon)",
     "example": "ví dụ",
     "exampleVi": "dịch ví dụ"
   }
@@ -508,9 +510,34 @@ export async function handleOcrExtract(body: any) {
 YÊU CẦU QUAN TRỌNG HÀNG ĐẦU - ĐỌC VÀ TRÍCH XUẤT 100% TOÀN BỘ DỮ LIỆU:
 1. TRÍCH XUẤT ĐẦY ĐỦ 100% CÁC TỪ VỰNG: Hãy đọc lần lượt từng dòng, từng cột, từng ô từ góc trên trái xuống góc dưới phải của tất cả hình ảnh. Nếu ảnh chứa bảng từ vựng hoặc danh sách 40, 50, 60 hay 100 từ, bạn BẮT BUỘC TRÍCH XUẤT BẰNG HẾT TOÀN BỘ TẤT CẢ TỪ VỰNG vào mảng "words".
 2. TUYỆT ĐỐI KHÔNG DỪNG LẠI GIỮA CHỪNG: KHÔNG ĐƯỢC TÓM TẮT, KHÔNG ĐƯỢC CHỈ LẤY 10-15 TỪ MẪU. Hãy kiên trì liệt kê từng từ một cho đến từ cuối cùng trong tài liệu.
-3. PHÂN TÍCH TỪNG TỪ:
+
+3. QUY TẮC ĐỐI ỨNG ANH - HÀN BẮT BUỘC (YÊU CẦU QUAN TRỌNG TỪ NGƯỜI DÙNG):
+   ★ TỪ TIẾNG HÀN BẮT BUỘC PHẢI CÓ NGHĨA TIẾNG ANH TƯƠNG ỨNG ("nghia_tieng_anh")!
+   ★ TỪ TIẾNG ANH BẮT BUỘC PHẢI CÓ NGHĨA TIẾNG HÀN TƯƠNG ỨNG KÈM ROMAJA ("nghia_tieng_han")!
+   
+   - Nếu từ vựng là Tiếng Hàn (${language === 'ko'} hoặc từ gốc là Tiếng Hàn):
+     • "tu": Từ tiếng Hàn (Hangul).
+     • "phien_am": Phiên âm Romaja chuẩn (ví dụ: [po-gi-ha-da]).
+     • "nghia": Nghĩa Tiếng Việt chuẩn xác theo ngữ cảnh bài học.
+     • "nghia_tieng_anh": BẮT BUỘC PHẢI CÓ từ/nghĩa Tiếng Anh tương ứng chính xác (ví dụ: nếu từ là "포기하다" thì "nghia_tieng_anh": "to give up, abandon"; nếu từ là "생일" thì "nghia_tieng_anh": "birthday"). Nếu trên ảnh có sẵn cột tiếng Anh thì lấy đúng theo ảnh; nếu ảnh KHÔNG có tiếng Anh thì AI BẮT BUỘC TỰ ĐỘNG DỊCH CHUẨN sang tiếng Anh. TUYỆT ĐỐI KHÔNG ĐỂ TRỐNG!
+     • "nghia_tieng_han": Để chuỗi rỗng "".
+
+   - Nếu từ vựng là Tiếng Anh (${language === 'en'} hoặc từ gốc là Tiếng Anh):
+     • "tu": Từ tiếng Anh.
+     • "phien_am": Phiên âm IPA chuẩn quốc tế (ví dụ: /əˈbændən/).
+     • "nghia": Nghĩa Tiếng Việt chuẩn xác theo ngữ cảnh bài học.
+     • "nghia_tieng_han": BẮT BUỘC PHẢI CÓ từ/nghĩa Tiếng Hàn tương ứng kèm phiên âm Romaja trong ngoặc vuông (ví dụ: nếu từ là "abandon" thì "nghia_tieng_han": "포기하다, 버리다 [po-gi-ha-da]"; nếu từ là "birthday" thì "nghia_tieng_han": "생일 [saeng-il]"). Nếu trên ảnh có sẵn cột tiếng Hàn thì lấy đúng theo ảnh; nếu ảnh KHÔNG có tiếng Hàn thì AI BẮT BUỘC TỰ ĐỘNG DỊCH CHUẨN sang tiếng Hàn kèm Romaja. TUYỆT ĐỐI KHÔNG ĐỂ TRỐNG!
+     • "nghia_tieng_anh": Để chuỗi rỗng "".
+
+   - Nếu ảnh là bảng từ vựng song ngữ (ví dụ có 1 cột Tiếng Hàn và 1 cột Tiếng Anh, hoặc bài học giải nghĩa qua lại):
+     • Ghép nối chính xác từng cặp từ đối ứng với nhau trên từng dòng.
+     • Cả hai trường "nghia_tieng_han" và "nghia_tieng_anh" đều được trích xuất chuẩn, kết hợp cùng nghĩa Tiếng Việt "nghia".
+
+4. PHÂN TÍCH TỪNG TỪ:
    - "tu": Từ/cụm từ chính xác trong ảnh (${langName}).
    - "nghia": Nghĩa Tiếng Việt đầy đủ, chuẩn xác theo ngữ cảnh bài học.
+   - "nghia_tieng_han": Nghĩa tiếng Hàn tương ứng kèm Romaja (nếu từ là tiếng Anh, BẮT BUỘC).
+   - "nghia_tieng_anh": Nghĩa tiếng Anh tương ứng (nếu từ là tiếng Hàn, BẮT BUỘC).
    - "phien_am": Phiên âm chuẩn (IPA cho Tiếng Anh, Romaja cho Tiếng Hàn, Pinyin có dấu thanh cho Tiếng Trung).
    - "loai_tu": Loại từ (Danh từ, Động từ, Tính từ, Trạng từ, Cụm từ...).
    - "cap_do": ${levelGuide}.
@@ -518,7 +545,7 @@ YÊU CẦU QUAN TRỌNG HÀNG ĐẦU - ĐỌC VÀ TRÍCH XUẤT 100% TOÀN BỘ 
    - "vi_du": Câu ví dụ ngắn gọn, tự nhiên minh họa từ (nếu trong ảnh có sẵn câu thì lấy trong ảnh, nếu không có thì AI tự tạo câu chuẩn).
    - "vi_du_dich": Dịch nghĩa câu ví dụ sang Tiếng Việt.
 
-4. TRÍCH XUẤT NGỮ PHÁP (nếu có trong ảnh): Liệt kê các cấu trúc/mẫu câu xuất hiện trong ảnh vào mảng "grammar".
+5. TRÍCH XUẤT NGỮ PHÁP (nếu có trong ảnh): Liệt kê các cấu trúc/mẫu câu xuất hiện trong ảnh vào mảng "grammar".
 
 Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
 {
@@ -528,6 +555,8 @@ Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
     {
       "tu": "từ hoặc cụm từ",
       "nghia": "nghĩa tiếng Việt",
+      "nghia_tieng_han": "Từ/nghĩa tiếng Hàn tương ứng kèm Romaja (BẮT BUỘC khi từ là tiếng Anh, ví dụ: 포기하다 [po-gi-ha-da])",
+      "nghia_tieng_anh": "Từ/nghĩa tiếng Anh tương ứng (BẮT BUỘC khi từ là tiếng Hàn, ví dụ: to give up, abandon)",
       "phien_am": "phiên âm",
       "loai_tu": "loại từ",
       "cap_do": "TOEIC 650 / TOPIK 2 / HSK 3",
@@ -579,7 +608,12 @@ Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
     maxOutputTokens: 16384,
   });
 
-  return safeParseJSON(response.text || '{}');
+  const parsed = safeParseJSON(response.text || '{}');
+  if (Array.isArray(parsed.words) && parsed.words.length > 0) {
+    parsed.words = await ensureBilingualMeanings(parsed.words, language);
+  }
+
+  return parsed;
 }
 
 export async function handleExtractTextbook(body: any) {
@@ -609,6 +643,11 @@ Tài liệu: ${fileName || 'Sách giáo khoa'}.
 Chế độ: ${extractMode === 'vocab' ? 'Chỉ từ vựng' : extractMode === 'grammar' ? 'Chỉ ngữ pháp' : 'Toàn diện'}.
 ${customInstruction ? `Yêu cầu: ${customInstruction}` : ''}
 
+QUY TẮC ĐỐI ỨNG ANH - HÀN BẮT BUỘC:
+- Mọi từ Tiếng Hàn BẮT BUỘC phải có nghĩa Tiếng Anh tương ứng ("nghia_tieng_anh").
+- Mọi từ Tiếng Anh BẮT BUỘC phải có nghĩa Tiếng Hàn tương ứng kèm Romaja ("nghia_tieng_han").
+- Dù tài liệu sách có song ngữ hay chỉ đơn ngữ, AI BẮT BUỘC tự điền đầy đủ cả nghĩa Tiếng Việt ("nghia") lẫn nghĩa ngôn ngữ đối ứng.
+
 Trả về JSON thuần tuý:
 {
   "bookTitle": "Tên sách",
@@ -620,9 +659,11 @@ Trả về JSON thuần tuý:
   "vocabulary": [
     {
       "tu": "từ",
-      "nghia": "nghĩa",
+      "nghia": "nghĩa tiếng Việt",
       "phien_am": "phiên âm",
       "loai_tu": "loại từ",
+      "nghia_tieng_han": "Từ/nghĩa tiếng Hàn tương ứng kèm Romaja nếu từ là tiếng Anh (ví dụ: 포기하다 [po-gi-ha-da])",
+      "nghia_tieng_anh": "Từ/nghĩa tiếng Anh tương ứng nếu từ là tiếng Hàn (ví dụ: to give up, abandon)",
       "unit": "Bài 1",
       "vi_du": "ví dụ",
       "vi_du_dich": "dịch",
@@ -677,5 +718,147 @@ Trả về JSON thuần tuý:
     responseMimeType: 'application/json',
   });
 
-  return safeParseJSON(response.text || '{}');
+  const parsed = safeParseJSON(response.text || '{}');
+  if (Array.isArray(parsed.vocabularies) && parsed.vocabularies.length > 0) {
+    parsed.vocabularies = await ensureBilingualMeanings(parsed.vocabularies, language);
+  } else if (Array.isArray(parsed.words) && parsed.words.length > 0) {
+    parsed.words = await ensureBilingualMeanings(parsed.words, language);
+  }
+
+  return parsed;
 }
+
+/**
+ * Đảm bảo 100% từ vựng trích xuất:
+ * - Từ tiếng Hàn (Hangul) BẮT BUỘC có nghĩa tiếng Anh (nghia_tieng_anh) & ngon_ngu = 'ko'
+ * - Từ tiếng Anh BẮT BUỘC có nghĩa tiếng Hàn (nghia_tieng_han kèm Romaja) & ngon_ngu = 'en'
+ * Tự động chạy bổ sung AI nếu thiếu trước khi trả về cho client.
+ */
+async function ensureBilingualMeanings(words: any[], defaultLanguage?: string): Promise<any[]> {
+  if (!Array.isArray(words) || words.length === 0) return words;
+
+  const isHangul = (text: string) => /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/.test(text || '');
+  const isChinese = (text: string) => /[\u4E00-\u9FFF]/.test(text || '');
+
+  const missingList: any[] = [];
+
+  words.forEach((w, index) => {
+    // 1. Phân loại ngôn ngữ chuẩn xác dựa trên ký tự từ vựng
+    if (isHangul(w.tu)) {
+      w.ngon_ngu = 'ko';
+    } else if (isChinese(w.tu)) {
+      w.ngon_ngu = 'zh';
+    } else if (defaultLanguage === 'en' || !isHangul(w.tu)) {
+      w.ngon_ngu = defaultLanguage || 'en';
+    } else {
+      w.ngon_ngu = defaultLanguage || 'ko';
+    }
+
+    // 2. Kiểm tra nếu là từ tiếng Hàn mà thiếu nghĩa tiếng Anh
+    if (w.ngon_ngu === 'ko') {
+      if (!w.nghia_tieng_anh || String(w.nghia_tieng_anh).trim() === '') {
+        missingList.push({
+          index,
+          tu: w.tu,
+          nghia: w.nghia,
+          ngon_ngu: 'ko',
+        });
+      }
+    }
+
+    // 3. Kiểm tra nếu là từ tiếng Anh mà thiếu nghĩa tiếng Hàn
+    if (w.ngon_ngu === 'en') {
+      if (!w.nghia_tieng_han || String(w.nghia_tieng_han).trim() === '') {
+        missingList.push({
+          index,
+          tu: w.tu,
+          nghia: w.nghia,
+          ngon_ngu: 'en',
+        });
+      }
+    }
+  });
+
+  // Nếu có từ bị thiếu nghĩa đối ứng, lập tức gọi AI bổ sung hàng loạt trước khi trả về
+  if (missingList.length > 0) {
+    try {
+      const fillResult = await handleFillMissingBilingual({
+        language: defaultLanguage || 'ko',
+        words: missingList.map((m) => ({
+          word_id: String(m.index),
+          tu: m.tu,
+          nghia: m.nghia,
+          ngon_ngu: m.ngon_ngu,
+        })),
+      });
+
+      if (Array.isArray(fillResult.results)) {
+        fillResult.results.forEach((r: any) => {
+          const idx = parseInt(r.word_id, 10);
+          if (!isNaN(idx) && words[idx]) {
+            if (r.nghia_tieng_anh && (!words[idx].nghia_tieng_anh || words[idx].nghia_tieng_anh.trim() === '')) {
+              words[idx].nghia_tieng_anh = r.nghia_tieng_anh;
+            }
+            if (r.nghia_tieng_han && (!words[idx].nghia_tieng_han || words[idx].nghia_tieng_han.trim() === '')) {
+              words[idx].nghia_tieng_han = r.nghia_tieng_han;
+            }
+            if (r.phien_am && (!words[idx].phien_am || words[idx].phien_am.trim() === '')) {
+              words[idx].phien_am = r.phien_am;
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Tự động bổ sung nghĩa đối ứng AI trong lúc đọc tài liệu thất bại:', err);
+    }
+  }
+
+  return words;
+}
+
+export async function handleFillMissingBilingual(body: any) {
+  const { words, language } = body;
+  if (!Array.isArray(words) || words.length === 0) {
+    return { results: [] };
+  }
+
+  const ai = getGenAI();
+  const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
+
+  const prompt = `Bạn là chuyên gia ngôn ngữ học đối chiếu Anh - Hàn - Việt.
+Nhiệm vụ: Cung cấp nghĩa đối ứng chính xác tuyệt đối cho danh sách từ vựng ${langName} sau:
+- Với từ Tiếng Hàn (ko): BẮT BUỘC cung cấp từ/nghĩa tương đương trong Tiếng Anh ("nghia_tieng_anh") (ví dụ: 포기하다 -> to give up / abandon).
+- Với từ Tiếng Anh (en): BẮT BUỘC cung cấp từ/nghĩa tương đương trong Tiếng Hàn kèm Romaja ("nghia_tieng_han") (ví dụ: abandon -> 포기하다, 버리다 [po-gi-ha-da]).
+
+Danh sách từ cần bổ sung:
+${JSON.stringify(
+  words.map((w: any) => ({
+    word_id: w.word_id,
+    tu: w.tu,
+    nghia: w.nghia,
+    ngon_ngu: w.ngon_ngu || language,
+  })),
+  null,
+  2
+)}
+
+Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
+{
+  "results": [
+    {
+      "word_id": "word_id từ danh sách",
+      "nghia_tieng_han": "Từ/nghĩa tiếng Hàn tương ứng kèm Romaja (nếu từ là tiếng Anh, ví dụ: 생일 [saeng-il])",
+      "nghia_tieng_anh": "Từ/nghĩa tiếng Anh tương ứng chuẩn xác (nếu từ là tiếng Hàn, ví dụ: birthday)",
+      "phien_am": "Phiên âm chuẩn bổ sung nếu thiếu (IPA cho Anh, Romaja cho Hàn)"
+    }
+  ]
+}`;
+
+  const response = await callNonTutorGeminiWithRetry(ai, prompt, {
+    responseMimeType: 'application/json',
+    temperature: 0.1,
+  });
+
+  return safeParseJSON(response.text || '{"results":[]}');
+}
+
