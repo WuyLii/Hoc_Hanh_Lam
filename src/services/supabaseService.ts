@@ -19,6 +19,8 @@ export interface SupabaseConfig {
   autoSync: boolean;
 }
 
+export const DEFAULT_SUPABASE_URL = 'https://fzdxabrvddjtpnbjvcii.supabase.co';
+
 const STORAGE_KEY = 'hoc_hanh_lam_supabase_config';
 
 export class SupabaseService {
@@ -44,8 +46,17 @@ export class SupabaseService {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const rawUrl = parsed.url;
+        const validUrl =
+          rawUrl &&
+          !rawUrl.includes('your-project-id') &&
+          !rawUrl.includes('example.co') &&
+          !rawUrl.includes('xyzcompany')
+            ? rawUrl
+            : DEFAULT_SUPABASE_URL;
+
         return {
-          url: this.normalizeUrl(parsed.url || ''),
+          url: this.normalizeUrl(validUrl),
           anonKey: this.cleanKey(parsed.anonKey || ''),
           autoSync: Boolean(parsed.autoSync),
         };
@@ -55,11 +66,11 @@ export class SupabaseService {
     }
 
     // Fallback to environment variables if present
-    const envUrl = import.meta.env.VITE_SUPABASE_URL || (import.meta.env as any).SUPABASE_URL || '';
+    const envUrl = import.meta.env.VITE_SUPABASE_URL || (import.meta.env as any).SUPABASE_URL || DEFAULT_SUPABASE_URL;
     const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || (import.meta.env as any).SUPABASE_ANON_KEY || '';
 
     return {
-      url: this.normalizeUrl(envUrl),
+      url: this.normalizeUrl(envUrl || DEFAULT_SUPABASE_URL),
       anonKey: this.cleanKey(envKey),
       autoSync: false,
     };
@@ -471,16 +482,27 @@ export class SupabaseService {
   }
 
   /**
-   * Delete a vocabulary item from Supabase
+   * Delete vocabulary item(s) from Supabase
    */
-  public static async deleteVocabulary(wordId: string): Promise<boolean> {
+  public static async deleteVocabulary(
+    wordIds: string | string[]
+  ): Promise<{ success: boolean; message: string }> {
     const client = this.getClient();
-    if (!client) return false;
+    const ids = Array.isArray(wordIds) ? wordIds : [wordIds];
+    if (!client || ids.length === 0) {
+      return { success: true, message: 'Không có từ cần xóa' };
+    }
+
     try {
-      const { error } = await client.from('vocabulary').delete().eq('word_id', wordId);
-      return !error;
-    } catch (e) {
-      return false;
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100);
+        const { error } = await client.from('vocabulary').delete().in('word_id', chunk);
+        if (error) throw error;
+      }
+      return { success: true, message: `Đã xóa ${ids.length} từ khỏi Supabase Cloud thành công` };
+    } catch (err: any) {
+      console.error('Lỗi khi xóa từ vựng khỏi Supabase:', err);
+      return { success: false, message: err?.message || String(err) };
     }
   }
 
@@ -499,16 +521,49 @@ export class SupabaseService {
   }
 
   /**
-   * Delete a grammar item from Supabase
+   * Delete grammar item(s) from Supabase
    */
-  public static async deleteGrammar(grammarId: string): Promise<boolean> {
+  public static async deleteGrammar(
+    grammarIds: string | string[]
+  ): Promise<{ success: boolean; message: string }> {
     const client = this.getClient();
-    if (!client) return false;
+    const ids = Array.isArray(grammarIds) ? grammarIds : [grammarIds];
+    if (!client || ids.length === 0) {
+      return { success: true, message: 'Không có ngữ pháp cần xóa' };
+    }
+
     try {
-      const { error } = await client.from('grammar').delete().eq('grammar_id', grammarId);
-      return !error;
-    } catch (e) {
-      return false;
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100);
+        const { error } = await client.from('grammar').delete().in('grammar_id', chunk);
+        if (error) throw error;
+      }
+      return { success: true, message: `Đã xóa ${ids.length} ngữ pháp khỏi Supabase Cloud` };
+    } catch (err: any) {
+      console.error('Lỗi khi xóa ngữ pháp khỏi Supabase:', err);
+      return { success: false, message: err?.message || String(err) };
+    }
+  }
+
+  /**
+   * Delete specific decks by their deck_id list from Supabase Cloud
+   */
+  public static async deleteDecks(deckIds: string[]): Promise<{ success: boolean; message: string }> {
+    const client = this.getClient();
+    if (!client || !deckIds || deckIds.length === 0) {
+      return { success: true, message: 'Không có bộ thẻ cần xóa' };
+    }
+
+    try {
+      for (let i = 0; i < deckIds.length; i += 100) {
+        const chunk = deckIds.slice(i, i + 100);
+        const { error } = await client.from('decks').delete().in('deck_id', chunk);
+        if (error) throw error;
+      }
+      return { success: true, message: `Đã xóa ${deckIds.length} bộ thẻ khỏi Supabase Cloud` };
+    } catch (err: any) {
+      console.error('Lỗi khi xóa bộ thẻ khỏi Supabase:', err);
+      return { success: false, message: err?.message || String(err) };
     }
   }
 

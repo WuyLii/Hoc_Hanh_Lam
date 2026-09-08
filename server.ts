@@ -48,15 +48,47 @@ function serverDeduplicateVocab(items: any[]): any[] {
   items.forEach((item) => {
     if (!item) return;
     const wordKey = String(item.tu || '').trim().toLowerCase();
-    const meaningKey = String(item.nghia || '').trim().toLowerCase();
     const langKey = String(item.ngon_ngu || 'ko').trim().toLowerCase();
     if (!wordKey && !item.word_id) return;
-    const key = `${langKey}:${wordKey}:${meaningKey}`;
+    const key = `${langKey}:${wordKey}`;
     if (!map.has(key)) {
       map.set(key, { ...item, tu: String(item.tu || '').trim(), nghia: String(item.nghia || '').trim() });
     } else {
       const existing = map.get(key);
-      map.set(key, { ...existing, ...item });
+      const existingSrs = existing.srs_box || 0;
+      const incomingSrs = item.srs_box || 0;
+      const primary = incomingSrs >= existingSrs ? item : existing;
+      const secondary = incomingSrs >= existingSrs ? existing : item;
+
+      let mergedNghia = String(existing.nghia || '').trim();
+      const incomingNghia = String(item.nghia || '').trim();
+      if (!mergedNghia) {
+        mergedNghia = incomingNghia;
+      } else if (incomingNghia && !mergedNghia.toLowerCase().includes(incomingNghia.toLowerCase())) {
+        mergedNghia = `${mergedNghia}, ${incomingNghia}`;
+      }
+
+      map.set(key, {
+        ...secondary,
+        ...primary,
+        word_id: primary.word_id || existing.word_id || item.word_id,
+        tu: String(primary.tu || existing.tu || '').trim(),
+        nghia: mergedNghia,
+        phien_am: primary.phien_am || secondary.phien_am || '',
+        loai_tu: primary.loai_tu || secondary.loai_tu || 'Từ vựng',
+        vi_du: (primary.vi_du && primary.vi_du.length > 5) ? primary.vi_du : (secondary.vi_du || primary.vi_du || ''),
+        vi_du_dich: (primary.vi_du_dich && primary.vi_du_dich.length > 3) ? primary.vi_du_dich : (secondary.vi_du_dich || primary.vi_du_dich || ''),
+        nghia_tieng_han: primary.nghia_tieng_han || secondary.nghia_tieng_han || '',
+        nghia_tieng_anh: primary.nghia_tieng_anh || secondary.nghia_tieng_anh || '',
+        phien_am_tieng_han: primary.phien_am_tieng_han || secondary.phien_am_tieng_han || '',
+        chu_de: primary.chu_de || secondary.chu_de || 'Tổng hợp',
+        cap_do: primary.cap_do || secondary.cap_do || 'Cơ bản',
+        srs_box: Math.max(existingSrs, incomingSrs),
+        times_reviewed: (existing.times_reviewed || 0) + (item.times_reviewed || 0),
+        times_correct: (existing.times_correct || 0) + (item.times_correct || 0),
+        last_reviewed: primary.last_reviewed || secondary.last_reviewed || null,
+        created_at: existing.created_at || item.created_at || new Date().toISOString(),
+      });
     }
   });
   return Array.from(map.values());
@@ -68,15 +100,28 @@ function serverDeduplicateGrammar(items: any[]): any[] {
   items.forEach((item) => {
     if (!item) return;
     const structKey = String(item.cau_truc || '').trim().toLowerCase();
-    const meaningKey = String(item.y_nghia || '').trim().toLowerCase();
     const langKey = String(item.ngon_ngu || 'ko').trim().toLowerCase();
     if (!structKey) return;
-    const key = `${langKey}:${structKey}:${meaningKey}`;
+    const key = `${langKey}:${structKey}`;
     if (!map.has(key)) {
       map.set(key, { ...item, cau_truc: String(item.cau_truc || '').trim() });
     } else {
       const existing = map.get(key);
-      map.set(key, { ...existing, ...item });
+      let mergedGiaiThich = String(existing.giai_thich || '').trim();
+      const incomingGiaiThich = String(item.giai_thich || item.y_nghia || '').trim();
+      if (!mergedGiaiThich) {
+        mergedGiaiThich = incomingGiaiThich;
+      } else if (incomingGiaiThich && !mergedGiaiThich.toLowerCase().includes(incomingGiaiThich.toLowerCase())) {
+        mergedGiaiThich = `${mergedGiaiThich}; ${incomingGiaiThich}`;
+      }
+      map.set(key, {
+        ...existing,
+        ...item,
+        grammar_id: existing.grammar_id || item.grammar_id,
+        giai_thich: mergedGiaiThich,
+        vi_du: item.vi_du || existing.vi_du || '',
+        vi_du_dich: item.vi_du_dich || existing.vi_du_dich || '',
+      });
     }
   });
   return Array.from(map.values());
@@ -314,6 +359,24 @@ async function startServer() {
     } catch (err: any) {
       console.error('Error in /api/sync/store:', err);
       res.status(500).json({ error: 'Lỗi khi lưu trữ dữ liệu đám mây' });
+    }
+  });
+
+  app.post('/api/sync/delete-words', (req, res) => {
+    try {
+      const { wordIds } = req.body;
+      if (Array.isArray(wordIds) && wordIds.length > 0) {
+        const idSet = new Set(wordIds);
+        if (Array.isArray(memoryStore.vocabulary)) {
+          memoryStore.vocabulary = memoryStore.vocabulary.filter((w: any) => !idSet.has(w.word_id));
+        }
+        memoryStore.lastUpdated = new Date().toISOString();
+        saveMemoryStore();
+      }
+      res.json({ success: true, count: wordIds?.length || 0, store: memoryStore });
+    } catch (err: any) {
+      console.error('Error in /api/sync/delete-words:', err);
+      res.status(500).json({ error: err.message });
     }
   });
 

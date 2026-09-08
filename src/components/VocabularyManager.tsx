@@ -33,6 +33,7 @@ export const VocabularyManager: React.FC = () => {
     updateVocabulary,
     deleteVocabulary,
     batchDeleteVocabulary,
+    cleanAllDuplicates,
     batchAddVocabulary,
     selectedLevelFilter,
     setSelectedLevelFilter,
@@ -651,18 +652,30 @@ export const VocabularyManager: React.FC = () => {
 
             {/* Quick Duplicate Filter Toggle */}
             {duplicateWordSet.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowOnlyDuplicates((prev) => !prev)}
-                className={`px-2.5 py-1 border text-[10px] font-bold font-mono uppercase transition flex items-center gap-1 ${
-                  showOnlyDuplicates
-                    ? 'bg-rose-600 text-white border-rose-800'
-                    : 'bg-[#F9F7F2] text-rose-900 border-rose-300 hover:border-rose-600'
-                }`}
-              >
-                <CopyCheck className="w-3 h-3" />
-                <span>⚠️ CHỈ HIỆN TỪ TRÙNG ({duplicateWordSet.size} NHÓM)</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowOnlyDuplicates((prev) => !prev)}
+                  className={`px-2.5 py-1 border text-[10px] font-bold font-mono uppercase transition flex items-center gap-1 ${
+                    showOnlyDuplicates
+                      ? 'bg-rose-600 text-white border-rose-800'
+                      : 'bg-[#F9F7F2] text-rose-900 border-rose-300 hover:border-rose-600'
+                  }`}
+                >
+                  <CopyCheck className="w-3 h-3" />
+                  <span>⚠️ CHỈ HIỆN TỪ TRÙNG ({duplicateWordSet.size} NHÓM)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsDuplicateModalOpen(true)}
+                  className="px-2.5 py-1 border border-amber-500 bg-amber-100 hover:bg-amber-200 text-amber-950 text-[10px] font-bold font-mono uppercase transition flex items-center gap-1"
+                  title="Mở bảng xử lý và xóa từ trùng"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-600" />
+                  <span>⚡ XỬ LÝ TRÙNG LẶP</span>
+                </button>
+              </>
             )}
           </div>
           
@@ -1224,9 +1237,8 @@ export const VocabularyManager: React.FC = () => {
         isOpen={isDuplicateModalOpen}
         onClose={() => setIsDuplicateModalOpen(false)}
         vocabularyItems={currentLangVocabulary}
-        onDeleteWords={(wordIds) => {
-          batchDeleteVocabulary(wordIds);
-        }}
+        onDeleteWords={batchDeleteVocabulary}
+        onAutoCleanAll={() => cleanAllDuplicates(currentLanguage)}
         currentLanguage={currentLanguage}
       />
     </div>

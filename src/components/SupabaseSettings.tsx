@@ -36,7 +36,26 @@ export const SupabaseSettings: React.FC = () => {
     exportToSupabase,
   } = useApp();
 
-  const [config, setConfig] = useState<SupabaseConfig>(SupabaseService.getConfig());
+  const [config, setConfig] = useState<SupabaseConfig>(() => {
+    const current = SupabaseService.getConfig();
+    if (!current.url || current.url.includes('example.co') || current.url.includes('your-project-id')) {
+      const updated = { ...current, url: 'https://fzdxabrvddjtpnbjvcii.supabase.co' };
+      SupabaseService.saveConfig(updated);
+      return updated;
+    }
+    return current;
+  });
+
+  useEffect(() => {
+    // Automatically persist to ensure saved state has the target URL
+    const current = SupabaseService.getConfig();
+    if (current.url !== 'https://fzdxabrvddjtpnbjvcii.supabase.co' && (!current.url || current.url.includes('example.co') || current.url.includes('your-project-id'))) {
+      const updated = { ...current, url: 'https://fzdxabrvddjtpnbjvcii.supabase.co' };
+      SupabaseService.saveConfig(updated);
+      setConfig(updated);
+    }
+  }, []);
+
   const [showKey, setShowKey] = useState(false);
   const [hasCopiedSql, setHasCopiedSql] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -377,10 +396,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authen
             <div className="relative">
               <Globe2 className="w-4 h-4 absolute left-3 top-3 text-stone-400" />
               <input
+                id="supabase-project-url-input"
                 type="text"
                 value={config.url}
                 onChange={(e) => setConfig({ ...config, url: e.target.value.trim() })}
-                placeholder="https://xyzcompany.supabase.co"
+                placeholder="https://fzdxabrvddjtpnbjvcii.supabase.co"
                 className="w-full pl-9 pr-4 py-2 bg-white border border-[#1A1A1A] font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>

@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { VocabularyItem, LanguageCode, LANGUAGES } from '../types';
-import { ttsService } from '../services/ttsService';
 import { SpeakButton } from './SpeakButton';
 import {
   X,
@@ -9,20 +8,20 @@ import {
   Check,
   AlertTriangle,
   Sparkles,
-  Volume2,
   Search,
-  Filter,
   CheckSquare,
-  Square,
   RotateCcw,
   ShieldCheck,
+  Loader2,
+  Zap,
 } from 'lucide-react';
 
 interface DuplicateVocabModalProps {
   isOpen: boolean;
   onClose: () => void;
   vocabularyItems: VocabularyItem[];
-  onDeleteWords: (wordIds: string[]) => void;
+  onDeleteWords: (wordIds: string[]) => Promise<any> | void;
+  onAutoCleanAll?: () => Promise<{ success: boolean; deletedCount: number; message: string }>;
   currentLanguage: LanguageCode;
 }
 
@@ -31,11 +30,15 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
   onClose,
   vocabularyItems,
   onDeleteWords,
+  onAutoCleanAll,
   currentLanguage,
 }) => {
   const currentLangInfo = LANGUAGES[currentLanguage];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [confirmPending, setConfirmPending] = useState<'selected' | 'all' | null>(null);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Group duplicate words by normalized 'tu' (lowercase, trimmed)
   const duplicateGroups = useMemo(() => {
@@ -69,7 +72,6 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
   const filteredGroups = useMemo(() => {
     if (!searchQuery.trim()) return duplicateGroups;
     const q = searchQuery.toLowerCase().trim();
-    const tokens = q.split(/\s+/).filter(Boolean);
 
     return duplicateGroups.filter((g) => {
       const groupText = [
@@ -94,26 +96,28 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
     return duplicateGroups.reduce((acc, g) => acc + (g.items.length - 1), 0);
   }, [duplicateGroups]);
 
-  // Initialize auto-selection on modal open or duplicate change
-  React.useEffect(() => {
+  // Initialize auto-selection on modal open or when duplicateGroups changes
+  useEffect(() => {
     if (isOpen) {
       handleAutoSelectOlder();
+      setNotification(null);
+      setConfirmPending(null);
     }
-  }, [isOpen, duplicateGroups]);
+  }, [isOpen, duplicateGroups.length]);
 
   if (!isOpen) return null;
 
-  // Preset Auto-Selection 1: Keep newest entry (highest date or latest array index), mark older ones for deletion
+  // Preset Auto-Selection 1: Keep newest entry, mark older ones for deletion
   const handleAutoSelectOlder = () => {
     const newSelected = new Set<string>();
     duplicateGroups.forEach((group) => {
-      // Sort items by created_at or word_id
       const sorted = [...group.items].sort((a, b) => {
         const timeA = new Date(a.created_at || 0).getTime();
         const timeB = new Date(b.created_at || 0).getTime();
-        return timeB - timeA; // newest first
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.word_id || '').localeCompare(a.word_id || '');
       });
-      // Keep the newest (index 0), mark all others for deletion
+      // Keep newest (index 0), mark the rest
       for (let i = 1; i < sorted.length; i++) {
         newSelected.add(sorted[i].word_id);
       }
@@ -127,9 +131,15 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
     duplicateGroups.forEach((group) => {
       const sorted = [...group.items].sort((a, b) => {
         if ((b.srs_box || 0) !== (a.srs_box || 0)) {
-          return (b.srs_box || 0) - (a.srs_box || 0); // highest SRS first
+          return (b.srs_box || 0) - (a.srs_box || 0);
         }
-        return (b.times_reviewed || 0) - (a.times_reviewed || 0);
+        if ((b.times_reviewed || 0) !== (a.times_reviewed || 0)) {
+          return (b.times_reviewed || 0) - (a.times_reviewed || 0);
+        }
+        const timeA = new Date(a.created_at || 0).getTime();
+        const timeB = new Date(b.created_at || 0).getTime();
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.word_id || '').localeCompare(a.word_id || '');
       });
       // Keep index 0, delete the rest
       for (let i = 1; i < sorted.length; i++) {
@@ -176,10 +186,8 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
     setSelectedForDeletion((prev) => {
       const next = new Set(prev);
       if (allGroupSelected) {
-        // Deselect group
         idsInGroup.forEach((id) => next.delete(id));
       } else {
-        // Keep 1st item, mark rest for deletion
         next.delete(groupItems[0].word_id);
         for (let i = 1; i < groupItems.length; i++) {
           next.add(groupItems[i].word_id);
@@ -189,19 +197,74 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
     });
   };
 
-  // Perform deletion
-  const handleConfirmDelete = () => {
-    if (selectedForDeletion.size === 0) {
-      alert('Vui lòng chọn ít nhất 1 từ vựng trùng lặp để xoá.');
-      return;
-    }
-
-    const confirmMessage = `⚠️ Bạn có chắc chắn muốn XOÁ VĨNH VIỄN ${selectedForDeletion.size} từ vựng trùng lặp đã chọn không?\nAction này không thể hoàn tác.`;
-    if (window.confirm(confirmMessage)) {
+  // Perform deletion of selected items
+  const handleExecuteDeleteSelected = async () => {
+    if (selectedForDeletion.size === 0) return;
+    setIsProcessing(true);
+    setNotification(null);
+    try {
       const idsToDelete = Array.from(selectedForDeletion);
-      onDeleteWords(idsToDelete);
-      alert(`🎉 Đã dọn dẹp và xoá thành công ${idsToDelete.length} từ vựng trùng lặp!`);
-      onClose();
+      await onDeleteWords(idsToDelete);
+      setNotification({
+        type: 'success',
+        text: `Đã dọn dẹp và xóa vĩnh viễn ${idsToDelete.length} từ trùng lặp khỏi bộ nhớ, Máy chủ và Supabase Cloud!`,
+      });
+      setSelectedForDeletion(new Set());
+      setConfirmPending(null);
+    } catch (err: any) {
+      setNotification({
+        type: 'error',
+        text: `Lỗi khi xóa từ trùng: ${err.message || err}`,
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Perform 1-click auto clean all
+  const handleExecuteAutoCleanAll = async () => {
+    setIsProcessing(true);
+    setNotification(null);
+    try {
+      if (onAutoCleanAll) {
+        const res = await onAutoCleanAll();
+        setNotification({
+          type: res.success ? 'success' : 'error',
+          text: res.message,
+        });
+      } else {
+        const idsToDelete: string[] = [];
+        duplicateGroups.forEach((group) => {
+          const sorted = [...group.items].sort((a, b) => {
+            if ((b.srs_box || 0) !== (a.srs_box || 0)) return (b.srs_box || 0) - (a.srs_box || 0);
+            if ((b.times_reviewed || 0) !== (a.times_reviewed || 0)) return (b.times_reviewed || 0) - (a.times_reviewed || 0);
+            const timeA = new Date(a.created_at || 0).getTime();
+            const timeB = new Date(b.created_at || 0).getTime();
+            if (timeA !== timeB) return timeB - timeA;
+            return (b.word_id || '').localeCompare(a.word_id || '');
+          });
+          for (let i = 1; i < sorted.length; i++) {
+            idsToDelete.push(sorted[i].word_id);
+          }
+        });
+
+        if (idsToDelete.length > 0) {
+          await onDeleteWords(idsToDelete);
+          setNotification({
+            type: 'success',
+            text: `Đã dọn dẹp tự động và xóa thành công ${idsToDelete.length} từ trùng lặp!`,
+          });
+        }
+      }
+      setSelectedForDeletion(new Set());
+      setConfirmPending(null);
+    } catch (err: any) {
+      setNotification({
+        type: 'error',
+        text: `Lỗi khi dọn dẹp: ${err.message || err}`,
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -231,14 +294,42 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
+            disabled={isProcessing}
+            className="p-1.5 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-40"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Area */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 bg-[#F9F7F2]">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 bg-[#F9F7F2]">
+          {/* Notification Banner */}
+          {notification && (
+            <div
+              className={`p-3.5 border-2 flex items-center justify-between gap-3 animate-in fade-in ${
+                notification.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-600 text-emerald-950'
+                  : 'bg-rose-50 border-rose-600 text-rose-950'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-xs font-mono font-bold">
+                {notification.type === 'success' ? (
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                )}
+                <span>{notification.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNotification(null)}
+                className="p-1 hover:bg-black/10 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {duplicateGroups.length === 0 ? (
             <div className="p-12 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-3">
               <ShieldCheck className="w-12 h-12 text-emerald-600 mx-auto" />
@@ -251,6 +342,28 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
             </div>
           ) : (
             <>
+              {/* 1-Click Fast Cleanup Hero Banner */}
+              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-[#1A1A1A] editorial-shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-xs font-mono font-black text-amber-950 uppercase tracking-wider">
+                    <Zap className="w-4 h-4 text-amber-600 fill-amber-500" />
+                    <span>Dọn dẹp tự động 1-Click (Khuyên dùng)</span>
+                  </div>
+                  <p className="text-xs font-mono text-stone-700">
+                    Tự động giữ 1 bản sao tối ưu nhất (ưu tiên SRS cao nhất) cho mỗi nhóm và xóa sạch {totalExcessItems} từ dư thừa.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setConfirmPending('all')}
+                  disabled={isProcessing}
+                  className="px-4 py-2 border-2 border-[#1A1A1A] bg-amber-400 hover:bg-amber-300 text-[#1A1A1A] font-mono text-xs font-bold uppercase tracking-wider editorial-shadow-xs flex items-center justify-center gap-2 transition shrink-0 disabled:opacity-40"
+                >
+                  <Zap className="w-4 h-4 fill-current" />
+                  <span>XÓA SẠCH {totalExcessItems} TỪ TRÙNG NGAY</span>
+                </button>
+              </div>
+
               {/* Presets & Filter Controls */}
               <div className="p-4 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -284,7 +397,8 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
                     <button
                       type="button"
                       onClick={handleAutoSelectOlder}
-                      className="px-3 py-1.5 border border-[#1A1A1A] bg-amber-50 hover:bg-amber-100 text-amber-950 text-xs font-mono font-bold flex items-center gap-1.5 transition"
+                      disabled={isProcessing}
+                      className="px-3 py-1.5 border border-[#1A1A1A] bg-amber-50 hover:bg-amber-100 text-amber-950 text-xs font-mono font-bold flex items-center gap-1.5 transition disabled:opacity-40"
                       title="Giữ từ mới nhất, chọn xoá các từ cũ hơn"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-amber-600" />
@@ -294,7 +408,8 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
                     <button
                       type="button"
                       onClick={handleAutoSelectKeepHighestSrs}
-                      className="px-3 py-1.5 border border-[#1A1A1A] bg-emerald-50 hover:bg-emerald-100 text-emerald-950 text-xs font-mono font-bold flex items-center gap-1.5 transition"
+                      disabled={isProcessing}
+                      className="px-3 py-1.5 border border-[#1A1A1A] bg-emerald-50 hover:bg-emerald-100 text-emerald-950 text-xs font-mono font-bold flex items-center gap-1.5 transition disabled:opacity-40"
                       title="Giữ bản sao có cấp độ ôn tập SRS cao nhất"
                     >
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
@@ -304,7 +419,8 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
                     <button
                       type="button"
                       onClick={handleAutoSelectExceptFirst}
-                      className="px-3 py-1.5 border border-[#1A1A1A] bg-stone-100 hover:bg-stone-200 text-[#1A1A1A] text-xs font-mono font-bold flex items-center gap-1.5 transition"
+                      disabled={isProcessing}
+                      className="px-3 py-1.5 border border-[#1A1A1A] bg-stone-100 hover:bg-stone-200 text-[#1A1A1A] text-xs font-mono font-bold flex items-center gap-1.5 transition disabled:opacity-40"
                     >
                       <CheckSquare className="w-3.5 h-3.5" />
                       <span>Giữ 1 bản sao bất kỳ</span>
@@ -313,7 +429,8 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
                     <button
                       type="button"
                       onClick={handleClearSelections}
-                      className="px-3 py-1.5 border border-stone-300 bg-white hover:bg-stone-100 text-stone-600 text-xs font-mono font-medium flex items-center gap-1.5 transition ml-auto"
+                      disabled={isProcessing}
+                      className="px-3 py-1.5 border border-stone-300 bg-white hover:bg-stone-100 text-stone-600 text-xs font-mono font-medium flex items-center gap-1.5 transition ml-auto disabled:opacity-40"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>Bỏ chọn tất cả</span>
@@ -360,7 +477,8 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleToggleGroupExceptFirst(group.items)}
-                              className="px-2.5 py-1 text-[11px] font-mono font-bold border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition"
+                              disabled={isProcessing}
+                              className="px-2.5 py-1 text-[11px] font-mono font-bold border border-[#1A1A1A] bg-white hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-40"
                             >
                               Toggle nhóm này
                             </button>
@@ -369,13 +487,13 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
 
                         {/* Duplicate Items Grid inside Group */}
                         <div className="divide-y border-stone-200">
-                          {group.items.map((item, itemIdx) => {
+                          {group.items.map((item) => {
                             const isMarkedForDelete = selectedForDeletion.has(item.word_id);
 
                             return (
                               <div
                                 key={item.word_id}
-                                onClick={() => handleToggleItem(item.word_id)}
+                                onClick={() => !isProcessing && handleToggleItem(item.word_id)}
                                 className={`p-4 transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                                   isMarkedForDelete
                                     ? 'bg-rose-50/70 border-l-4 border-l-rose-600'
@@ -454,6 +572,7 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
                                       type="checkbox"
                                       checked={isMarkedForDelete}
                                       onChange={() => handleToggleItem(item.word_id)}
+                                      disabled={isProcessing}
                                       className="w-5 h-5 accent-rose-600 cursor-pointer"
                                     />
                                   </div>
@@ -471,29 +590,82 @@ export const DuplicateVocabModal: React.FC<DuplicateVocabModalProps> = ({
           )}
         </div>
 
+        {/* Inline Confirmation Bar */}
+        {confirmPending && (
+          <div className="px-5 py-3.5 bg-amber-50 border-t-2 border-amber-600 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2.5 text-amber-950 text-xs font-mono font-bold">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+              <span>
+                {confirmPending === 'all'
+                  ? `Xác nhận dọn dẹp tự động tất cả ${totalExcessItems} từ trùng lặp? Dữ liệu sẽ được dọn sạch khỏi Máy chủ và Supabase Cloud.`
+                  : `Xác nhận xóa vĩnh viễn ${selectedForDeletion.size} từ trùng lặp đã chọn khỏi Máy chủ và Supabase Cloud?`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setConfirmPending(null)}
+                disabled={isProcessing}
+                className="flex-1 sm:flex-none px-3 py-1.5 border border-[#1A1A1A] bg-white hover:bg-stone-100 text-xs font-mono font-bold uppercase"
+              >
+                HỦY
+              </button>
+              <button
+                type="button"
+                onClick={confirmPending === 'all' ? handleExecuteAutoCleanAll : handleExecuteDeleteSelected}
+                disabled={isProcessing}
+                className="flex-1 sm:flex-none px-4 py-1.5 border-2 border-[#1A1A1A] bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono font-bold uppercase flex items-center justify-center gap-2 editorial-shadow-xs"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>ĐANG DỌN DẸP...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>XÁC NHẬN XOÁ NGAY</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer Action Bar */}
-        {duplicateGroups.length > 0 && (
+        {duplicateGroups.length > 0 && !confirmPending && (
           <div className="px-5 py-3.5 border-t-2 border-[#1A1A1A] bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-xs font-mono text-[#1A1A1A] font-bold">
-              Tổng số từ sẽ xoá: <span className="text-rose-600 text-sm font-black">{selectedForDeletion.size}</span> từ vựng
+              Tổng số từ sẽ xoá:{' '}
+              <span className="text-rose-600 text-sm font-black">{selectedForDeletion.size}</span> từ vựng
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 sm:flex-none px-4 py-2 border-2 border-[#1A1A1A] bg-white hover:bg-stone-100 text-xs font-mono font-bold uppercase"
+                disabled={isProcessing}
+                className="flex-1 sm:flex-none px-4 py-2 border-2 border-[#1A1A1A] bg-white hover:bg-stone-100 text-xs font-mono font-bold uppercase disabled:opacity-40"
               >
-                HỦY BỎ
+                ĐÓNG
               </button>
               <button
                 type="button"
-                onClick={handleConfirmDelete}
-                disabled={selectedForDeletion.size === 0}
+                onClick={() => setConfirmPending('selected')}
+                disabled={selectedForDeletion.size === 0 || isProcessing}
                 className="flex-1 sm:flex-none px-6 py-2 border-2 border-[#1A1A1A] bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm flex items-center justify-center gap-2 transition"
               >
-                <Trash2 className="w-4 h-4" />
-                <span>XOÁ {selectedForDeletion.size} TỪ TRÙNG LẬP DÃ CHỌN</span>
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>ĐANG XỬ LÝ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>XOÁ {selectedForDeletion.size} TỪ TRÙNG ĐÃ CHỌN</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

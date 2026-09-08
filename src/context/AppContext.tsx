@@ -43,7 +43,8 @@ interface AppContextType {
   addVocabulary: (item: Partial<VocabularyItem>) => VocabularyItem;
   updateVocabulary: (item: VocabularyItem) => void;
   deleteVocabulary: (wordId: string) => void;
-  batchDeleteVocabulary: (wordIds: string[]) => number;
+  batchDeleteVocabulary: (wordIds: string[]) => Promise<number>;
+  cleanAllDuplicates: (language?: LanguageCode) => Promise<{ success: boolean; deletedCount: number; message: string }>;
   batchAddVocabulary: (items: Partial<VocabularyItem>[]) => number;
   recordSRSRating: (wordId: string, rating: RecallQuality) => void;
 
@@ -395,24 +396,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setVocabulary((prev) => prev.map((w) => (w.word_id === item.word_id ? item : w)));
   };
 
-  const deleteVocabulary = (wordId: string) => {
-    setVocabulary((prev) => prev.filter((w) => w.word_id !== wordId));
-  };
-
-  const batchDeleteVocabulary = (wordIds: string[]): number => {
+  const batchDeleteVocabulary = async (wordIds: string[]): Promise<number> => {
+    if (!wordIds || wordIds.length === 0) return 0;
     const idsSet = new Set(wordIds);
-    let deletedCount = 0;
+
+    // 1. Immediately update React state and IndexedDB storage
     setVocabulary((prev) => {
-      const filtered = prev.filter((w) => {
-        if (idsSet.has(w.word_id)) {
-          deletedCount++;
-          return false;
-        }
-        return true;
-      });
+      const filtered = prev.filter((w) => !idsSet.has(w.word_id));
+      idbSet('vocabulary', filtered).catch(() => {});
       return filtered;
     });
+
+    // 2. Immediately delete from local server memory store & disk
+    try {
+      await safeFetchWithTimeout(
+        '/api/sync/delete-words',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wordIds }),
+        },
+        5000
+      );
+    } catch (e) {
+      console.warn('Không thể gửi yêu cầu xóa từ vựng lên máy chủ:', e);
+    }
+
+    // 3. Immediately delete from Supabase Cloud if configured
+    if (SupabaseService.isConfigured()) {
+      try {
+        await SupabaseService.deleteVocabulary(wordIds);
+      } catch (e) {
+        console.warn('Lỗi khi xóa từ vựng khỏi Supabase Cloud:', e);
+      }
+    }
+
     return wordIds.length;
+  };
+
+  const deleteVocabulary = (wordId: string) => {
+    batchDeleteVocabulary([wordId]).catch((e) => {
+      console.error('Lỗi khi xóa từ vựng:', e);
+    });
+  };
+
+  const cleanAllDuplicates = async (
+    lang?: LanguageCode
+  ): Promise<{ success: boolean; deletedCount: number; message: string }> => {
+    const targetLang = lang || currentLanguage;
+    const map = new Map<string, VocabularyItem[]>();
+    const listToCheck = vocabulary.filter((w) => !lang || w.ngon_ngu === targetLang);
+
+    listToCheck.forEach((item) => {
+      const langKey = (item.ngon_ngu || 'ko').trim().toLowerCase();
+      const wordKey = (item.tu || '').trim().toLowerCase();
+      if (!wordKey) return;
+      const key = `${langKey}:${wordKey}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    });
+
+    const idsToDelete: string[] = [];
+    map.forEach((items) => {
+      if (items.length > 1) {
+        // Sort items: keep best copy
+        // 1. Highest SRS box
+        // 2. Highest times reviewed
+        // 3. Newest created_at or word_id
+        const sorted = [...items].sort((a, b) => {
+          if ((b.srs_box || 0) !== (a.srs_box || 0)) {
+            return (b.srs_box || 0) - (a.srs_box || 0);
+          }
+          if ((b.times_reviewed || 0) !== (a.times_reviewed || 0)) {
+            return (b.times_reviewed || 0) - (a.times_reviewed || 0);
+          }
+          const timeA = new Date(a.created_at || 0).getTime();
+          const timeB = new Date(b.created_at || 0).getTime();
+          if (timeA !== timeB) return timeB - timeA;
+          return (b.word_id || '').localeCompare(a.word_id || '');
+        });
+
+        // Keep item at index 0, mark all other duplicate copies for deletion
+        for (let i = 1; i < sorted.length; i++) {
+          idsToDelete.push(sorted[i].word_id);
+        }
+      }
+    });
+
+    if (idsToDelete.length === 0) {
+      return { success: true, deletedCount: 0, message: 'Kho từ vựng của bạn không có từ bị trùng lặp!' };
+    }
+
+    await batchDeleteVocabulary(idsToDelete);
+    return {
+      success: true,
+      deletedCount: idsToDelete.length,
+      message: `Đã dọn dẹp và xóa sạch thành công ${idsToDelete.length} từ vựng trùng lặp!`,
+    };
   };
 
   const batchAddVocabulary = (items: Partial<VocabularyItem>[]): number => {
@@ -499,7 +579,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteDeck = (deckId: string) => {
-    setDecks((prev) => prev.filter((d) => d.deck_id !== deckId));
+    setDecks((prev) => {
+      const filtered = prev.filter((d) => d.deck_id !== deckId);
+      idbSet('decks', filtered).catch(() => {});
+      return filtered;
+    });
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.deleteDecks([deckId]).catch(() => {});
+    }
   };
 
   // Grammar operations
@@ -526,7 +613,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteGrammar = (grammarId: string) => {
-    setGrammar((prev) => prev.filter((g) => g.grammar_id !== grammarId));
+    setGrammar((prev) => {
+      const filtered = prev.filter((g) => g.grammar_id !== grammarId);
+      idbSet('grammar', filtered).catch(() => {});
+      return filtered;
+    });
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.deleteGrammar([grammarId]).catch(() => {});
+    }
   };
 
   const batchAddGrammar = (items: Partial<GrammarItem>[]): number => {
@@ -1121,6 +1215,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateVocabulary,
         deleteVocabulary,
         batchDeleteVocabulary,
+        cleanAllDuplicates,
         batchAddVocabulary,
         recordSRSRating,
 
