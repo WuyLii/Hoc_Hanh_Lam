@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { GrammarItem, LANGUAGES } from '../types';
 import { ttsService } from '../services/ttsService';
 import { SpeakButton } from './SpeakButton';
 import { TextbookExtractorModal } from './TextbookExtractorModal';
+import { matchGrammar } from '../utils/searchHelper';
 import {
   Plus,
   Search,
@@ -120,32 +121,35 @@ export const GrammarManager: React.FC = () => {
     resetForm();
   };
 
-  // Filter Grammar Items
-  const filteredGrammar = currentLangGrammar.filter((g) => {
-    const q = searchQuery.toLowerCase().trim();
-    let matchQuery = !q;
-    if (q) {
-      const searchFields = [
-        g.cau_truc,
-        g.giai_thich,
-        g.vi_du,
-        g.vi_du_dich,
-        g.ghi_chu,
-        g.cap_do,
-        g.tags?.join(' '),
-      ].map((f) => (f || '').toLowerCase());
+  // Filter & Rank Grammar Items with smart symbol and tone-insensitive search
+  const filteredGrammar = useMemo(() => {
+    const scored = currentLangGrammar
+      .map((g) => {
+        const matchLevel =
+          selectedLevel === 'ALL' ||
+          g.cap_do === selectedLevel ||
+          (selectedLevel && g.cap_do && (
+            g.cap_do.toLowerCase().includes(selectedLevel.toLowerCase()) ||
+            selectedLevel.toLowerCase().includes(g.cap_do.toLowerCase())
+          ));
+        if (!matchLevel) return null;
 
-      matchQuery = searchFields.some((f) => f.includes(q));
-    }
-    const matchLevel =
-      selectedLevel === 'ALL' ||
-      g.cap_do === selectedLevel ||
-      (selectedLevel && g.cap_do && (
-        g.cap_do.toLowerCase().includes(selectedLevel.toLowerCase()) ||
-        selectedLevel.toLowerCase().includes(g.cap_do.toLowerCase())
-      ));
-    return matchQuery && matchLevel;
-  });
+        const res = matchGrammar(g, searchQuery);
+        if (!res.matches) return null;
+
+        return { item: g, score: res.score };
+      })
+      .filter((entry): entry is { item: GrammarItem; score: number } => entry !== null);
+
+    return scored
+      .sort((a, b) => {
+        if (searchQuery.trim() && b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return new Date(b.item.created_at || '').getTime() - new Date(a.item.created_at || '').getTime();
+      })
+      .map((entry) => entry.item);
+  }, [currentLangGrammar, selectedLevel, searchQuery]);
 
   return (
     <div className="space-y-8 pb-12">
@@ -191,12 +195,24 @@ export const GrammarManager: React.FC = () => {
           <div className="sm:col-span-8 relative">
             <Search className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
             <input
+              id="grammar-search-input"
               type="text"
-              placeholder="Search syntax structures, grammar rules, keyword explanations..."
+              placeholder="Tìm cấu trúc ngữ pháp (ví dụ: ~고 싶다, -ㄹ 수 있다), giải thích, ví dụ (có/không dấu)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white"
+              className="w-full pl-9 pr-8 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white transition"
             />
+            {searchQuery && (
+              <button
+                id="clear-grammar-search-btn"
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 text-stone-400 hover:text-[#1A1A1A] transition"
+                title="Xóa tìm kiếm"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
           <div className="sm:col-span-4">
             <select
@@ -213,6 +229,21 @@ export const GrammarManager: React.FC = () => {
             </select>
           </div>
         </div>
+
+        {searchQuery && (
+          <div className="flex items-center justify-between gap-2 text-xs font-mono bg-emerald-50 text-emerald-900 border border-emerald-300 px-3 py-1.5">
+            <span>
+              Tìm thấy <strong>{filteredGrammar.length}</strong> cấu trúc ngữ pháp khớp với &quot;{searchQuery}&quot;
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="text-emerald-700 hover:text-red-600 font-bold underline"
+            >
+              Bỏ lọc
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono">
           <div className="text-stone-600">
@@ -248,16 +279,31 @@ export const GrammarManager: React.FC = () => {
       {filteredGrammar.length === 0 ? (
         <div className="p-12 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-3">
           <BookMarked className="w-8 h-8 mx-auto text-stone-400" />
-          <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">No grammar patterns found</h3>
+          <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">
+            {searchQuery ? `Không tìm thấy cấu trúc ngữ pháp nào khớp với "${searchQuery}"` : 'Chưa có cấu trúc ngữ pháp nào'}
+          </h3>
           <p className="text-xs font-mono text-stone-500 max-w-md mx-auto">
-            Document key grammar structures to practice sentence scrambles and improve writing accuracy.
+            {searchQuery
+              ? 'Thử tìm từ khóa không dấu, bỏ các ký tự phụ như ~, - hoặc xóa bộ lọc tìm kiếm.'
+              : 'Ghi chép các cấu trúc ngữ pháp quan trọng để luyện tập ghép câu và nâng cao kỹ năng diễn đạt.'}
           </p>
-          <button
-            onClick={handleOpenAddModal}
-            className="px-4 py-2 border border-[#1A1A1A] bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase tracking-wider"
-          >
-            + ADD_FIRST_RULE
-          </button>
+          {searchQuery ? (
+            <button
+              id="clear-grammar-empty-btn"
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="px-4 py-2 border border-[#1A1A1A] bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase tracking-wider hover:bg-stone-800 transition"
+            >
+              Xóa bộ lọc tìm kiếm
+            </button>
+          ) : (
+            <button
+              onClick={handleOpenAddModal}
+              className="px-4 py-2 border border-[#1A1A1A] bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase tracking-wider hover:bg-stone-800 transition"
+            >
+              + ADD_FIRST_RULE
+            </button>
+          )}
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -6,6 +6,7 @@ import { ttsService } from '../services/ttsService';
 import { SpeakButton } from './SpeakButton';
 import { TextbookExtractorModal } from './TextbookExtractorModal';
 import { DuplicateVocabModal } from './DuplicateVocabModal';
+import { matchVocabulary, VocabSearchScope } from '../utils/searchHelper';
 import {
   Plus,
   Search,
@@ -46,6 +47,7 @@ export const VocabularyManager: React.FC = () => {
 
   // Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<VocabSearchScope>('all');
   const [selectedTopic, setSelectedTopic] = useState('ALL');
   const [selectedLevel, setSelectedLevel] = useState(selectedLevelFilter || 'ALL');
   const [selectedSrsBox, setSelectedSrsBox] = useState('ALL');
@@ -60,7 +62,7 @@ export const VocabularyManager: React.FC = () => {
   // Reset pagination on filter change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedTopic, selectedLevel, selectedSrsBox, showOnlyDuplicates, sortBy]);
+  }, [searchQuery, searchScope, selectedTopic, selectedLevel, selectedSrsBox, showOnlyDuplicates, sortBy]);
 
   // Modal States
   const [isTextbookModalOpen, setIsTextbookModalOpen] = useState(false);
@@ -349,54 +351,51 @@ export const VocabularyManager: React.FC = () => {
     return dups;
   }, [currentLangVocabulary]);
 
-  // Filtered & Sorted Vocabulary with Korean <-> English cross search
-  const filteredWords = currentLangVocabulary.filter((w) => {
-    const normWord = (w.tu || '').trim().toLowerCase();
-    const isDuplicate = duplicateWordSet.has(normWord);
+  // Filtered & Sorted Vocabulary with intelligent search (multi-field, accent-tolerant, relevance-ranked)
+  const scoredWords = useMemo(() => {
+    return currentLangVocabulary
+      .map((w) => {
+        const normWord = (w.tu || '').trim().toLowerCase();
+        const isDuplicate = duplicateWordSet.has(normWord);
+        if (showOnlyDuplicates && !isDuplicate) return null;
 
-    if (showOnlyDuplicates && !isDuplicate) return false;
+        const matchTopic = selectedTopic === 'ALL' || w.chu_de === selectedTopic;
+        const matchLevel =
+          selectedLevel === 'ALL' ||
+          w.cap_do === selectedLevel ||
+          (selectedLevel && w.cap_do && (
+            w.cap_do.toLowerCase().includes(selectedLevel.toLowerCase()) ||
+            selectedLevel.toLowerCase().includes(w.cap_do.toLowerCase())
+          ));
+        const matchSrs =
+          selectedSrsBox === 'ALL' ||
+          (selectedSrsBox === 'new' && (w.srs_box === 0 || !w.times_reviewed)) ||
+          (selectedSrsBox === 'learning' && w.srs_box >= 1 && w.srs_box <= 3) ||
+          (selectedSrsBox === 'mastered' && w.srs_box >= 4);
 
-    const q = searchQuery.toLowerCase().trim();
-    let matchQuery = !q;
-    if (q) {
-      const searchFields = [
-        w.tu,
-        w.nghia,
-        w.phien_am,
-        w.nghia_tieng_han,
-        w.nghia_tieng_anh,
-        w.vi_du,
-        w.vi_du_dich,
-        w.loai_tu,
-        w.chu_de,
-        w.cap_do,
-      ].map((f) => (f || '').toLowerCase());
+        if (!matchTopic || !matchLevel || !matchSrs) return null;
 
-      matchQuery = searchFields.some((f) => f.includes(q));
-    }
+        const searchRes = matchVocabulary(w, searchQuery, searchScope);
+        if (!searchRes.matches) return null;
 
-    const matchTopic = selectedTopic === 'ALL' || w.chu_de === selectedTopic;
-    const matchLevel =
-      selectedLevel === 'ALL' ||
-      w.cap_do === selectedLevel ||
-      (selectedLevel && w.cap_do && (
-        w.cap_do.toLowerCase().includes(selectedLevel.toLowerCase()) ||
-        selectedLevel.toLowerCase().includes(w.cap_do.toLowerCase())
-      ));
-    const matchSrs =
-      selectedSrsBox === 'ALL' ||
-      (selectedSrsBox === 'new' && (w.srs_box === 0 || !w.times_reviewed)) ||
-      (selectedSrsBox === 'learning' && w.srs_box >= 1 && w.srs_box <= 3) ||
-      (selectedSrsBox === 'mastered' && w.srs_box >= 4);
+        return { word: w, score: searchRes.score };
+      })
+      .filter((entry): entry is { word: VocabularyItem; score: number } => entry !== null);
+  }, [currentLangVocabulary, duplicateWordSet, showOnlyDuplicates, selectedTopic, selectedLevel, selectedSrsBox, searchQuery, searchScope]);
 
-    return matchQuery && matchTopic && matchLevel && matchSrs;
-  });
-
-  const sortedWords = [...filteredWords].sort((a, b) => {
-    if (sortBy === 'alphabetical') return a.tu.localeCompare(b.tu);
-    if (sortBy === 'srs') return (a.srs_box || 0) - (b.srs_box || 0);
-    return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
-  });
+  const sortedWords = useMemo(() => {
+    return [...scoredWords]
+      .sort((a, b) => {
+        // If user typed a search query and sort is 'recent', rank by match relevance first
+        if (searchQuery.trim() && sortBy === 'recent' && b.score !== a.score) {
+          return b.score - a.score;
+        }
+        if (sortBy === 'alphabetical') return a.word.tu.localeCompare(b.word.tu);
+        if (sortBy === 'srs') return (a.word.srs_box || 0) - (b.word.srs_box || 0);
+        return new Date(b.word.created_at || '').getTime() - new Date(a.word.created_at || '').getTime();
+      })
+      .map((entry) => entry.word);
+  }, [scoredWords, searchQuery, sortBy]);
 
   const totalItems = sortedWords.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -584,16 +583,28 @@ export const VocabularyManager: React.FC = () => {
       {/* Filter & Search Bar */}
       <div className="p-4 sm:p-6 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          {/* Search Input */}
+          {/* Search Input with Clear Button */}
           <div className="sm:col-span-4 relative">
             <Search className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
             <input
+              id="vocabulary-search-input"
               type="text"
-              placeholder={`Search keyword, definition, ${currentLangInfo.phoneticLabel}...`}
+              placeholder={`Tìm từ, nghĩa tiếng Việt, ${currentLangInfo.phoneticLabel.toLowerCase()} (có/không dấu)...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white font-mono transition"
+              className="w-full pl-9 pr-8 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white font-mono transition"
             />
+            {searchQuery && (
+              <button
+                id="clear-vocab-search-btn"
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 text-stone-400 hover:text-[#1A1A1A] transition"
+                title="Xóa tìm kiếm"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Topic Filter */}
@@ -641,6 +652,47 @@ export const VocabularyManager: React.FC = () => {
               <option value="mastered">MASTERED (4-5)</option>
             </select>
           </div>
+        </div>
+
+        {/* Search Scope & Query Status Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-stone-500 text-[11px] uppercase font-bold mr-1">Phạm vi:</span>
+            {[
+              { id: 'all', label: 'Tất cả' },
+              { id: 'word', label: 'Từ gốc' },
+              { id: 'meaning', label: 'Nghĩa tiếng Việt' },
+              { id: 'hanviet', label: 'Hán Việt' },
+            ].map((sc) => (
+              <button
+                key={sc.id}
+                type="button"
+                onClick={() => setSearchScope(sc.id as VocabSearchScope)}
+                className={`px-2.5 py-1 text-[11px] font-bold border transition ${
+                  searchScope === sc.id
+                    ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                    : 'bg-[#F9F7F2] text-stone-700 border-stone-300 hover:border-[#1A1A1A]'
+                }`}
+              >
+                {sc.label}
+              </button>
+            ))}
+          </div>
+
+          {searchQuery && (
+            <div className="flex items-center gap-2 text-[11px] bg-emerald-50 text-emerald-900 border border-emerald-300 px-2.5 py-1">
+              <span>
+                Tìm thấy <strong>{sortedWords.length}</strong> từ khớp với &quot;{searchQuery}&quot;
+              </span>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="text-emerald-700 hover:text-red-600 font-bold underline ml-1"
+              >
+                Bỏ lọc
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sort & View Mode Bar */}
@@ -755,10 +807,27 @@ export const VocabularyManager: React.FC = () => {
       {sortedWords.length === 0 ? (
         <div className="p-12 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-3">
           <BookOpen className="w-8 h-8 mx-auto text-stone-400" />
-          <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">No vocabulary terms found</h3>
+          <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">
+            {searchQuery ? `Không tìm thấy từ vựng nào khớp với "${searchQuery}"` : 'Chưa có từ vựng nào trong danh sách'}
+          </h3>
           <p className="text-xs font-mono text-stone-500 max-w-sm mx-auto">
-            Try adjusting your search criteria or add new words via "+ NEW_TERM" or "IMPORT_CSV".
+            {searchQuery
+              ? 'Thử tìm từ không dấu, chuyển phạm vi tìm kiếm sang "Tất cả" hoặc kiểm tra lại chính tả.'
+              : 'Hãy thêm từ mới bằng nút "+ THÊM TỪ MỚI" hoặc nhập dữ liệu qua sách/CSV.'}
           </p>
+          {searchQuery && (
+            <button
+              id="clear-vocab-empty-btn"
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setSearchScope('all');
+              }}
+              className="mt-2 px-4 py-2 bg-[#1A1A1A] text-white text-xs font-mono font-bold hover:bg-stone-800 transition"
+            >
+              Xóa bộ lọc tìm kiếm
+            </button>
+          )}
         </div>
       ) : viewMode === 'table' ? (
         <div className="bg-white border-2 border-[#1A1A1A] editorial-shadow-sm overflow-x-auto">
