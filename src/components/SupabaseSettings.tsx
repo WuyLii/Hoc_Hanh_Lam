@@ -234,52 +234,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- RLS & POLICIES (BẢO VỆ VÀ PHÂN QUYỀN TRUY CẬP)
-ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vocabulary ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.decks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.grammar ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.review_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mock_test_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.progress_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public full access user_profiles" ON public.user_profiles;
-CREATE POLICY "Public full access user_profiles" ON public.user_profiles FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access vocabulary" ON public.vocabulary;
-CREATE POLICY "Public full access vocabulary" ON public.vocabulary FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access decks" ON public.decks;
-CREATE POLICY "Public full access decks" ON public.decks FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access grammar" ON public.grammar;
-CREATE POLICY "Public full access grammar" ON public.grammar FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access review_sessions" ON public.review_sessions;
-CREATE POLICY "Public full access review_sessions" ON public.review_sessions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access mock_test_records" ON public.mock_test_records;
-CREATE POLICY "Public full access mock_test_records" ON public.mock_test_records FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access progress_records" ON public.progress_records;
-CREATE POLICY "Public full access progress_records" ON public.progress_records FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access journal_entries" ON public.journal_entries;
-CREATE POLICY "Public full access journal_entries" ON public.journal_entries FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access chat_conversations" ON public.chat_conversations;
-CREATE POLICY "Public full access chat_conversations" ON public.chat_conversations FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access notifications" ON public.notifications;
-CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
--- ====================================================================
--- CẤP QUYỀN TRUY CẬP (GRANT) CHO ROLE ANON & AUTHENTICATED
--- (BẮT BUỘC ĐỂ KHÔNG BỊ LỖI 42501: permission denied for table)
--- ====================================================================
+-- BẢO MẬT VÀ PHÂN QUYỀN TRUY CẬP (CHO PHÉP SELECT, INSERT, UPDATE, DELETE TỪ WEB)
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
@@ -287,15 +242,39 @@ GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+
+-- Tắt RLS để ứng dụng web có thể tự do thêm, sửa, xóa dữ liệu qua public Anon Key
+ALTER TABLE IF EXISTS public.user_profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.vocabulary DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.decks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.grammar DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.review_sessions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.mock_test_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.progress_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.journal_entries DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.chat_conversations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;
 `;
 
-  const grantOnlySqlScript = `-- SỬA LỖI 42501 (PERMISSION DENIED) TRÊN SUPABASE:
--- Dán 3 dòng này vào Supabase SQL Editor và bấm Run:
+  const grantOnlySqlScript = `-- CẤP TOÀN QUYỀN VÀ CHO PHÉP XOÁ/THÊM/SỬA TRÊN SUPABASE (CHỐNG LỖI 42501):
+-- 1. Cho phép truy cập và cấp quyền cho anon (khóa web) và authenticated
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;`;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+
+-- 2. Tắt RLS để web có thể xóa, sửa, thêm từ vựng và ngữ pháp trực tiếp không bị chặn
+ALTER TABLE IF EXISTS public.vocabulary DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.grammar DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.decks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.user_profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.review_sessions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.mock_test_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.progress_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.journal_entries DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.chat_conversations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
 
   const [hasCopiedGrantSql, setHasCopiedGrantSql] = useState(false);
 

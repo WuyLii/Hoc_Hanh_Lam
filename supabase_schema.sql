@@ -183,29 +183,26 @@ CREATE INDEX IF NOT EXISTS idx_journal_user ON public.journal_entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_user ON public.chat_conversations(user_id);
 
 -- ====================================================================
--- BẢO MẬT ROW LEVEL SECURITY (RLS) - CHO PHÉP TRUY VẤN TỪ CLIENT ANON KEY
+-- BẢO MẬT VÀ PHÂN QUYỀN TRUY CẬP (CHO PHÉP SELECT, INSERT, UPDATE, DELETE TỪ WEB)
 -- ====================================================================
-ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vocabulary ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.decks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.grammar ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.review_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mock_test_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.progress_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
 
--- Tạo chính sách (Policies) cho phép tất cả thao tác qua Public Anon Key
-CREATE POLICY "Public full access user_profiles" ON public.user_profiles FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access vocabulary" ON public.vocabulary FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access decks" ON public.decks FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access grammar" ON public.grammar FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access review_sessions" ON public.review_sessions FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access mock_test_records" ON public.mock_test_records FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access progress_records" ON public.progress_records FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access journal_entries" ON public.journal_entries FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access chat_conversations" ON public.chat_conversations FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+
+-- Tắt RLS để ứng dụng web có thể tự do thêm, sửa, xóa dữ liệu qua public Anon Key
+ALTER TABLE IF EXISTS public.user_profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.vocabulary DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.decks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.grammar DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.review_sessions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.mock_test_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.progress_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.journal_entries DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.chat_conversations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;
 
 -- HOÀN TẤT SCHEMA!
