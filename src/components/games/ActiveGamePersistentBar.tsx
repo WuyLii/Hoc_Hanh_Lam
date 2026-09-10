@@ -40,10 +40,10 @@ export const ActiveGamePersistentBar: React.FC = () => {
 
   if (isMinimized) {
     return (
-      <div className="fixed bottom-16 md:bottom-6 right-3 md:right-6 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200">
+      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 right-3 md:right-6 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200">
         <button
           onClick={() => setIsMinimized(false)}
-          className="flex items-center gap-2 px-3.5 py-2.5 bg-[#1A1A1A] text-[#F9F7F2] border-2 border-amber-500 shadow-[4px_4px_0px_0px_#1A1A1A] hover:bg-stone-900 transition group"
+          className="flex items-center gap-2 px-3.5 py-2.5 bg-[#1A1A1A] text-[#F9F7F2] border-2 border-amber-500 shadow-[4px_4px_0px_0px_#1A1A1A] hover:bg-stone-900 transition group min-h-[44px]"
           title="Bấm để mở rộng bảng trò chơi đang chạy"
         >
           <span className="relative flex h-2.5 w-2.5">
@@ -64,7 +64,7 @@ export const ActiveGamePersistentBar: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-16 md:bottom-6 left-2 right-2 md:left-auto md:right-6 md:max-w-xl z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
+    <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 left-2 right-2 md:left-auto md:right-6 md:max-w-xl z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
       <div className="bg-[#1A1A1A] text-[#F9F7F2] border-2 border-[#1A1A1A] shadow-[5px_5px_0px_0px_#D97706] p-3.5 sm:p-4">
         {/* Top Status Header */}
         <div className="flex items-center justify-between gap-2 border-b border-stone-700/80 pb-2 mb-2.5 text-xs font-mono">

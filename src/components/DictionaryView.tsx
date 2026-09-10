@@ -246,27 +246,27 @@ export const DictionaryView: React.FC = () => {
       )}
 
       {/* Hero Header */}
-      <div className="border-2 border-[#1A1A1A] bg-white p-6 sm:p-8 editorial-shadow space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#1A1A1A]/20 pb-4">
+      <div className="border-2 border-[#1A1A1A] bg-white p-4 sm:p-6 md:p-8 editorial-shadow space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 border-b border-[#1A1A1A]/20 pb-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="bg-[#1A1A1A] text-white text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5">
                 PHIÊN BẢN v3.0 MỚI
               </span>
-              <span className="text-xs font-mono uppercase text-stone-500 font-bold">
+              <span className="text-[11px] sm:text-xs font-mono uppercase text-stone-500 font-bold">
                 Song ngữ & Học thuật đối chiếu
               </span>
             </div>
             <h1 className="font-serif font-black text-2xl sm:text-4xl text-[#1A1A1A] tracking-tight">
               ĐẠI TỪ ĐIỂN ĐA NGÔN NGỮ
             </h1>
-            <p className="font-mono text-xs text-stone-600 max-w-2xl">
+            <p className="font-mono text-xs text-stone-600 max-w-2xl leading-relaxed">
               Tra cứu sâu mọi từ vựng ngoại ngữ với phiên âm quốc tế (IPA / Romaja / Pinyin), âm Hán Việt, bảng chia động từ, câu ví dụ thực tế và tự động đồng bộ kho từ SRS.
             </p>
           </div>
 
           {/* Language Tabs */}
-          <div className="flex items-center gap-1 border-2 border-[#1A1A1A] p-1 bg-[#F9F7F2]">
+          <div className="grid grid-cols-3 sm:flex items-center gap-1 border-2 border-[#1A1A1A] p-1 bg-[#F9F7F2] w-full sm:w-auto">
             {(Object.keys(LANGUAGES) as LanguageCode[]).map((code) => {
               const info = LANGUAGES[code];
               const isSelected = code === currentLanguage;
@@ -278,14 +278,14 @@ export const DictionaryView: React.FC = () => {
                     setResult(null);
                     setError(null);
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold uppercase transition ${
+                  className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-mono font-bold uppercase transition ${
                     isSelected
-                      ? 'bg-[#1A1A1A] text-white'
-                      : 'text-stone-700 hover:bg-stone-200'
+                      ? 'bg-[#1A1A1A] text-white shadow-xs'
+                      : 'text-stone-700 hover:bg-stone-200 active:bg-stone-300'
                   }`}
                 >
                   <span>{info.flag}</span>
-                  <span>{info.name}</span>
+                  <span className="truncate">{info.name}</span>
                 </button>
               );
             })}
@@ -485,7 +485,7 @@ export const DictionaryView: React.FC = () => {
 
           {/* Detailed Dictionary Result */}
           {result && !loading && (
-            <div className="border-2 border-[#1A1A1A] bg-white p-6 sm:p-8 editorial-shadow space-y-6">
+            <div className="border-2 border-[#1A1A1A] bg-white p-4 sm:p-6 md:p-8 editorial-shadow space-y-5 sm:space-y-6">
               {/* Header Info */}
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-[#1A1A1A] pb-5">
                 <div className="space-y-2">

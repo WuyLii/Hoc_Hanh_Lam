@@ -230,15 +230,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
         </nav>
 
         {/* ================= MOBILE NATIVE HEADER (< MD) ================= */}
-        <div className="md:hidden px-3.5 py-2.5 flex items-center justify-between gap-2 bg-[#F9F7F2]">
+        <div className="md:hidden px-3.5 pt-[max(0.65rem,env(safe-area-inset-top))] pb-2.5 flex items-center justify-between gap-2 bg-[#F9F7F2]">
           {/* Logo & Compact Title */}
           <div
-            className="flex items-center gap-2.5 cursor-pointer shrink-0"
+            className="flex items-center gap-2.5 cursor-pointer shrink-0 active:opacity-80 transition"
             onClick={() => setActiveNav('dashboard')}
           >
-            <Logo size={34} className="w-8 h-8" />
+            <Logo size={32} className="w-8 h-8 shrink-0" />
             <div className="flex flex-col">
-              <span className="text-base font-serif font-black tracking-tight leading-none text-[#1A1A1A]">
+              <span className="text-[15px] font-serif font-black tracking-tight leading-none text-[#1A1A1A]">
                 HỌC HÀNH LẮM
               </span>
               <span className="text-[9px] font-mono tracking-wider text-stone-600 font-bold uppercase mt-0.5">
@@ -252,16 +252,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
             {/* Quick Language Toggle */}
             <button
               onClick={() => setShowLangMenu(!showLangMenu)}
-              className="flex items-center gap-1 px-2 py-1 bg-white border border-[#1A1A1A] text-xs font-mono font-bold"
+              className="flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] bg-white border border-[#1A1A1A] text-xs font-mono font-bold active:bg-stone-100 transition"
+              title="Đổi ngôn ngữ học"
             >
               <span>{currentLangInfo.flag}</span>
-              <span className="text-[10px] uppercase">{currentLanguage.toUpperCase()}</span>
+              <span className="text-[11px] uppercase font-bold">{currentLanguage.toUpperCase()}</span>
             </button>
 
             {/* Quick Camera OCR */}
             <button
               onClick={onOpenOcrModal}
-              className="p-1.5 bg-[#1A1A1A] text-white border border-[#1A1A1A] active:bg-stone-800"
+              className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center bg-[#1A1A1A] text-white border border-[#1A1A1A] active:bg-stone-800 transition"
               title="Quét OCR từ ảnh"
             >
               <Camera className="w-4 h-4" />
@@ -270,8 +271,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
             {/* Menu Drawer Toggle */}
             <button
               onClick={() => setShowMobileDrawer(!showMobileDrawer)}
-              className="p-1.5 bg-white text-[#1A1A1A] border border-[#1A1A1A] active:bg-stone-200"
-              title="Danh mục tính năng"
+              className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center bg-white text-[#1A1A1A] border border-[#1A1A1A] active:bg-stone-200 transition"
+              title="Tất cả tính năng"
             >
               {showMobileDrawer ? <X className="w-4 h-4" /> : <Grid className="w-4 h-4" />}
             </button>
@@ -280,7 +281,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
 
         {/* Sync Status Banner */}
         {syncStatusMsg && (
-          <div className="bg-[#1A1A1A] text-[#F9F7F2] text-[11px] font-mono py-1 px-3 text-center tracking-wider">
+          <div className="bg-[#1A1A1A] text-[#F9F7F2] text-[11px] font-mono py-1.5 px-3 text-center tracking-wider">
             {syncStatusMsg}
           </div>
         )}
@@ -288,13 +289,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
         {/* Mobile Language Switcher Dropdown */}
         {showLangMenu && (
           <div
-            className="md:hidden border-t border-[#1A1A1A] bg-[#F3EFE6] p-2 space-y-1 animate-in slide-in-from-top-2"
+            className="md:hidden border-t border-[#1A1A1A] bg-[#F3EFE6] p-2.5 space-y-1.5 animate-in slide-in-from-top-2"
             onClick={() => setShowLangMenu(false)}
           >
-            <div className="text-[9px] font-mono uppercase font-bold text-stone-600 px-2 py-0.5">
+            <div className="text-[9px] font-mono uppercase font-bold text-stone-600 px-1">
               Chọn ngôn ngữ đang học:
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-3 gap-2">
               {(Object.keys(LANGUAGES) as LanguageCode[]).map((code) => {
                 const info = LANGUAGES[code];
                 const isSelected = code === currentLanguage;
@@ -302,10 +303,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
                   <button
                     key={code}
                     onClick={() => setCurrentLanguage(code)}
-                    className={`flex items-center justify-center gap-1.5 p-2 text-xs font-bold border transition ${
+                    className={`flex items-center justify-center gap-1.5 p-2.5 text-xs font-bold border transition min-h-[44px] ${
                       isSelected
-                        ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
-                        : 'bg-white text-[#1A1A1A] border-stone-300'
+                        ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-xs'
+                        : 'bg-white text-[#1A1A1A] border-stone-300 active:bg-stone-100'
                     }`}
                   >
                     <span>{info.flag}</span>
@@ -319,85 +320,104 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
       </header>
 
       {/* ================= MOBILE BOTTOM NAVIGATION BAR (< MD) ================= */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F9F7F2] border-t-2 border-[#1A1A1A] px-2 py-1.5 shadow-lg">
-        <div className="grid grid-cols-5 gap-1 text-center">
+      {/* Optimized for iPhone 12 Pro (390px) with 6 balanced columns and safe-area padding */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F9F7F2]/95 backdrop-blur-md border-t-2 border-[#1A1A1A] px-1 pt-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+        <div className="grid grid-cols-6 gap-0.5 text-center">
+          {/* 1. Tổng quan */}
           <button
             onClick={() => handleMobileNavClick('dashboard')}
-            className={`flex flex-col items-center justify-center py-1 rounded transition ${
-              activeNav === 'dashboard' ? 'text-[#1A1A1A] font-bold' : 'text-stone-500'
+            className={`flex flex-col items-center justify-center py-1 px-0.5 rounded transition min-h-[44px] ${
+              activeNav === 'dashboard'
+                ? 'bg-[#1A1A1A] text-[#F9F7F2] font-bold'
+                : 'text-stone-600 hover:text-black active:bg-stone-200/60'
             }`}
           >
-            <BarChart3 className={`w-5 h-5 ${activeNav === 'dashboard' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
-            <span className="text-[10px] font-mono uppercase mt-0.5">Tổng quan</span>
+            <BarChart3 className={`w-4 h-4 ${activeNav === 'dashboard' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
+            <span className="text-[9px] font-mono tracking-tighter uppercase mt-0.5">Tổng quan</span>
           </button>
 
+          {/* 2. Từ điển */}
           <button
             onClick={() => handleMobileNavClick('dictionary')}
-            className={`flex flex-col items-center justify-center py-1 rounded transition ${
-              activeNav === 'dictionary' ? 'text-[#1A1A1A] font-bold' : 'text-stone-500'
+            className={`flex flex-col items-center justify-center py-1 px-0.5 rounded transition min-h-[44px] ${
+              activeNav === 'dictionary'
+                ? 'bg-[#1A1A1A] text-[#F9F7F2] font-bold'
+                : 'text-stone-600 hover:text-black active:bg-stone-200/60'
             }`}
           >
-            <BookMarked className={`w-5 h-5 ${activeNav === 'dictionary' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
-            <span className="text-[10px] font-mono uppercase mt-0.5">Từ điển</span>
+            <BookMarked className={`w-4 h-4 ${activeNav === 'dictionary' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
+            <span className="text-[9px] font-mono tracking-tighter uppercase mt-0.5">Từ điển</span>
           </button>
 
+          {/* 3. Từ vựng */}
           <button
             onClick={() => handleMobileNavClick('vocabulary')}
-            className={`flex flex-col items-center justify-center py-1 rounded transition ${
-              activeNav === 'vocabulary' ? 'text-[#1A1A1A] font-bold' : 'text-stone-500'
+            className={`flex flex-col items-center justify-center py-1 px-0.5 rounded transition min-h-[44px] ${
+              activeNav === 'vocabulary'
+                ? 'bg-[#1A1A1A] text-[#F9F7F2] font-bold'
+                : 'text-stone-600 hover:text-black active:bg-stone-200/60'
             }`}
           >
-            <BookOpen className={`w-5 h-5 ${activeNav === 'vocabulary' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
-            <span className="text-[10px] font-mono uppercase mt-0.5">Từ vựng</span>
+            <BookOpen className={`w-4 h-4 ${activeNav === 'vocabulary' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
+            <span className="text-[9px] font-mono tracking-tighter uppercase mt-0.5">Từ vựng</span>
           </button>
 
+          {/* 4. Ngữ pháp */}
           <button
             onClick={() => handleMobileNavClick('grammar')}
-            className={`flex flex-col items-center justify-center py-1 rounded transition ${
-              activeNav === 'grammar' ? 'text-[#1A1A1A] font-bold' : 'text-stone-500'
+            className={`flex flex-col items-center justify-center py-1 px-0.5 rounded transition min-h-[44px] ${
+              activeNav === 'grammar'
+                ? 'bg-[#1A1A1A] text-[#F9F7F2] font-bold'
+                : 'text-stone-600 hover:text-black active:bg-stone-200/60'
             }`}
           >
-            <Layers className={`w-5 h-5 ${activeNav === 'grammar' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
-            <span className="text-[10px] font-mono uppercase mt-0.5">Ngữ pháp</span>
+            <Layers className={`w-4 h-4 ${activeNav === 'grammar' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
+            <span className="text-[9px] font-mono tracking-tighter uppercase mt-0.5">Ngữ pháp</span>
           </button>
 
+          {/* 5. Trò chơi / Luyện tập */}
           <button
             onClick={() => handleMobileNavClick('games')}
-            className={`flex flex-col items-center justify-center py-1 rounded transition relative ${
-              activeNav === 'games' ? 'text-[#1A1A1A] font-bold' : 'text-stone-500'
+            className={`flex flex-col items-center justify-center py-1 px-0.5 rounded transition min-h-[44px] relative ${
+              activeNav === 'games'
+                ? 'bg-[#1A1A1A] text-[#F9F7F2] font-bold'
+                : 'text-stone-600 hover:text-black active:bg-stone-200/60'
             }`}
           >
             <div className="relative">
-              <Gamepad2 className={`w-5 h-5 ${activeNav === 'games' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
+              <Gamepad2 className={`w-4 h-4 ${activeNav === 'games' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
               {selectedGameMode && (
-                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                 </span>
               )}
             </div>
-            <span className="text-[10px] font-mono uppercase mt-0.5 font-semibold">
+            <span className="text-[9px] font-mono tracking-tighter uppercase mt-0.5 font-semibold">
               {selectedGameMode ? 'Đang chơi' : 'Luyện tập'}
             </span>
           </button>
 
+          {/* 6. Tất cả / Menu */}
           <button
             onClick={() => setShowMobileDrawer(!showMobileDrawer)}
-            className={`flex flex-col items-center justify-center py-1 rounded transition ${
-              showMobileDrawer ? 'text-[#1A1A1A] font-bold' : 'text-stone-500'
+            className={`flex flex-col items-center justify-center py-1 px-0.5 rounded transition min-h-[44px] ${
+              showMobileDrawer
+                ? 'bg-[#1A1A1A] text-[#F9F7F2] font-bold'
+                : 'text-stone-600 hover:text-black active:bg-stone-200/60'
             }`}
           >
-            <Grid className="w-5 h-5" />
-            <span className="text-[10px] font-mono uppercase mt-0.5">Tất cả</span>
+            <Grid className="w-4 h-4" />
+            <span className="text-[9px] font-mono tracking-tighter uppercase mt-0.5">Tất cả</span>
           </button>
         </div>
-      </div>
+      </nav>
 
       {/* ================= MOBILE ALL MODULES DRAWER (< MD) ================= */}
       {showMobileDrawer && (
         <div className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end animate-in fade-in duration-150">
           <div
-            className="bg-[#F9F7F2] border-t-2 border-[#1A1A1A] max-h-[85vh] overflow-y-auto rounded-t-2xl p-5 space-y-4 shadow-2xl animate-in slide-in-from-bottom duration-200"
+            className="bg-[#F9F7F2] border-t-2 border-[#1A1A1A] max-h-[85vh] overflow-y-auto rounded-t-2xl p-4 sm:p-5 pb-[max(1.75rem,calc(env(safe-area-inset-bottom)+1.25rem))] space-y-4 shadow-2xl animate-in slide-in-from-bottom duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Drawer Header */}

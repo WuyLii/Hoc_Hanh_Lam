@@ -139,28 +139,28 @@ export const Dashboard: React.FC = () => {
           <div className="border-t border-[#1A1A1A] grid grid-cols-2 sm:grid-cols-4 bg-[#F9F7F2]">
             <button
               onClick={() => startReviewSession('flashcard')}
-              className="flex flex-col items-center justify-center p-6 border-r border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] transition-colors group"
+              className="flex flex-col items-center justify-center p-4 sm:p-6 border-r border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] active:bg-stone-800 active:text-white transition-colors group"
             >
               <span className="text-2xl sm:text-3xl mb-1 font-serif font-bold group-hover:text-amber-300">01</span>
               <span className="text-[10px] font-mono uppercase font-bold tracking-widest">Thẻ ghi nhớ</span>
             </button>
             <button
               onClick={() => setActiveNav('mocktest')}
-              className="flex flex-col items-center justify-center p-6 sm:border-r border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] transition-colors group"
+              className="flex flex-col items-center justify-center p-4 sm:p-6 sm:border-r border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] active:bg-stone-800 active:text-white transition-colors group"
             >
               <span className="text-2xl sm:text-3xl mb-1 font-serif font-bold group-hover:text-amber-300">02</span>
               <span className="text-[10px] font-mono uppercase font-bold tracking-widest">Thi thử</span>
             </button>
             <button
               onClick={() => setActiveNav('grammar')}
-              className="flex flex-col items-center justify-center p-6 border-r border-t sm:border-t-0 border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] transition-colors group"
+              className="flex flex-col items-center justify-center p-4 sm:p-6 border-r border-t sm:border-t-0 border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] active:bg-stone-800 active:text-white transition-colors group"
             >
               <span className="text-2xl sm:text-3xl mb-1 font-serif font-bold group-hover:text-amber-300">03</span>
               <span className="text-[10px] font-mono uppercase font-bold tracking-widest">Ngữ pháp</span>
             </button>
             <button
               onClick={() => setActiveNav('aichat')}
-              className="flex flex-col items-center justify-center p-6 border-t sm:border-t-0 border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] transition-colors group"
+              className="flex flex-col items-center justify-center p-4 sm:p-6 border-t sm:border-t-0 border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] active:bg-stone-800 active:text-white transition-colors group"
             >
               <span className="text-2xl sm:text-3xl mb-1 font-serif font-bold group-hover:text-amber-300">04</span>
               <span className="text-[10px] font-mono uppercase font-bold tracking-widest">Gia sư AI</span>
@@ -171,7 +171,7 @@ export const Dashboard: React.FC = () => {
 
 
       {/* Target Language Switcher Cards (Tri-Lingual Matrix) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {(Object.keys(LANGUAGES) as LanguageCode[]).map((code) => {
           const info = LANGUAGES[code];
           const isSelected = code === currentLanguage;
@@ -182,10 +182,10 @@ export const Dashboard: React.FC = () => {
             <div
               key={code}
               onClick={() => setCurrentLanguage(code)}
-              className={`p-6 border-2 border-[#1A1A1A] cursor-pointer transition-all duration-150 ${
+              className={`p-4 sm:p-6 border-2 border-[#1A1A1A] cursor-pointer transition-all duration-150 ${
                 isSelected
                   ? 'bg-[#1A1A1A] text-[#F9F7F2] editorial-shadow'
-                  : 'bg-white text-[#1A1A1A] hover:bg-[#F3EFE6]'
+                  : 'bg-white text-[#1A1A1A] hover:bg-[#F3EFE6] active:bg-[#ECE7DC]'
               }`}
             >
               <div className="flex items-start justify-between">

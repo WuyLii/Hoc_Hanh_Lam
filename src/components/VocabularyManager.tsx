@@ -934,13 +934,13 @@ export const VocabularyManager: React.FC = () => {
           </table>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {paginatedWords.map((word) => {
             const accuracy = word.times_reviewed > 0 ? Math.round((word.times_correct / word.times_reviewed) * 100) : 0;
             return (
               <div
                 key={word.word_id}
-                className="p-6 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm hover:editorial-shadow transition-all flex flex-col justify-between group"
+                className="p-4 sm:p-6 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm hover:editorial-shadow transition-all flex flex-col justify-between group"
               >
                 <div>
                   {/* Top Metadata Badges */}
