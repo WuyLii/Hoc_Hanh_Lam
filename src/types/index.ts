@@ -367,3 +367,54 @@ export interface TextbookExtractResult {
   grammar: ExtractedGrammarItem[];
 }
 
+export interface DictionaryExample {
+  sentence: string;
+  phonetic?: string;
+  translation: string;
+}
+
+export interface DictionaryConjugation {
+  form: string;
+  description: string;
+}
+
+export interface DictionaryResult {
+  query: string;
+  language: LanguageCode;
+  found: boolean;
+  word: string;
+  originalScript?: string;
+  phonetic?: string;
+  partOfSpeech?: string;
+  level?: string;
+  primaryMeaning: string;
+  additionalMeanings?: string[];
+  hanVietOrRoot?: string;
+  englishMeaning?: string;
+  koreanMeaning?: string;
+  chineseMeaning?: string;
+  definition?: string;
+  examples?: DictionaryExample[];
+  synonyms?: string[];
+  antonyms?: string[];
+  collocations?: string[];
+  conjugationsOrForms?: DictionaryConjugation[];
+  grammarNotes?: string;
+  mnemonic?: string;
+  aiModel?: string;
+  aiModelId?: string;
+  aiModelKey?: string;
+  turn?: number;
+  fromCache?: boolean;
+}
+
+export interface DictionaryHistoryItem {
+  id: string;
+  query: string;
+  word: string;
+  meaning: string;
+  language: LanguageCode;
+  timestamp: string;
+  isStarred?: boolean;
+}
+

@@ -4,6 +4,7 @@ import { LANGUAGES, LanguageCode } from '../types';
 import { Logo } from './Logo';
 import {
   BookOpen,
+  BookMarked,
   Gamepad2,
   Headphones,
   Award,
@@ -73,14 +74,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', num: '01', icon: BarChart3 },
     { id: 'levels', label: 'Cấp bậc trình độ', num: '02', icon: GraduationCap },
-    { id: 'vocabulary', label: 'Từ vựng', num: '03', icon: BookOpen },
-    { id: 'grammar', label: 'Ngữ pháp', num: '04', icon: Layers },
-    { id: 'games', label: 'Trò chơi SRS', num: '05', icon: Gamepad2 },
-    { id: 'mocktest', label: 'Đề thi thử', num: '06', icon: Award },
-    { id: 'aichat', label: 'Gia sư AI', num: '07', icon: Sparkles },
-    { id: 'stroke', label: 'Tập viết nét chữ', num: '08', icon: PenTool },
-    { id: 'numbers', label: 'Số & Lượng từ', num: '09', icon: Calculator },
-    { id: 'sheets', label: 'CSDL Supabase / Sheets', num: '10', icon: Database },
+    { id: 'dictionary', label: 'Tra từ điển', num: '03', icon: BookMarked },
+    { id: 'vocabulary', label: 'Từ vựng', num: '04', icon: BookOpen },
+    { id: 'grammar', label: 'Ngữ pháp', num: '05', icon: Layers },
+    { id: 'games', label: 'Trò chơi SRS', num: '06', icon: Gamepad2 },
+    { id: 'mocktest', label: 'Đề thi thử', num: '07', icon: Award },
+    { id: 'aichat', label: 'Gia sư AI', num: '08', icon: Sparkles },
+    { id: 'stroke', label: 'Tập viết nét chữ', num: '09', icon: PenTool },
+    { id: 'numbers', label: 'Số & Lượng từ', num: '10', icon: Calculator },
+    { id: 'sheets', label: 'CSDL Supabase / Sheets', num: '11', icon: Database },
   ];
 
   const handleMobileNavClick = (id: string) => {
@@ -107,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
                     HỌC HÀNH LẮM
                   </span>
                   <span className="bg-[#1A1A1A] text-[#F9F7F2] text-[9px] font-mono font-bold px-1.5 py-0.5 uppercase tracking-widest">
-                    v2.5
+                    v3.0
                   </span>
                 </div>
                 <p className="text-[10px] font-mono tracking-[0.15em] uppercase text-[#1A1A1A]/70 mt-0.5">
@@ -327,6 +329,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
           >
             <BarChart3 className={`w-5 h-5 ${activeNav === 'dashboard' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
             <span className="text-[10px] font-mono uppercase mt-0.5">Tổng quan</span>
+          </button>
+
+          <button
+            onClick={() => handleMobileNavClick('dictionary')}
+            className={`flex flex-col items-center justify-center py-1 rounded transition ${
+              activeNav === 'dictionary' ? 'text-[#1A1A1A] font-bold' : 'text-stone-500'
+            }`}
+          >
+            <BookMarked className={`w-5 h-5 ${activeNav === 'dictionary' ? 'stroke-[2.5]' : 'stroke-1.5'}`} />
+            <span className="text-[10px] font-mono uppercase mt-0.5">Từ điển</span>
           </button>
 
           <button

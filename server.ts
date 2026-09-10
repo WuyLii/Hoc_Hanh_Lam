@@ -8,6 +8,7 @@ import {
   handleOcrExtract,
   handleExtractTextbook,
   handleFillMissingBilingual,
+  handleDictionaryLookup,
   handleChat,
   handleGenerateExample,
   handleRoleplay,
@@ -260,6 +261,17 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error in /api/gemini/fill-missing-bilingual:', error);
       res.status(500).json({ error: error?.message || 'Lỗi khi bổ sung nghĩa song ngữ đối ứng' });
+    }
+  });
+
+  // 7.5. Deep Academic Bilingual Dictionary Lookup (Anh-Việt, Hàn-Việt, Trung-Việt)
+  app.post('/api/gemini/dictionary-lookup', async (req, res) => {
+    try {
+      const result = await handleDictionaryLookup(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error in /api/gemini/dictionary-lookup:', error);
+      res.status(500).json({ error: error?.message || 'Lỗi khi tra cứu từ điển' });
     }
   });
 

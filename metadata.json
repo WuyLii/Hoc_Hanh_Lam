@@ -1,6 +1,6 @@
 {
   "name": "Học Hành Lắm",
-  "description": "Nền tảng học và ôn tập ngoại ngữ cá nhân hóa (Anh - Hàn - Trung) với kho từ vựng, ngữ pháp, SRS, AI đọc sách giáo trình và đồng bộ Google Sheets.",
+  "description": "Học Hành Lắm v3.0 - Nền tảng học tập ngoại ngữ Anh, Hàn, Trung cá nhân hóa và Đại từ điển song ngữ thông minh.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

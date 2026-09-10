@@ -153,13 +153,99 @@ export async function callGeminiTutorAlternating(
 }
 
 // =========================================================================
-// 2. MÔ HÌNH DÀNH RIÊNG CHO CÁC TÍNH NĂNG KHÁC (NON-TUTOR ONLY)
+// 2. BẢNG PHÂN BỔ ĐỘC QUYỀN 2 CON AI CỐ ĐỊNH CHO TRA TỪ ĐIỂN (DICTIONARY DEDICATED ONLY)
+// 2 con AI này ĐƯỢC CẤP ĐỘC QUYỀN CHO TRA TỪ ĐIỂN, luân phiên phân tải và tự động dự phòng.
+// TUYỆT ĐỐI KHÔNG CHỖ NÀO KHÁC ĐƯỢC PHÉP GỌI 2 CON AI NÀY VÀ TỪ ĐIỂN CHỈ GỌI ĐÚNG 2 CON NÀY.
+// Đảm bảo mỗi ngày tra cứu tối thiểu 100+ từ vựng mượt mà mà không lo hết lượt.
+// =========================================================================
+export const DEDICATED_DICTIONARY_MODELS = [
+  {
+    id: 'dict-ai-1',
+    name: 'Từ điển AI 1 (Gemini 3.8 Flash)',
+    model: 'gemini-3.8-flash',
+    description: 'Chuyên gia Đại từ điển Học thuật, Ngữ nghĩa sâu sắc & Phiên âm quốc tế',
+  },
+  {
+    id: 'dict-ai-2',
+    name: 'Từ điển AI 2 (Gemini Flash Latest)',
+    model: 'gemini-flash-latest',
+    description: 'Chuyên gia Song ngữ Tốc độ cao, Đối chiếu Hán Việt & Dự phòng thông minh',
+  },
+] as const;
+
+let globalDictionaryTurnCounter = 0;
+
+export async function callGeminiDictionaryAlternating(
+  ai: GoogleGenAI,
+  contents: any,
+  config?: any
+) {
+  const currentTurn = globalDictionaryTurnCounter++;
+  const isTurn0 = currentTurn % 2 === 0;
+
+  // Lượt chẵn: Từ điển AI 1 trước, nếu quá tải/lỗi tự động chuyển sang Từ điển AI 2.
+  // Lượt lẻ: Từ điển AI 2 trước, nếu quá tải/lỗi tự động chuyển sang Từ điển AI 1.
+  const dictSequence = isTurn0
+    ? [DEDICATED_DICTIONARY_MODELS[0], DEDICATED_DICTIONARY_MODELS[1]]
+    : [DEDICATED_DICTIONARY_MODELS[1], DEDICATED_DICTIONARY_MODELS[0]];
+
+  let lastError: any = null;
+
+  for (const dictAI of dictSequence) {
+    let attempts = 0;
+    const maxAttempts = 2;
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        const res = await ai.models.generateContent({
+          model: dictAI.model,
+          contents,
+          config,
+        });
+        if (res && res.text) {
+          return {
+            res,
+            aiInfo: {
+              id: dictAI.id,
+              name: dictAI.name,
+              model: dictAI.model,
+              turn: currentTurn + 1,
+            },
+          };
+        }
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
+        const isTransient =
+          errMsg.includes('503') ||
+          errMsg.includes('UNAVAILABLE') ||
+          errMsg.includes('high demand') ||
+          errMsg.includes('429') ||
+          errMsg.includes('Quota') ||
+          errMsg.includes('RESOURCE_EXHAUSTED') ||
+          errMsg.includes('Deadline') ||
+          errMsg.includes('overloaded');
+
+        if (isTransient && attempts < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
+        } else {
+          break; // chuyển ngay sang con AI dự phòng độc quyền thứ 2
+        }
+      }
+    }
+  }
+
+  throw new Error(formatGeminiError(lastError));
+}
+
+// =========================================================================
+// 3. MÔ HÌNH DÀNH RIÊNG CHO CÁC TÍNH NĂNG KHÁC (NON-TUTOR, NON-DICTIONARY)
 // OCR, Bóc tách Sách, Đề thi, Nhật ký, Tạo từ vựng, Nhập vai...
-// TUYỆT ĐỐI KHÔNG ĐƯỢC CHỨA gemini-3.7-flash HOẶC gemini-3.1-pro-preview
-// (2 con AI gia sư được bảo vệ độc quyền).
+// TUYỆT ĐỐI KHÔNG ĐƯỢC CHỨA:
+// - gemini-3.7-flash, gemini-3.1-pro-preview (Bảo vệ độc quyền Gia sư AI)
+// - gemini-3.8-flash, gemini-flash-latest (Bảo vệ độc quyền Tra Từ Điển AI)
 // =========================================================================
 export const NON_TUTOR_MODELS = [
-  'gemini-flash-latest',
   'gemini-3.1-flash-lite',
 ];
 
@@ -860,5 +946,124 @@ Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
   });
 
   return safeParseJSON(response.text || '{"results":[]}');
+}
+
+const serverDictionaryCache = new Map<string, any>();
+const MAX_SERVER_CACHE_SIZE = 500;
+
+export async function handleDictionaryLookup(body: any) {
+  const { query, language, mode, forceRefresh } = body;
+  if (!query || typeof query !== 'string' || !query.trim()) {
+    throw new Error('Từ khóa tra cứu không được để trống');
+  }
+
+  const qClean = query.trim();
+  const cacheKey = `${language}:${mode || 'auto'}:${qClean.toLowerCase()}`;
+
+  // Kiểm tra bộ nhớ đệm máy chủ (0ms, 0 quota, bảo lưu tuyệt đối lượt tra)
+  if (!forceRefresh && serverDictionaryCache.has(cacheKey)) {
+    const cached = serverDictionaryCache.get(cacheKey);
+    return {
+      ...cached,
+      fromCache: true,
+    };
+  }
+
+  const ai = getGenAI();
+  const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
+  const targetScript = language === 'en' ? 'IPA' : language === 'ko' ? 'Hangul & Romaja' : 'Chữ Hán & Pinyin';
+
+  const prompt = `Bạn là Đại từ điển Ngôn ngữ Song ngữ và Đối chiếu học thuật chuyên sâu nhất (Anh - Hàn - Trung - Việt).
+Người dùng đang tra cứu từ khóa: "${qClean}"
+Ngôn ngữ mục tiêu chính: ${langName} (${language})
+Chế độ tra cứu: ${mode || 'auto'} (tự động nhận diện từ khóa là tiếng Việt hay ${langName}).
+
+Nhiệm vụ: Phân tích tra cứu mục từ một cách chuẩn xác, học thuật, toàn diện và tự nhiên nhất theo cấu trúc JSON.
+Hãy cung cấp:
+1. "word": Từ vựng chuẩn trong ${langName} (hoặc từ được tra). Nếu người dùng gõ tiếng Việt, hãy dịch sang từ ${langName} tương đương tự nhiên và phổ biến nhất.
+2. "originalScript": Chữ Hán/Hangul gốc (nếu là Tiếng Trung thì đưa chữ Giản thể & Phồn thể; nếu là Tiếng Hàn thì đưa chữ Hangul; nếu là Tiếng Anh thì đưa từ gốc).
+3. "phonetic": Phiên âm chuẩn quốc tế (${targetScript}). Tiếng Anh phải có IPA chuẩn (ví dụ: /ˈbjuːtɪfl/), Tiếng Hàn có Romaja chuẩn (ví dụ: [chug-ha-hae-yo]), Tiếng Trung có Pinyin kèm thanh điệu (ví dụ: nǐ hǎo).
+4. "partOfSpeech": Loại từ tiếng Việt (Danh từ, Động từ, Tính từ, Trạng từ, Cụm từ, v.v.).
+5. "level": Cấp độ (ví dụ A1, A2, B1, B2, C1, C2 cho tiếng Anh; TOPIK 1..6 cho tiếng Hàn; HSK 1..6 cho tiếng Trung).
+6. "primaryMeaning": Nghĩa tiếng Việt chính xác và ngắn gọn nhất.
+7. "additionalMeanings": Mảng 2-4 nghĩa phụ hoặc các nét nghĩa ngữ cảnh khác nhau bằng tiếng Việt.
+8. "hanVietOrRoot": Âm Hán Việt và chữ Hán tương ứng (rất quan trọng đối với người Việt học tiếng Hàn/Trung, ví dụ 한국 [Hán Việt: Hàn Quốc], 成功 [Hán Việt: Thành công]). Nếu là tiếng Anh, có thể ghi gốc từ Latin/Hy Lạp hoặc từ tương đương Hán Việt.
+9. "englishMeaning": Nghĩa tương đương trong Tiếng Anh.
+10. "koreanMeaning": Nghĩa tương đương trong Tiếng Hàn.
+11. "chineseMeaning": Nghĩa tương đương trong Tiếng Trung.
+12. "definition": Giải thích định nghĩa ngữ cảnh và sắc thái sử dụng bằng tiếng Việt.
+13. "examples": Danh sách 2-4 câu ví dụ thực tế sử dụng từ trên (mỗi câu gồm: "sentence": câu ngoại ngữ, "phonetic": phiên âm, "translation": bản dịch tiếng Việt).
+14. "synonyms": Danh sách 2-5 từ đồng nghĩa trong ${langName}.
+15. "antonyms": Danh sách 2-5 từ trái nghĩa trong ${langName}.
+16. "collocations": 2-4 cụm từ kết hợp tự nhiên (collocations / thành ngữ) thông dụng.
+17. "conjugationsOrForms": Dạng chia động từ hoặc biến thể quan trọng (ví dụ tiếng Hàn: dạng kính ngữ trang trọng, dạng thân mật, quá khứ, tương lai; tiếng Anh: V1, V2, V3, danh từ liên quan; tiếng Trung: từ ghép hay gặp). Mảng các object: {"form": "tên dạng", "description": "từ biến thể"}.
+18. "grammarNotes": Ghi chú ngữ pháp hoặc lưu ý tránh dùng sai (nếu có).
+19. "mnemonic": Mẹo ghi nhớ từ vựng dễ thuộc hoặc liên tưởng thú vị.
+
+Trả về duy nhất định dạng JSON chuẩn:
+{
+  "found": true,
+  "word": "từ",
+  "originalScript": "chữ gốc",
+  "phonetic": "phiên âm",
+  "partOfSpeech": "loại từ",
+  "level": "cấp độ",
+  "primaryMeaning": "nghĩa chính",
+  "additionalMeanings": ["nghĩa 1", "nghĩa 2"],
+  "hanVietOrRoot": "âm Hán Việt",
+  "englishMeaning": "English meaning",
+  "koreanMeaning": "Korean meaning",
+  "chineseMeaning": "Chinese meaning",
+  "definition": "định nghĩa chi tiết",
+  "examples": [
+    {
+      "sentence": "câu ví dụ",
+      "phonetic": "phiên âm",
+      "translation": "dịch nghĩa"
+    }
+  ],
+  "synonyms": ["từ đồng nghĩa"],
+  "antonyms": ["từ trái nghĩa"],
+  "collocations": ["cụm từ hay đi kèm"],
+  "conjugationsOrForms": [
+    { "form": "tên thể", "description": "dạng từ" }
+  ],
+  "grammarNotes": "lưu ý ngữ pháp",
+  "mnemonic": "mẹo nhớ"
+}`;
+
+  // Gọi độc quyền 2 con AI chỉ dành riêng cho Tra Từ Điển (luân phiên và tự động dự phòng)
+  const resultObj = await callGeminiDictionaryAlternating(ai, prompt, {
+    responseMimeType: 'application/json',
+    temperature: 0.3,
+  });
+
+  const parsed = safeParseJSON(resultObj.res.text || '{}');
+  const finalResult = {
+    ...parsed,
+    query: qClean,
+    language,
+    found: Boolean(parsed.word || parsed.primaryMeaning),
+    aiModel: resultObj.aiInfo.name,
+    aiModelId: resultObj.aiInfo.id,
+    aiModelKey: resultObj.aiInfo.model,
+    turn: resultObj.aiInfo.turn,
+    fromCache: false,
+  };
+
+  // Lưu vào bộ đệm máy chủ
+  if (finalResult.found) {
+    if (serverDictionaryCache.size >= MAX_SERVER_CACHE_SIZE) {
+      const firstKey = serverDictionaryCache.keys().next().value;
+      if (firstKey) serverDictionaryCache.delete(firstKey);
+    }
+    serverDictionaryCache.set(cacheKey, finalResult);
+    if (finalResult.word) {
+      const wordKey = `${language}:${mode || 'auto'}:${finalResult.word.toLowerCase()}`;
+      serverDictionaryCache.set(wordKey, finalResult);
+    }
+  }
+
+  return finalResult;
 }
 

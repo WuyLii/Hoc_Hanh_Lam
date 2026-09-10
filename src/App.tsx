@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { ProficiencyLevelView } from './components/ProficiencyLevelView';
+import { DictionaryView } from './components/DictionaryView';
 import { VocabularyManager } from './components/VocabularyManager';
 import { GrammarManager } from './components/GrammarManager';
 import { GameReviewHub } from './components/games/GameReviewHub';
@@ -87,6 +88,7 @@ const AppContent: React.FC = () => {
         {/* Dynamic Views: rendered when activeNav is matched */}
         {activeNav === 'dashboard' && <Dashboard />}
         {activeNav === 'levels' && <ProficiencyLevelView />}
+        {activeNav === 'dictionary' && <DictionaryView />}
         {activeNav === 'vocabulary' && <VocabularyManager />}
         {activeNav === 'grammar' && <GrammarManager />}
         {activeNav === 'mocktest' && <MockTestView />}
@@ -105,7 +107,7 @@ const AppContent: React.FC = () => {
           <div className="flex items-baseline gap-2">
             <span className="font-serif font-black tracking-tight text-base">HỌC HÀNH LẮM</span>
             <span className="text-[10px] uppercase font-mono tracking-widest text-[#1A1A1A]/70">
-              — Phiên bản v2.5 / Đa ngôn ngữ (Anh • Hàn • Trung)
+              — Phiên bản v3.0 / Đa ngôn ngữ (Anh • Hàn • Trung)
             </span>
           </div>
           <div className="text-xs font-serif italic text-stone-700 text-center sm:text-right">
