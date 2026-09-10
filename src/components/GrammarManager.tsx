@@ -197,7 +197,7 @@ export const GrammarManager: React.FC = () => {
             <input
               id="grammar-search-input"
               type="text"
-              placeholder="Tìm cấu trúc ngữ pháp (ví dụ: ~고 싶다, -ㄹ 수 있다), giải thích, ví dụ (có/không dấu)..."
+              placeholder="Tìm kiếm tập trung theo cấu trúc hoặc giải thích ngữ pháp (có/không dấu)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-8 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white transition"
@@ -284,7 +284,7 @@ export const GrammarManager: React.FC = () => {
           </h3>
           <p className="text-xs font-mono text-stone-500 max-w-md mx-auto">
             {searchQuery
-              ? 'Thử tìm từ khóa không dấu, bỏ các ký tự phụ như ~, - hoặc xóa bộ lọc tìm kiếm.'
+              ? 'Thử tìm từ khóa không dấu hoặc kiểm tra lại cấu trúc / giải thích ngữ pháp.'
               : 'Ghi chép các cấu trúc ngữ pháp quan trọng để luyện tập ghép câu và nâng cao kỹ năng diễn đạt.'}
           </p>
           {searchQuery ? (

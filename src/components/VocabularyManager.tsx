@@ -47,7 +47,7 @@ export const VocabularyManager: React.FC = () => {
 
   // Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchScope, setSearchScope] = useState<VocabSearchScope>('all');
+  const [searchScope, setSearchScope] = useState<VocabSearchScope>('both');
   const [selectedTopic, setSelectedTopic] = useState('ALL');
   const [selectedLevel, setSelectedLevel] = useState(selectedLevelFilter || 'ALL');
   const [selectedSrsBox, setSelectedSrsBox] = useState('ALL');
@@ -589,7 +589,7 @@ export const VocabularyManager: React.FC = () => {
             <input
               id="vocabulary-search-input"
               type="text"
-              placeholder={`Tìm từ, nghĩa tiếng Việt, ${currentLangInfo.phoneticLabel.toLowerCase()} (có/không dấu)...`}
+              placeholder="Tìm kiếm tập trung theo từ hoặc nghĩa của từ (có/không dấu)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-8 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white font-mono transition"
@@ -657,12 +657,11 @@ export const VocabularyManager: React.FC = () => {
         {/* Search Scope & Query Status Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs font-mono">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-stone-500 text-[11px] uppercase font-bold mr-1">Phạm vi:</span>
+            <span className="text-stone-500 text-[11px] uppercase font-bold mr-1">Tra cứu:</span>
             {[
-              { id: 'all', label: 'Tất cả' },
-              { id: 'word', label: 'Từ gốc' },
-              { id: 'meaning', label: 'Nghĩa tiếng Việt' },
-              { id: 'hanviet', label: 'Hán Việt' },
+              { id: 'both', label: 'Từ & Nghĩa' },
+              { id: 'word', label: 'Chỉ Từ vựng' },
+              { id: 'meaning', label: 'Chỉ Nghĩa của từ' },
             ].map((sc) => (
               <button
                 key={sc.id}
@@ -812,7 +811,7 @@ export const VocabularyManager: React.FC = () => {
           </h3>
           <p className="text-xs font-mono text-stone-500 max-w-sm mx-auto">
             {searchQuery
-              ? 'Thử tìm từ không dấu, chuyển phạm vi tìm kiếm sang "Tất cả" hoặc kiểm tra lại chính tả.'
+              ? 'Thử tìm từ không dấu hoặc kiểm tra lại từ vựng/nghĩa của từ.'
               : 'Hãy thêm từ mới bằng nút "+ THÊM TỪ MỚI" hoặc nhập dữ liệu qua sách/CSV.'}
           </p>
           {searchQuery && (
@@ -821,7 +820,7 @@ export const VocabularyManager: React.FC = () => {
               type="button"
               onClick={() => {
                 setSearchQuery('');
-                setSearchScope('all');
+                setSearchScope('both');
               }}
               className="mt-2 px-4 py-2 bg-[#1A1A1A] text-white text-xs font-mono font-bold hover:bg-stone-800 transition"
             >
