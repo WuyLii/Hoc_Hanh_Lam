@@ -118,7 +118,9 @@ export class SupabaseService {
 
   public static isConfigured(): boolean {
     const config = this.getConfig();
-    return Boolean(this.safeCreateClient(config.url, config.anonKey));
+    const normalizedUrl = this.normalizeUrl(config.url);
+    const trimmedKey = this.cleanKey(config.anonKey);
+    return Boolean(this.isValidUrl(normalizedUrl) && trimmedKey && !trimmedKey.includes('your-anon-key'));
   }
 
   public static saveConfig(config: SupabaseConfig): void {

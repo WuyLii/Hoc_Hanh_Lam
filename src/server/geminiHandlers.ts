@@ -22,6 +22,15 @@ export function formatGeminiError(err: any): string {
   const rawStr = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
 
   if (
+    rawStr.includes('denied access') ||
+    rawStr.includes('PERMISSION_DENIED') ||
+    rawStr.includes('403') ||
+    rawStr.includes('Forbidden')
+  ) {
+    return 'Khóa API Gemini (GEMINI_API_KEY) hoặc dự án gặp lỗi phân quyền truy cập (403 Permission Denied / Project Denied Access). Vui lòng kiểm tra API Key tại Google AI Studio hoặc cấu hình lại biến môi trường!';
+  }
+
+  if (
     rawStr.includes('Quota exceeded') ||
     rawStr.includes('quota') ||
     rawStr.includes('429') ||
@@ -29,16 +38,17 @@ export function formatGeminiError(err: any): string {
     rawStr.includes('rate limit') ||
     rawStr.includes('limit: 0')
   ) {
-    return 'Hệ thống AI vừa chạm giới hạn số lượt gửi trong 1 phút (Quota / Rate Limit - Lỗi 429). Vui lòng đợi khoảng 30–60 giây rồi bấm nút "Thử Lại"!';
+    return 'Hệ thống AI vừa chạm giới hạn số lượt gửi (Quota / Rate Limit - Lỗi 429). Vui lòng đợi khoảng 30–60 giây rồi bấm nút "Thử Lại"!';
   }
 
   if (
     rawStr.includes('503') ||
     rawStr.includes('UNAVAILABLE') ||
     rawStr.includes('high demand') ||
-    rawStr.includes('overloaded')
+    rawStr.includes('overloaded') ||
+    rawStr.includes('Deadline')
   ) {
-    return 'Hệ thống AI Gemini từ Google đang quá tải tạm thời (Lỗi 503 High Demand). Vui lòng bấm nút "Thử Lại" sau 10 - 15 giây!';
+    return 'Hệ thống AI Gemini đang quá tải tạm thời (Lỗi 503 High Demand). Vui lòng bấm nút "Thử Lại" sau ít giây!';
   }
 
   if (rawStr.includes('GEMINI_API_KEY')) {
@@ -50,12 +60,19 @@ export function formatGeminiError(err: any): string {
     if (parsedErr?.error?.message) {
       const msg = parsedErr.error.message;
       if (
+        msg.includes('denied access') ||
+        msg.includes('PERMISSION_DENIED') ||
+        msg.includes('403')
+      ) {
+        return 'Khóa API Gemini gặp lỗi phân quyền (403 Permission Denied). Vui lòng kiểm tra lại API Key!';
+      }
+      if (
         msg.includes('Quota') ||
         msg.includes('quota') ||
         msg.includes('429') ||
         msg.includes('RESOURCE_EXHAUSTED')
       ) {
-        return 'Hệ thống AI vừa chạm giới hạn số lượt gửi trong 1 phút (Quota / Rate Limit - Lỗi 429). Vui lòng đợi khoảng 30–60 giây rồi bấm nút "Thử Lại"!';
+        return 'Hệ thống AI vừa chạm giới hạn số lượt gửi (Quota / Rate Limit - Lỗi 429). Vui lòng đợi 30–60 giây rồi thử lại!';
       }
       return msg;
     }
@@ -72,15 +89,21 @@ export function formatGeminiError(err: any): string {
 export const DEDICATED_TUTOR_MODELS = [
   {
     id: 'tutor-1',
-    name: 'Gia sư AI 1 (Gemini 3.7 Flash)',
-    model: 'gemini-3.7-flash',
+    name: 'Gia sư AI 1 (Gemini Flash)',
+    model: 'gemini-flash-latest',
     description: 'Chuyên gia Sư phạm & Tư duy Sâu sắc',
   },
   {
     id: 'tutor-2',
-    name: 'Gia sư AI 2 (Gemini 3.1 Pro)',
-    model: 'gemini-3.1-pro-preview',
+    name: 'Gia sư AI 2 (Gemini 3.7 Flash)',
+    model: 'gemini-3.7-flash',
     description: 'Chuyên gia Phân tích Chuyên sâu & Logic Ngôn ngữ',
+  },
+  {
+    id: 'tutor-backup',
+    name: 'Gia sư AI Dự phòng (Flash Lite)',
+    model: 'gemini-3.1-flash-lite',
+    description: 'Dự phòng siêu tốc',
   },
 ] as const;
 
@@ -97,55 +120,36 @@ export async function callGeminiTutorAlternating(
   const currentTurn = typeof requestedTurn === 'number' ? requestedTurn : globalTutorTurnCounter++;
   const isTurn0 = currentTurn % 2 === 0;
 
-  // Lượt chẵn: Gia sư 1 trước, nếu lỗi chỉ fallback sang Gia sư 2.
-  // Lượt lẻ: Gia sư 2 trước, nếu lỗi chỉ fallback sang Gia sư 1.
+  // Lượt chẵn: Gia sư 1 trước, nếu lỗi tự động thử các con còn lại.
+  // Lượt lẻ: Gia sư 2 trước, nếu lỗi tự động thử các con còn lại.
   const tutorSequence = isTurn0
-    ? [DEDICATED_TUTOR_MODELS[0], DEDICATED_TUTOR_MODELS[1]]
-    : [DEDICATED_TUTOR_MODELS[1], DEDICATED_TUTOR_MODELS[0]];
+    ? [DEDICATED_TUTOR_MODELS[0], DEDICATED_TUTOR_MODELS[1], DEDICATED_TUTOR_MODELS[2]]
+    : [DEDICATED_TUTOR_MODELS[1], DEDICATED_TUTOR_MODELS[0], DEDICATED_TUTOR_MODELS[2]];
 
   let lastError: any = null;
 
   for (const tutor of tutorSequence) {
-    let attempts = 0;
-    const maxAttempts = 2;
-    while (attempts < maxAttempts) {
-      try {
-        attempts++;
-        const res = await ai.models.generateContent({
-          model: tutor.model,
-          contents,
-          config,
-        });
-        if (res && res.text) {
-          return {
-            res,
-            tutorInfo: {
-              id: tutor.id,
-              name: tutor.name,
-              model: tutor.model,
-              turn: currentTurn + 1,
-            },
-          };
-        }
-      } catch (err: any) {
-        lastError = err;
-        const errMsg = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
-        const isTransient =
-          errMsg.includes('503') ||
-          errMsg.includes('UNAVAILABLE') ||
-          errMsg.includes('high demand') ||
-          errMsg.includes('429') ||
-          errMsg.includes('Quota') ||
-          errMsg.includes('RESOURCE_EXHAUSTED') ||
-          errMsg.includes('Deadline') ||
-          errMsg.includes('overloaded');
-
-        if (isTransient && attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
-        } else {
-          break;
-        }
+    try {
+      const res = await ai.models.generateContent({
+        model: tutor.model,
+        contents,
+        config,
+      });
+      if (res && res.text) {
+        return {
+          res,
+          tutorInfo: {
+            id: tutor.id,
+            name: tutor.name,
+            model: tutor.model,
+            turn: currentTurn + 1,
+          },
+        };
       }
+    } catch (err: any) {
+      lastError = err;
+      // Continue to next model in sequence immediately if access denied or quota hit
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
   }
 
@@ -155,21 +159,32 @@ export async function callGeminiTutorAlternating(
 // =========================================================================
 // 2. BẢNG PHÂN BỔ ĐỘC QUYỀN 2 CON AI CỐ ĐỊNH CHO TRA TỪ ĐIỂN (DICTIONARY DEDICATED ONLY)
 // 2 con AI này ĐƯỢC CẤP ĐỘC QUYỀN CHO TRA TỪ ĐIỂN, luân phiên phân tải và tự động dự phòng.
-// TUYỆT ĐỐI KHÔNG CHỖ NÀO KHÁC ĐƯỢC PHÉP GỌI 2 CON AI NÀY VÀ TỪ ĐIỂN CHỈ GỌI ĐÚNG 2 CON NÀY.
 // Đảm bảo mỗi ngày tra cứu tối thiểu 100+ từ vựng mượt mà mà không lo hết lượt.
 // =========================================================================
 export const DEDICATED_DICTIONARY_MODELS = [
   {
     id: 'dict-ai-1',
-    name: 'Từ điển AI 1 (Gemini 3.8 Flash)',
-    model: 'gemini-3.8-flash',
+    name: 'Từ điển AI 1 (Gemini Flash)',
+    model: 'gemini-flash-latest',
     description: 'Chuyên gia Đại từ điển Học thuật, Ngữ nghĩa sâu sắc & Phiên âm quốc tế',
   },
   {
     id: 'dict-ai-2',
-    name: 'Từ điển AI 2 (Gemini Flash Latest)',
-    model: 'gemini-flash-latest',
+    name: 'Từ điển AI 2 (Gemini 3.7 Flash)',
+    model: 'gemini-3.7-flash',
     description: 'Chuyên gia Song ngữ Tốc độ cao, Đối chiếu Hán Việt & Dự phòng thông minh',
+  },
+  {
+    id: 'dict-ai-lite',
+    name: 'Từ điển AI 3 (Gemini Flash Lite)',
+    model: 'gemini-3.1-flash-lite',
+    description: 'Dự phòng siêu tốc độ cao',
+  },
+  {
+    id: 'dict-ai-preview',
+    name: 'Từ điển AI 4 (Gemini 3.8 Flash)',
+    model: 'gemini-3.8-flash',
+    description: 'Phiên bản thế hệ mới',
   },
 ] as const;
 
@@ -183,55 +198,36 @@ export async function callGeminiDictionaryAlternating(
   const currentTurn = globalDictionaryTurnCounter++;
   const isTurn0 = currentTurn % 2 === 0;
 
-  // Lượt chẵn: Từ điển AI 1 trước, nếu quá tải/lỗi tự động chuyển sang Từ điển AI 2.
-  // Lượt lẻ: Từ điển AI 2 trước, nếu quá tải/lỗi tự động chuyển sang Từ điển AI 1.
+  // Lượt chẵn: AI 1 -> AI 2 -> AI 3 -> AI 4
+  // Lượt lẻ: AI 2 -> AI 1 -> AI 3 -> AI 4
   const dictSequence = isTurn0
-    ? [DEDICATED_DICTIONARY_MODELS[0], DEDICATED_DICTIONARY_MODELS[1], { id: 'dict-ai-lite', name: 'Từ điển AI Dự phòng (Flash Lite)', model: 'gemini-3.1-flash-lite', description: 'Dự phòng siêu tốc' }]
-    : [DEDICATED_DICTIONARY_MODELS[1], DEDICATED_DICTIONARY_MODELS[0], { id: 'dict-ai-lite', name: 'Từ điển AI Dự phòng (Flash Lite)', model: 'gemini-3.1-flash-lite', description: 'Dự phòng siêu tốc' }];
+    ? [DEDICATED_DICTIONARY_MODELS[0], DEDICATED_DICTIONARY_MODELS[1], DEDICATED_DICTIONARY_MODELS[2], DEDICATED_DICTIONARY_MODELS[3]]
+    : [DEDICATED_DICTIONARY_MODELS[1], DEDICATED_DICTIONARY_MODELS[0], DEDICATED_DICTIONARY_MODELS[2], DEDICATED_DICTIONARY_MODELS[3]];
 
   let lastError: any = null;
 
   for (const dictAI of dictSequence) {
-    let attempts = 0;
-    const maxAttempts = 2;
-    while (attempts < maxAttempts) {
-      try {
-        attempts++;
-        const res = await ai.models.generateContent({
-          model: dictAI.model,
-          contents,
-          config,
-        });
-        if (res && res.text) {
-          return {
-            res,
-            aiInfo: {
-              id: dictAI.id,
-              name: dictAI.name,
-              model: dictAI.model,
-              turn: currentTurn + 1,
-            },
-          };
-        }
-      } catch (err: any) {
-        lastError = err;
-        const errMsg = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
-        const isTransient =
-          errMsg.includes('503') ||
-          errMsg.includes('UNAVAILABLE') ||
-          errMsg.includes('high demand') ||
-          errMsg.includes('429') ||
-          errMsg.includes('Quota') ||
-          errMsg.includes('RESOURCE_EXHAUSTED') ||
-          errMsg.includes('Deadline') ||
-          errMsg.includes('overloaded');
-
-        if (isTransient && attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
-        } else {
-          break; // chuyển ngay sang con AI dự phòng độc quyền thứ 2
-        }
+    try {
+      const res = await ai.models.generateContent({
+        model: dictAI.model,
+        contents,
+        config,
+      });
+      if (res && res.text) {
+        return {
+          res,
+          aiInfo: {
+            id: dictAI.id,
+            name: dictAI.name,
+            model: dictAI.model,
+            turn: currentTurn + 1,
+          },
+        };
       }
+    } catch (err: any) {
+      lastError = err;
+      // Try the next model without aborting
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
   }
 
@@ -241,50 +237,29 @@ export async function callGeminiDictionaryAlternating(
 // =========================================================================
 // 3. MÔ HÌNH DÀNH RIÊNG CHO CÁC TÍNH NĂNG KHÁC (NON-TUTOR, NON-DICTIONARY)
 // OCR, Bóc tách Sách, Đề thi, Nhật ký, Tạo từ vựng, Nhập vai...
-// TUYỆT ĐỐI KHÔNG ĐƯỢC CHỨA:
-// - gemini-3.7-flash, gemini-3.1-pro-preview (Bảo vệ độc quyền Gia sư AI)
-// - gemini-3.8-flash, gemini-flash-latest (Bảo vệ độc quyền Tra Từ Điển AI)
 // =========================================================================
 export const NON_TUTOR_MODELS = [
   'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
+  'gemini-3.7-flash',
 ];
 
 export async function callNonTutorGeminiWithRetry(ai: GoogleGenAI, contents: any, config?: any) {
   let lastError: any = null;
 
   for (const model of NON_TUTOR_MODELS) {
-    let attempts = 0;
-    const maxAttempts = 2;
-    while (attempts < maxAttempts) {
-      try {
-        attempts++;
-        const res = await ai.models.generateContent({
-          model,
-          contents,
-          config,
-        });
-        if (res && res.text) {
-          return res;
-        }
-      } catch (err: any) {
-        lastError = err;
-        const errMsg = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
-        const isTransient =
-          errMsg.includes('503') ||
-          errMsg.includes('UNAVAILABLE') ||
-          errMsg.includes('high demand') ||
-          errMsg.includes('429') ||
-          errMsg.includes('Quota') ||
-          errMsg.includes('RESOURCE_EXHAUSTED') ||
-          errMsg.includes('Deadline') ||
-          errMsg.includes('overloaded');
-
-        if (isTransient && attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
-        } else {
-          break;
-        }
+    try {
+      const res = await ai.models.generateContent({
+        model,
+        contents,
+        config,
+      });
+      if (res && res.text) {
+        return res;
       }
+    } catch (err: any) {
+      lastError = err;
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
   }
 

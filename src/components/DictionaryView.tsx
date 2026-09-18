@@ -313,14 +313,14 @@ export const DictionaryView: React.FC = () => {
             <div className="flex items-center gap-2 text-stone-700 bg-white p-2 border border-stone-300">
               <span className="w-2.5 h-2.5 rounded-full bg-[#1A1A1A] shrink-0" />
               <div>
-                <span className="font-bold text-[#1A1A1A]">AI 1: Gemini 3.8 Flash</span>
+                <span className="font-bold text-[#1A1A1A]">AI 1: Gemini Flash (Primary)</span>
                 <span className="text-stone-500 block text-[10px]">Học thuật, ngữ nghĩa chuyên sâu & phiên âm IPA/Pinyin chuẩn</span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-stone-700 bg-white p-2 border border-stone-300">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-600 shrink-0" />
               <div>
-                <span className="font-bold text-[#1A1A1A]">AI 2: Gemini Flash Latest</span>
+                <span className="font-bold text-[#1A1A1A]">AI 2: Gemini 3.7 Flash</span>
                 <span className="text-stone-500 block text-[10px]">Tốc độ cao, đối chiếu song ngữ & Tự động dự phòng thông minh</span>
               </div>
             </div>
