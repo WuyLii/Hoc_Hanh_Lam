@@ -4,8 +4,9 @@ import { GrammarItem, LANGUAGES } from '../types';
 import { ttsService } from '../services/ttsService';
 import { SpeakButton } from './SpeakButton';
 import { TextbookExtractorModal } from './TextbookExtractorModal';
+import { DuplicateGrammarModal } from './DuplicateGrammarModal';
 import { matchGrammar } from '../utils/searchHelper';
-import koreanGrammarSeed from '../data/koreanGrammarData.json';
+import { normalizeGrammarKey } from '../utils/deduplicate';
 import {
   Plus,
   Search,
@@ -20,7 +21,8 @@ import {
   List as ListIcon,
   BookOpen,
   CheckCircle,
-  RefreshCw,
+  CopyCheck,
+  AlertTriangle,
 } from 'lucide-react';
 
 const KOREAN_LESSONS = [
@@ -44,6 +46,8 @@ export const GrammarManager: React.FC = () => {
     batchAddGrammar,
     updateGrammar,
     deleteGrammar,
+    batchDeleteGrammar,
+    cleanAllDuplicateGrammar,
     selectedLevelFilter,
   } = useApp();
 
@@ -53,6 +57,33 @@ export const GrammarManager: React.FC = () => {
   const [selectedLesson, setSelectedLesson] = useState('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
+
+  // Compute duplicate grammar items info
+  const duplicateGrammarInfo = useMemo(() => {
+    const map = new Map<string, string[]>();
+    currentLangGrammar.forEach((g) => {
+      const key = normalizeGrammarKey(g.cau_truc || '');
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(g.grammar_id);
+    });
+
+    const duplicateKeys = new Set<string>();
+    const duplicateIds = new Set<string>();
+    let totalExcess = 0;
+
+    map.forEach((ids, key) => {
+      if (ids.length > 1) {
+        duplicateKeys.add(key);
+        ids.forEach((id) => duplicateIds.add(id));
+        totalExcess += ids.length - 1;
+      }
+    });
+
+    return { duplicateKeys, duplicateIds, totalGroups: duplicateKeys.size, totalExcess };
+  }, [currentLangGrammar]);
 
   React.useEffect(() => {
     if (selectedLevelFilter) {
@@ -141,16 +172,14 @@ export const GrammarManager: React.FC = () => {
     resetForm();
   };
 
-  const handleReloadKoreanCurriculum = () => {
-    const count = batchAddGrammar(koreanGrammarSeed as GrammarItem[]);
-    setToastMessage(`Đã nạp đầy đủ ${koreanGrammarSeed.length} ngữ pháp Sơ Cấp 1 (Bài 1 - Bài 9)!`);
-    setTimeout(() => setToastMessage(null), 4000);
-  };
-
-  // Filter & Rank Grammar Items with smart symbol, tone-insensitive search, and lesson tags
+  // Filter & Rank Grammar Items with smart symbol, tone-insensitive search, lesson tags, and duplicates
   const filteredGrammar = useMemo(() => {
     const scored = currentLangGrammar
       .map((g) => {
+        if (showOnlyDuplicates && !duplicateGrammarInfo.duplicateIds.has(g.grammar_id)) {
+          return null;
+        }
+
         const matchLevel =
           selectedLevel === 'ALL' ||
           g.cap_do === selectedLevel ||
@@ -182,7 +211,7 @@ export const GrammarManager: React.FC = () => {
         return (a.item.grammar_id || '').localeCompare(b.item.grammar_id || '');
       })
       .map((entry) => entry.item);
-  }, [currentLangGrammar, selectedLevel, selectedLesson, searchQuery]);
+  }, [currentLangGrammar, selectedLevel, selectedLesson, searchQuery, showOnlyDuplicates, duplicateGrammarInfo]);
 
   return (
     <div className="space-y-8 pb-12">
@@ -204,16 +233,28 @@ export const GrammarManager: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {currentLanguage === 'ko' && (
-            <button
-              onClick={handleReloadKoreanCurriculum}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 border-2 border-emerald-800 bg-emerald-100 text-emerald-950 hover:bg-emerald-200 text-xs font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm"
-              title="Đồng bộ lại toàn bộ 38 cấu trúc ngữ pháp Sơ cấp 1 từ Bài 1 đến Bài 9"
-            >
-              <RefreshCw className="w-4 h-4 text-emerald-700" />
-              <span>NẠP SƠ CẤP 1 (BÀI 1-9)</span>
-            </button>
-          )}
+          {/* Lọc & Dọn dẹp ngữ pháp trùng lặp */}
+          <button
+            id="btn-open-duplicate-grammar-modal"
+            onClick={() => setIsDuplicateModalOpen(true)}
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 border-2 text-xs font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm ${
+              duplicateGrammarInfo.totalGroups > 0
+                ? 'border-rose-800 bg-rose-100 text-rose-950 hover:bg-rose-200'
+                : 'border-[#1A1A1A] bg-white text-[#1A1A1A] hover:bg-stone-100'
+            }`}
+            title="Lọc và dọn dẹp ngữ pháp trùng lặp tự động hoặc thủ công"
+          >
+            <CopyCheck
+              className={`w-4 h-4 ${
+                duplicateGrammarInfo.totalGroups > 0 ? 'text-rose-700 font-bold animate-pulse' : 'text-stone-700'
+              }`}
+            />
+            <span>
+              {duplicateGrammarInfo.totalGroups > 0
+                ? `LỌC TRÙNG (${duplicateGrammarInfo.totalGroups} NHÓM)`
+                : 'LỌC NGỮ PHÁP TRÙNG'}
+            </span>
+          </button>
 
           <button
             onClick={() => setIsTextbookModalOpen(true)}
@@ -344,10 +385,44 @@ export const GrammarManager: React.FC = () => {
           </div>
         )}
 
+        {/* Duplicate Warning Banner in Filter Bar */}
+        {duplicateGrammarInfo.totalGroups > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-rose-50 border border-rose-300 text-rose-950 font-mono text-xs">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-700 shrink-0" />
+              <span>
+                Phát hiện <strong>{duplicateGrammarInfo.totalGroups}</strong> nhóm ngữ pháp trùng lặp ({duplicateGrammarInfo.totalExcess} bản sao thừa).
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowOnlyDuplicates(!showOnlyDuplicates)}
+                className={`px-2 py-1 text-[11px] font-bold border transition ${
+                  showOnlyDuplicates
+                    ? 'bg-rose-700 text-white border-rose-900'
+                    : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-100'
+                }`}
+              >
+                {showOnlyDuplicates ? '✓ Đang lọc nhóm trùng' : 'Chỉ xem nhóm trùng'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDuplicateModalOpen(true)}
+                className="px-2 py-1 bg-rose-700 text-white hover:bg-rose-800 font-bold text-[11px] transition flex items-center gap-1"
+              >
+                <CopyCheck className="w-3 h-3" />
+                <span>Mở bảng xử lý trùng</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono">
           <div className="text-stone-600">
             SHOWING <strong className="text-[#1A1A1A]">{filteredGrammar.length}</strong> OF {currentLangGrammar.length} RULES
             {selectedLesson !== 'ALL' && <span className="ml-2 text-indigo-700 font-bold">({selectedLesson})</span>}
+            {showOnlyDuplicates && <span className="ml-2 text-rose-700 font-bold">(Đang lọc trùng lặp)</span>}
           </div>
 
           <div className="flex items-center gap-1 border border-[#1A1A1A] p-0.5 bg-[#F9F7F2]">
@@ -380,21 +455,26 @@ export const GrammarManager: React.FC = () => {
         <div className="p-12 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-3">
           <BookMarked className="w-8 h-8 mx-auto text-stone-400" />
           <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">
-            {searchQuery ? `Không tìm thấy cấu trúc ngữ pháp nào khớp với "${searchQuery}"` : 'Chưa có cấu trúc ngữ pháp nào'}
+            {searchQuery || showOnlyDuplicates
+              ? 'Không tìm thấy cấu trúc ngữ pháp nào phù hợp bộ lọc'
+              : 'Chưa có cấu trúc ngữ pháp nào'}
           </h3>
           <p className="text-xs font-mono text-stone-500 max-w-md mx-auto">
-            {searchQuery
-              ? 'Thử tìm từ khóa không dấu hoặc kiểm tra lại cấu trúc / giải thích ngữ pháp.'
+            {searchQuery || showOnlyDuplicates
+              ? 'Thử xóa bộ lọc tìm kiếm hoặc tắt lọc trùng lặp để xem toàn bộ ngữ pháp.'
               : 'Ghi chép các cấu trúc ngữ pháp quan trọng để luyện tập ghép câu và nâng cao kỹ năng diễn đạt.'}
           </p>
-          {searchQuery ? (
+          {searchQuery || showOnlyDuplicates ? (
             <button
               id="clear-grammar-empty-btn"
               type="button"
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setShowOnlyDuplicates(false);
+              }}
               className="px-4 py-2 border border-[#1A1A1A] bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase tracking-wider hover:bg-stone-800 transition"
             >
-              Xóa bộ lọc tìm kiếm
+              Xóa tất cả bộ lọc
             </button>
           ) : (
             <button
@@ -407,52 +487,181 @@ export const GrammarManager: React.FC = () => {
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredGrammar.map((item) => (
-            <div
-              key={item.grammar_id}
-              className="p-6 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm hover:editorial-shadow transition-all flex flex-col justify-between group"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-[#1A1A1A]/15 pb-2">
-                  <span className="px-2 py-0.5 bg-[#1A1A1A] text-[#F9F7F2] text-[10px] font-mono font-bold uppercase">
-                    {item.cap_do}
-                  </span>
+          {filteredGrammar.map((item) => {
+            const isDuplicate = duplicateGrammarInfo.duplicateIds.has(item.grammar_id);
+
+            return (
+              <div
+                key={item.grammar_id}
+                className={`p-6 bg-white border-2 transition-all flex flex-col justify-between group ${
+                  isDuplicate
+                    ? 'border-rose-600 bg-rose-50/20 editorial-shadow-sm hover:editorial-shadow'
+                    : 'border-[#1A1A1A] editorial-shadow-sm hover:editorial-shadow'
+                }`}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#1A1A1A]/15 pb-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 bg-[#1A1A1A] text-[#F9F7F2] text-[10px] font-mono font-bold uppercase">
+                        {item.cap_do}
+                      </span>
+                      {isDuplicate && (
+                        <button
+                          type="button"
+                          onClick={() => setIsDuplicateModalOpen(true)}
+                          className="px-1.5 py-0.5 bg-rose-100 text-rose-800 border border-rose-400 text-[10px] font-mono font-bold flex items-center gap-1 hover:bg-rose-200 transition"
+                          title="Cấu trúc này bị trùng lặp, nhấn để mở bảng dọn dẹp"
+                        >
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          <span>TRÙNG</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEditModal(item)}
+                        className="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
+                        title="Edit Rule"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Remove rule "${item.cau_truc}"?`)) {
+                            deleteGrammar(item.grammar_id);
+                          }
+                        }}
+                        className="p-1 border border-[#1A1A1A] hover:bg-rose-900 hover:text-white transition"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-mono font-black text-[#1A1A1A] tracking-tight">
+                    {item.cau_truc}
+                  </h3>
+
+                  <p className="text-sm font-serif text-[#1A1A1A] leading-relaxed line-clamp-3">
+                    {item.giai_thich}
+                  </p>
+
+                  {item.vi_du && (
+                    <div className="p-2.5 bg-[#F9F7F2] border-l-2 border-[#1A1A1A] text-xs flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-serif italic text-[#1A1A1A]">"{item.vi_du}"</p>
+                        {item.vi_du_dich && (
+                          <p className="text-stone-600 font-mono text-[10px] mt-0.5">→ {item.vi_du_dich}</p>
+                        )}
+                      </div>
+                      <SpeakButton
+                        text={item.vi_du}
+                        language={item.ngon_ngu}
+                        variant="card"
+                        position="left"
+                        buttonClassName="bg-white p-1 shrink-0"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-[#1A1A1A]/20 flex flex-wrap gap-1">
+                  {item.tags?.map((t, idx) => (
+                    <span
+                      key={idx}
+                      className="px-1.5 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-stone-700 text-[9px] font-mono"
+                    >
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {filteredGrammar.map((item) => {
+            const isDuplicate = duplicateGrammarInfo.duplicateIds.has(item.grammar_id);
+
+            return (
+              <div
+                key={item.grammar_id}
+                className={`p-6 sm:p-8 bg-white border-2 transition-all space-y-4 ${
+                  isDuplicate
+                    ? 'border-rose-600 bg-rose-50/15 editorial-shadow-sm hover:editorial-shadow'
+                    : 'border-[#1A1A1A] editorial-shadow-sm hover:editorial-shadow'
+                }`}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4 border-b border-[#1A1A1A]/15 pb-4">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2 py-0.5 bg-[#1A1A1A] text-[#F9F7F2] text-[10px] font-mono font-bold uppercase">
+                        {item.cap_do}
+                      </span>
+                      {isDuplicate && (
+                        <button
+                          type="button"
+                          onClick={() => setIsDuplicateModalOpen(true)}
+                          className="px-2 py-0.5 bg-rose-100 text-rose-800 border border-rose-400 text-[10px] font-mono font-bold flex items-center gap-1 hover:bg-rose-200 transition"
+                          title="Cấu trúc này bị trùng lặp, nhấn để mở bảng dọn dẹp"
+                        >
+                          <AlertTriangle className="w-3 h-3" />
+                          <span>TRÙNG LẶP</span>
+                        </button>
+                      )}
+                      {item.tags?.map((t, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-stone-700 text-[10px] font-mono"
+                        >
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-mono font-black text-[#1A1A1A] tracking-tight">
+                      {item.cau_truc}
+                    </h3>
+                  </div>
+
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleOpenEditModal(item)}
-                      className="p-1 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
+                      className="p-1.5 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
                       title="Edit Rule"
                     >
-                      <Edit2 className="w-3 h-3" />
+                      <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Remove rule "${item.cau_truc}"?`)) {
+                        if (confirm(`Delete grammar rule "${item.cau_truc}"?`)) {
                           deleteGrammar(item.grammar_id);
                         }
                       }}
-                      className="p-1 border border-[#1A1A1A] hover:bg-rose-900 hover:text-white transition"
+                      className="p-1.5 border border-[#1A1A1A] hover:bg-rose-900 hover:text-white transition"
                       title="Delete"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
-                <h3 className="text-xl font-mono font-black text-[#1A1A1A] tracking-tight">
-                  {item.cau_truc}
-                </h3>
-
-                <p className="text-sm font-serif text-[#1A1A1A] leading-relaxed line-clamp-3">
+                {/* Explanation */}
+                <p className="text-sm sm:text-base font-serif text-[#1A1A1A] leading-relaxed">
                   {item.giai_thich}
                 </p>
 
+                {/* Example Box */}
                 {item.vi_du && (
-                  <div className="p-2.5 bg-[#F9F7F2] border-l-2 border-[#1A1A1A] text-xs flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-serif italic text-[#1A1A1A]">"{item.vi_du}"</p>
+                  <div className="p-4 bg-[#F9F7F2] border-l-4 border-[#1A1A1A] border-y border-r border-[#1A1A1A]/20 flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <p className="text-sm sm:text-base font-serif font-bold text-[#1A1A1A]">
+                        "{item.vi_du}"
+                      </p>
                       {item.vi_du_dich && (
-                        <p className="text-stone-600 font-mono text-[10px] mt-0.5">→ {item.vi_du_dich}</p>
+                        <p className="text-xs font-mono text-stone-600">→ {item.vi_du_dich}</p>
                       )}
                     </div>
                     <SpeakButton
@@ -460,111 +669,22 @@ export const GrammarManager: React.FC = () => {
                       language={item.ngon_ngu}
                       variant="card"
                       position="left"
-                      buttonClassName="bg-white p-1 shrink-0"
+                      buttonClassName="bg-white p-2 shrink-0"
+                      title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
                     />
                   </div>
                 )}
-              </div>
 
-              <div className="mt-4 pt-3 border-t border-[#1A1A1A]/20 flex flex-wrap gap-1">
-                {item.tags?.map((t, idx) => (
-                  <span
-                    key={idx}
-                    className="px-1.5 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-stone-700 text-[9px] font-mono"
-                  >
-                    #{t}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {filteredGrammar.map((item) => (
-            <div
-              key={item.grammar_id}
-              className="p-6 sm:p-8 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm hover:editorial-shadow transition-all space-y-4"
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between gap-4 border-b border-[#1A1A1A]/15 pb-4">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2 py-0.5 bg-[#1A1A1A] text-[#F9F7F2] text-[10px] font-mono font-bold uppercase">
-                      {item.cap_do}
-                    </span>
-                    {item.tags?.map((t, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-stone-700 text-[10px] font-mono"
-                      >
-                        #{t}
-                      </span>
-                    ))}
+                {/* Notes */}
+                {item.ghi_chu && (
+                  <div className="text-xs font-mono text-[#1A1A1A] bg-[#F9F7F2] border border-[#1A1A1A] p-3 flex items-start gap-2">
+                    <span className="font-bold shrink-0">NOTE:</span>
+                    <span>{item.ghi_chu}</span>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-mono font-black text-[#1A1A1A] tracking-tight">
-                    {item.cau_truc}
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleOpenEditModal(item)}
-                    className="p-1.5 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition"
-                    title="Edit Rule"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete grammar rule "${item.cau_truc}"?`)) {
-                        deleteGrammar(item.grammar_id);
-                      }
-                    }}
-                    className="p-1.5 border border-[#1A1A1A] hover:bg-rose-900 hover:text-white transition"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                )}
               </div>
-
-              {/* Explanation */}
-              <p className="text-sm sm:text-base font-serif text-[#1A1A1A] leading-relaxed">
-                {item.giai_thich}
-              </p>
-
-              {/* Example Box */}
-              {item.vi_du && (
-                <div className="p-4 bg-[#F9F7F2] border-l-4 border-[#1A1A1A] border-y border-r border-[#1A1A1A]/20 flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm sm:text-base font-serif font-bold text-[#1A1A1A]">
-                      "{item.vi_du}"
-                    </p>
-                    {item.vi_du_dich && (
-                      <p className="text-xs font-mono text-stone-600">→ {item.vi_du_dich}</p>
-                    )}
-                  </div>
-                  <SpeakButton
-                    text={item.vi_du}
-                    language={item.ngon_ngu}
-                    variant="card"
-                    position="left"
-                    buttonClassName="bg-white p-2 shrink-0"
-                    title="Nhấn để phát âm 1x • Rê chuột hoặc giữ để chọn tốc độ"
-                  />
-                </div>
-              )}
-
-              {/* Notes */}
-              {item.ghi_chu && (
-                <div className="text-xs font-mono text-[#1A1A1A] bg-[#F9F7F2] border border-[#1A1A1A] p-3 flex items-start gap-2">
-                  <span className="font-bold shrink-0">NOTE:</span>
-                  <span>{item.ghi_chu}</span>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -704,6 +824,16 @@ export const GrammarManager: React.FC = () => {
       <TextbookExtractorModal
         isOpen={isTextbookModalOpen}
         onClose={() => setIsTextbookModalOpen(false)}
+      />
+
+      {/* Duplicate Grammar Deduplication & Filter Modal */}
+      <DuplicateGrammarModal
+        isOpen={isDuplicateModalOpen}
+        onClose={() => setIsDuplicateModalOpen(false)}
+        grammarItems={currentLangGrammar}
+        onDeleteGrammar={batchDeleteGrammar}
+        onAutoCleanAll={() => cleanAllDuplicateGrammar(currentLanguage)}
+        currentLanguage={currentLanguage}
       />
     </div>
   );

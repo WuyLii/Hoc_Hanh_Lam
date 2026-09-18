@@ -319,6 +319,24 @@ async function startServer() {
     }
   });
 
+  app.post('/api/sync/delete-grammar', (req, res) => {
+    try {
+      const { grammarIds } = req.body;
+      if (Array.isArray(grammarIds) && grammarIds.length > 0) {
+        const idSet = new Set(grammarIds);
+        if (Array.isArray(memoryStore.grammar)) {
+          memoryStore.grammar = memoryStore.grammar.filter((g: any) => !idSet.has(g.grammar_id));
+        }
+        memoryStore.lastUpdated = new Date().toISOString();
+        saveMemoryStore();
+      }
+      res.json({ success: true, count: grammarIds?.length || 0, store: memoryStore });
+    } catch (err: any) {
+      console.error('Error in /api/sync/delete-grammar:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // 10. Direct Server REST APIs for Vocabulary (CRUD & Search directly on server disk)
   app.get('/api/vocabulary', (req, res) => {
     try {

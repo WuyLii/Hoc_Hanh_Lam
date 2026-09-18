@@ -141,13 +141,28 @@ export function cleanDeduplicateVocab(items: VocabularyItem[]): VocabularyItem[]
   return Array.from(map.values());
 }
 
+/**
+ * Normalizes grammar structure keys for robust duplicate comparison
+ * Example: "-아/어요" -> "아/어요", "V + (으)ㄹ 거예요" -> "v+(으)ㄹ거예요"
+ */
+export function normalizeGrammarKey(rawStructure: string): string {
+  if (!rawStructure || typeof rawStructure !== 'string') return '';
+  return rawStructure
+    .toLowerCase()
+    .replace(/^[-–—~.\s]+/, '')
+    .replace(/[-–—~.\s]+$/, '')
+    .replace(/\s*\+\s*/g, '+')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function cleanDeduplicateGrammar(items: GrammarItem[]): GrammarItem[] {
   if (!Array.isArray(items)) return [];
   const map = new Map<string, GrammarItem>();
 
   items.forEach((item) => {
     if (!item) return;
-    const structKey = (item.cau_truc || '').trim().toLowerCase();
+    const structKey = normalizeGrammarKey(item.cau_truc || '');
     const langKey = (item.ngon_ngu || 'ko').trim().toLowerCase();
 
     if (!structKey) return;
@@ -160,20 +175,28 @@ export function cleanDeduplicateGrammar(items: GrammarItem[]): GrammarItem[] {
         ...item,
         cau_truc: (item.cau_truc || '').trim(),
         giai_thich: cleanGiaiThich,
-        grammar_id: item.grammar_id || `g_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        grammar_id: item.grammar_id || `gr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       });
     } else {
       const existing = map.get(canonicalKey)!;
       const combinedGiaiThich = [existing.giai_thich, item.giai_thich].filter(Boolean).join('; ');
       const mergedGiaiThich = sanitizeAndDeduplicateGrammarExplanation(combinedGiaiThich);
+      
+      // Preserve richest example & example translation
+      const bestExample = (item.vi_du && item.vi_du.length > 5) ? item.vi_du : (existing.vi_du || item.vi_du || '');
+      const bestExampleVi = (item.vi_du_dich && item.vi_du_dich.length > 3) ? item.vi_du_dich : (existing.vi_du_dich || item.vi_du_dich || '');
+      const mergedTags = Array.from(new Set([...(existing.tags || []), ...(item.tags || [])]));
 
       map.set(canonicalKey, {
         ...existing,
         ...item,
         grammar_id: existing.grammar_id || item.grammar_id,
-        giai_thich: mergedGiaiThich,
-        vi_du: item.vi_du || existing.vi_du || '',
-        vi_du_dich: item.vi_du_dich || existing.vi_du_dich || '',
+        cau_truc: existing.cau_truc.length >= item.cau_truc.length ? existing.cau_truc : item.cau_truc,
+        giai_thich: mergedGiaiThich || existing.giai_thich || item.giai_thich,
+        vi_du: bestExample,
+        vi_du_dich: bestExampleVi,
+        tags: mergedTags,
+        ghi_chu: existing.ghi_chu || item.ghi_chu || '',
       });
     }
   });

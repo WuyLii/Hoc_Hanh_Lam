@@ -28,6 +28,7 @@ import {
   cleanDeduplicateVocab,
   cleanDeduplicateGrammar,
   cleanDeduplicateDecks,
+  normalizeGrammarKey,
 } from '../utils/deduplicate';
 import { idbGet, idbSet, idbClear } from '../utils/idbStorage';
 
@@ -59,6 +60,8 @@ interface AppContextType {
   addGrammar: (item: Partial<GrammarItem>) => GrammarItem;
   updateGrammar: (item: GrammarItem) => void;
   deleteGrammar: (grammarId: string) => void;
+  batchDeleteGrammar: (grammarIds: string[]) => Promise<number>;
+  cleanAllDuplicateGrammar: (language?: LanguageCode) => Promise<{ success: boolean; deletedCount: number; message: string }>;
   batchAddGrammar: (items: Partial<GrammarItem>[]) => number;
 
   reviewSessions: ReviewSession[];
@@ -621,15 +624,105 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setGrammar((prev) => prev.map((g) => (g.grammar_id === item.grammar_id ? item : g)));
   };
 
-  const deleteGrammar = (grammarId: string) => {
+  const batchDeleteGrammar = async (grammarIds: string[]): Promise<number> => {
+    if (!grammarIds || grammarIds.length === 0) return 0;
+    const idSet = new Set(grammarIds);
+
+    // 1. Immediately update in-memory state & IndexedDB
     setGrammar((prev) => {
-      const filtered = prev.filter((g) => g.grammar_id !== grammarId);
+      const filtered = prev.filter((g) => !idSet.has(g.grammar_id));
       idbSet('grammar', filtered).catch(() => {});
       return filtered;
     });
-    if (SupabaseService.isConfigured()) {
-      SupabaseService.deleteGrammar([grammarId]).catch(() => {});
+
+    // 2. Send delete command to Server cloud store
+    try {
+      await safeFetchWithTimeout(
+        '/api/sync/delete-grammar',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ grammarIds }),
+        },
+        5000
+      );
+    } catch (e) {
+      console.warn('Không thể gửi yêu cầu xóa ngữ pháp lên máy chủ:', e);
     }
+
+    // 3. Immediately delete from Supabase Cloud if configured
+    if (SupabaseService.isConfigured()) {
+      try {
+        await SupabaseService.deleteGrammar(grammarIds);
+      } catch (e) {
+        console.warn('Lỗi khi xóa ngữ pháp khỏi Supabase Cloud:', e);
+      }
+    }
+
+    return grammarIds.length;
+  };
+
+  const deleteGrammar = (grammarId: string) => {
+    batchDeleteGrammar([grammarId]).catch((e) => {
+      console.error('Lỗi khi xóa ngữ pháp:', e);
+    });
+  };
+
+  const cleanAllDuplicateGrammar = async (
+    lang?: LanguageCode
+  ): Promise<{ success: boolean; deletedCount: number; message: string }> => {
+    const targetLang = lang || currentLanguage;
+    const map = new Map<string, GrammarItem[]>();
+    const listToCheck = grammar.filter((g) => !lang || g.ngon_ngu === targetLang);
+
+    listToCheck.forEach((item) => {
+      const langKey = (item.ngon_ngu || 'ko').trim().toLowerCase();
+      const structKey = normalizeGrammarKey(item.cau_truc || '');
+      if (!structKey) return;
+      const key = `${langKey}:${structKey}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    });
+
+    const idsToDelete: string[] = [];
+    map.forEach((items) => {
+      if (items.length > 1) {
+        // Sort items: keep richest/most complete entry
+        const sorted = [...items].sort((a, b) => {
+          const scoreA = (a.vi_du ? 2 : 0) + (a.vi_du_dich ? 2 : 0) + ((a.giai_thich || '').length > 20 ? 1 : 0) + (a.tags?.length || 0);
+          const scoreB = (b.vi_du ? 2 : 0) + (b.vi_du_dich ? 2 : 0) + ((b.giai_thich || '').length > 20 ? 1 : 0) + (b.tags?.length || 0);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          const timeA = new Date(a.created_at || 0).getTime();
+          const timeB = new Date(b.created_at || 0).getTime();
+          if (timeA !== timeB) return timeB - timeA;
+          return (b.grammar_id || '').localeCompare(a.grammar_id || '');
+        });
+
+        // Keep index 0, mark other duplicate copies for deletion
+        for (let i = 1; i < sorted.length; i++) {
+          idsToDelete.push(sorted[i].grammar_id);
+        }
+      }
+    });
+
+    if (idsToDelete.length > 0) {
+      await batchDeleteGrammar(idsToDelete);
+    }
+
+    // Also run cleanDeduplicateGrammar to sanitize and deduplicate remaining items
+    setGrammar((prev) => {
+      const sanitized = cleanDeduplicateGrammar(prev);
+      idbSet('grammar', sanitized).catch(() => {});
+      return sanitized;
+    });
+
+    return {
+      success: true,
+      deletedCount: idsToDelete.length,
+      message: idsToDelete.length > 0
+        ? `Đã dọn dẹp và xóa sạch thành công ${idsToDelete.length} cấu trúc ngữ pháp trùng lặp!`
+        : 'Đã chuẩn hóa và làm sạch tất cả ngữ pháp!',
+    };
   };
 
   const batchAddGrammar = (items: Partial<GrammarItem>[]): number => {
@@ -1267,6 +1360,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addGrammar,
         updateGrammar,
         deleteGrammar,
+        batchDeleteGrammar,
+        cleanAllDuplicateGrammar,
         batchAddGrammar,
 
         reviewSessions,
