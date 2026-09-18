@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -88,7 +88,7 @@ export function createGenAIInstance(apiKey: string): GoogleGenAI {
     apiKey,
     httpOptions: {
       headers: {
-        'User-Agent': 'polyglot-hub-dual-key/2.0',
+        'User-Agent': 'aistudio-build',
       },
     },
   });
@@ -245,24 +245,24 @@ export interface DedicatedModelConfig {
 export const DEDICATED_TUTOR_MODELS: DedicatedModelConfig[] = [
   {
     id: 'tutor-1',
-    name: 'Gia sư AI 1 (Gemini 3.7 Flash)',
-    model: 'gemini-3.7-flash',
+    name: 'Gia sư AI 1 (Gemini 3.8 Flash Flagship)',
+    model: 'gemini-3.8-flash',
     fallbackModel: 'gemini-flash-latest',
-    description: 'Chuyên gia Phân tích Chuyên sâu & Sư phạm Ngôn ngữ Cao cấp',
+    description: 'Chuyên gia Phân tích Sư phạm Ngôn ngữ Chuyên sâu & Phản hồi Tốc độ cao',
   },
   {
     id: 'tutor-2',
-    name: 'Gia sư AI 2 (Gemini 3.1 Pro)',
-    model: 'gemini-3.1-pro',
-    fallbackModel: 'gemini-flash-latest',
-    description: 'Chuyên gia Logic Ngữ nghĩa Sâu sắc & Đối chiếu Đa Ngữ',
+    name: 'Gia sư AI 2 (Gemini Flash Latest)',
+    model: 'gemini-flash-latest',
+    fallbackModel: 'gemini-3.8-flash',
+    description: 'Chuyên gia Logic Ngữ nghĩa Sâu sắc & Đối chiếu Đa Ngữ Tốc độ cao',
   },
   {
     id: 'tutor-backup',
-    name: 'Gia sư AI Dự phòng (Gemini Flash Lite)',
+    name: 'Gia sư AI Dự phòng (Gemini 3.1 Flash Lite)',
     model: 'gemini-3.1-flash-lite',
     fallbackModel: 'gemini-flash-latest',
-    description: 'Dự phòng siêu tốc độ cao',
+    description: 'Dự phòng siêu tốc độ cao và ổn định',
   },
 ];
 
@@ -364,24 +364,24 @@ export async function callGeminiTutorAlternating(
 export const DEDICATED_DICTIONARY_MODELS: DedicatedModelConfig[] = [
   {
     id: 'dict-ai-1',
-    name: 'Từ điển AI 1 (Gemini 3.8 Flash)',
+    name: 'Từ điển AI 1 (Gemini 3.8 Flash Flagship)',
     model: 'gemini-3.8-flash',
     fallbackModel: 'gemini-flash-latest',
-    description: 'Chuyên gia Đại từ điển Học thuật, Ngữ nghĩa sâu sắc & Phiên âm quốc tế',
+    description: 'Chuyên gia Đại từ điển Học thuật, Ngữ nghĩa sâu sắc, IPA & Hán Việt',
   },
   {
     id: 'dict-ai-2',
     name: 'Từ điển AI 2 (Gemini Flash Latest)',
     model: 'gemini-flash-latest',
-    fallbackModel: 'gemini-3.7-flash',
+    fallbackModel: 'gemini-3.1-flash-lite',
     description: 'Chuyên gia Song ngữ Tốc độ cao, Đối chiếu Hán Việt & Dự phòng thông minh',
   },
   {
     id: 'dict-ai-lite',
-    name: 'Từ điển AI 3 (Gemini Flash Lite)',
+    name: 'Từ điển AI 3 (Gemini 3.1 Flash Lite)',
     model: 'gemini-3.1-flash-lite',
     fallbackModel: 'gemini-flash-latest',
-    description: 'Dự phòng siêu tốc độ cao',
+    description: 'Dự phòng siêu tốc độ cao và ổn định',
   },
 ];
 
@@ -475,12 +475,12 @@ export async function callGeminiDictionaryAlternating(
 // =========================================================================
 // NHÓM 3: CÁC TÍNH NĂNG CÒN LẠI (NON-TUTOR, NON-DICTIONARY)
 // OCR trích xuất ảnh, Bóc tách Sách, Đề thi, Nhật ký, Tạo từ vựng, Nhập vai...
-// Dùng nhóm mô hình độc lập: gemini-3.1-flash-lite, gemini-flash-latest, gemini-3.7-flash
+// Dùng nhóm mô hình độc lập: gemini-3.8-flash, gemini-flash-latest, gemini-3.1-flash-lite
 // =========================================================================
 export const NON_TUTOR_MODELS = [
-  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash',
   'gemini-flash-latest',
-  'gemini-3.7-flash',
+  'gemini-3.1-flash-lite',
 ];
 
 export async function callNonTutorGeminiWithRetry(options: any, contents: any, config?: any) {
@@ -593,7 +593,7 @@ export async function handleChat(body: any, headers?: any) {
     : '📚 QUY ĐỊNH ĐỘ DÀI: TRẢ LỜI CHI TIẾT (Long Mode). Đóng vai Gia sư AI cá nhân thực thụ, giải thích tận tình, dịch đầy đủ toàn vẹn, phân tích chi tiết từng thành phần ngữ pháp, từ vựng, phiên âm, ví dụ tự nhiên và mẹo nhớ.';
 
   const systemInstruction = `Bạn là THỰC THỂ AI GIA SƯ NGÔN NGỮ ĐỘC LẬP VÀ THÔNG MINH NHẤT (Polyglot Hub Dedicated Flagship Language Tutor).
-Bạn hoạt động như một con AI riêng biệt, thông minh nhất hệ thống, chuyên biệt nâng cao năng lực ngoại ngữ cho người học. Bạn hoàn toàn độc lập và không bị ảnh hưởng hay liên can tới các module AI bóc tách/OCR tiện ích khác.
+Bạn hoạt động như một con AI riêng biệt, thông minh nhất hệ thống, chuyên biệt nâng cao năng lực ngoại ngữ cho người học. Bạn phản hồi cực kỳ nhanh chóng và chính xác.
 
 Ngôn ngữ người học đang tập trung hiện tại: ${langName}.
 
@@ -661,7 +661,10 @@ Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markd
     contents,
     {
       systemInstruction,
-      temperature: 0.7,
+      temperature: 0.6,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
     },
     body.turn
   );
@@ -775,7 +778,10 @@ Trả về duy nhất định dạng JSON chuẩn:
     prompt,
     {
       responseMimeType: 'application/json',
-      temperature: 0.3,
+      temperature: 0.2,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
     }
   );
 
@@ -842,7 +848,13 @@ Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trú
   const response = await callNonTutorGeminiWithRetry(
     { customApiKey, customApiKey2, headers },
     prompt,
-    { responseMimeType: 'application/json' }
+    {
+      responseMimeType: 'application/json',
+      temperature: 0.3,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
+    }
   );
 
   return safeParseJSON(response.text || '{}');
@@ -895,6 +907,9 @@ Guidelines:
     {
       systemInstruction,
       temperature: 0.7,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
     }
   );
 
@@ -937,7 +952,13 @@ Hãy đánh giá chi tiết và trả về kết quả định dạng JSON thu�
   const response = await callNonTutorGeminiWithRetry(
     { customApiKey, customApiKey2, headers },
     prompt,
-    { responseMimeType: 'application/json' }
+    {
+      responseMimeType: 'application/json',
+      temperature: 0.3,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
+    }
   );
 
   return safeParseJSON(response.text || '{}');
@@ -986,7 +1007,13 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
   const response = await callNonTutorGeminiWithRetry(
     { customApiKey, customApiKey2, headers },
     prompt,
-    { responseMimeType: 'application/json' }
+    {
+      responseMimeType: 'application/json',
+      temperature: 0.3,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
+    }
   );
 
   return safeParseJSON(response.text || '{}');
@@ -1000,7 +1027,7 @@ export async function handleOcrExtract(body: any, headers?: any) {
 
 YÊU CẦU QUAN TRỌNG HÀNG ĐẦU - ĐỌC VÀ TRÍCH XUẤT 100% TOÀN BỘ DỮ LIỆU:
 1. TRÍCH XUẤT ĐẦY ĐỦ 100% CÁC TỪ VỰNG: Đọc lần lượt từng dòng, từng cột từ trên xuống dưới. BẮT BUỘC trích xuất TẤT CẢ các từ vựng vào mảng "words".
-2. QUY TẮC ĐỐI ỨNG ANH - HÀN BẮT BUỘC:
+2. QUY TẮC ĐỐI ỨNG ANH - HÀN BẮT BUỘC (Trực tiếp trong lần trích xuất này):
    - Nếu từ vựng là Tiếng Hàn (ko):
      • "tu": Từ tiếng Hàn (Hangul).
      • "phien_am": Phiên âm Romaja chuẩn (ví dụ: [po-gi-ha-da]).
@@ -1057,7 +1084,13 @@ Cấu trúc JSON đầu ra:
   const response = await callNonTutorGeminiWithRetry(
     { customApiKey, customApiKey2, headers },
     parts,
-    { responseMimeType: 'application/json' }
+    {
+      responseMimeType: 'application/json',
+      temperature: 0.1,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
+    }
   );
 
   const parsed = safeParseJSON(response.text || '{}');
@@ -1120,7 +1153,13 @@ Quy định cấu trúc JSON:
   const response = await callNonTutorGeminiWithRetry(
     { customApiKey, customApiKey2, headers },
     parts,
-    { responseMimeType: 'application/json' }
+    {
+      responseMimeType: 'application/json',
+      temperature: 0.2,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
+    }
   );
 
   const parsed = safeParseJSON(response.text || '{}');
@@ -1174,6 +1213,9 @@ Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
     {
       responseMimeType: 'application/json',
       temperature: 0.1,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
     }
   );
 
@@ -1212,11 +1254,13 @@ export async function ensureBilingualCrossMeanings(words: any[], defaultLanguage
     }
   });
 
+  // Chỉ gọi bổ sung nếu có từ thực sự thiếu (giới hạn tối đa 30 từ để đảm bảo tốc độ phản hồi)
   if (missingList.length > 0) {
     try {
+      const batchToFill = missingList.slice(0, 30);
       const fillResult = await handleFillMissingBilingual({
         language: defaultLanguage || 'ko',
-        words: missingList.map((m) => ({
+        words: batchToFill.map((m) => ({
           word_id: String(m.index),
           tu: m.tu,
           nghia: m.nghia,
