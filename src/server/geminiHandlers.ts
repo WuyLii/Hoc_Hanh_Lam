@@ -186,8 +186,8 @@ export async function callGeminiDictionaryAlternating(
   // Lượt chẵn: Từ điển AI 1 trước, nếu quá tải/lỗi tự động chuyển sang Từ điển AI 2.
   // Lượt lẻ: Từ điển AI 2 trước, nếu quá tải/lỗi tự động chuyển sang Từ điển AI 1.
   const dictSequence = isTurn0
-    ? [DEDICATED_DICTIONARY_MODELS[0], DEDICATED_DICTIONARY_MODELS[1]]
-    : [DEDICATED_DICTIONARY_MODELS[1], DEDICATED_DICTIONARY_MODELS[0]];
+    ? [DEDICATED_DICTIONARY_MODELS[0], DEDICATED_DICTIONARY_MODELS[1], { id: 'dict-ai-lite', name: 'Từ điển AI Dự phòng (Flash Lite)', model: 'gemini-3.1-flash-lite', description: 'Dự phòng siêu tốc' }]
+    : [DEDICATED_DICTIONARY_MODELS[1], DEDICATED_DICTIONARY_MODELS[0], { id: 'dict-ai-lite', name: 'Từ điển AI Dự phòng (Flash Lite)', model: 'gemini-3.1-flash-lite', description: 'Dự phòng siêu tốc' }];
 
   let lastError: any = null;
 

@@ -46,28 +46,77 @@ export async function lookupDictionaryApi(
     };
   }
 
-  const response = await fetch('/api/gemini/dictionary-lookup', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, language, mode, forceRefresh }),
-  });
+  // Resilient fetch with retries & timeout
+  const maxAttempts = 2;
+  let lastError: any = null;
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Lỗi kết nối từ điển (${response.status})`);
-  }
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
 
-  const result: DictionaryResult = await response.json();
-  if (result && result.found) {
-    memoryCache.set(cacheKey, result);
-    // Also cache by resulting word
-    if (result.word) {
-      memoryCache.set(getCacheKey(result.word, language), result);
+    try {
+      const response = await fetch('/api/gemini/dictionary-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, language, mode, forceRefresh }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const msg = errorData.error || `Lỗi kết nối từ điển (${response.status})`;
+        throw new Error(msg);
+      }
+
+      const result: DictionaryResult = await response.json();
+      if (result && result.found) {
+        memoryCache.set(cacheKey, result);
+        // Also cache by resulting word
+        if (result.word) {
+          memoryCache.set(getCacheKey(result.word, language), result);
+        }
+        savePersistentCache();
+      }
+
+      return result;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      lastError = err;
+
+      // If aborted by timeout
+      if (err?.name === 'AbortError') {
+        lastError = new Error('Quá trình tra cứu mất quá nhiều thời gian. Vui lòng bấm thử lại!');
+      }
+
+      // If network fetch failed (e.g. TypeError: Failed to fetch)
+      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError') || err?.name === 'TypeError') {
+        lastError = new Error('Không thể kết nối đến máy chủ từ điển. Đang thử kết nối lại...');
+      }
+
+      // If this is the first attempt, wait briefly and retry
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
-    savePersistentCache();
   }
 
-  return result;
+  // If all attempts failed, check if we have any cached partial result
+  if (memoryCache.has(cacheKey)) {
+    return {
+      ...memoryCache.get(cacheKey)!,
+      fromCache: true,
+    };
+  }
+
+  // Throw clear friendly error
+  const finalMessage = lastError?.message || 'Không thể tra từ điển lúc này. Vui lòng thử lại sau ít giây!';
+  throw new Error(
+    finalMessage.includes('Failed to fetch')
+      ? 'Không thể kết nối đến máy chủ từ điển. Vui lòng kiểm tra đường truyền mạng hoặc thử lại!'
+      : finalMessage
+  );
 }
 
 export function getDictionaryHistory(): DictionaryHistoryItem[] {
