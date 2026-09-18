@@ -5,6 +5,7 @@ import { ttsService } from '../services/ttsService';
 import { SpeakButton } from './SpeakButton';
 import { TextbookExtractorModal } from './TextbookExtractorModal';
 import { matchGrammar } from '../utils/searchHelper';
+import koreanGrammarSeed from '../data/koreanGrammarData.json';
 import {
   Plus,
   Search,
@@ -17,13 +18,30 @@ import {
   Sparkles,
   LayoutGrid,
   List as ListIcon,
+  BookOpen,
+  CheckCircle,
+  RefreshCw,
 } from 'lucide-react';
+
+const KOREAN_LESSONS = [
+  { id: 'ALL', label: 'Tất cả bài', icon: '📚' },
+  { id: 'Bài 1', label: 'Bài 1: Giới thiệu (소개)', icon: '👋' },
+  { id: 'Bài 2', label: 'Bài 2: Trường học (학교)', icon: '🏫' },
+  { id: 'Bài 3', label: 'Bài 3: Sinh hoạt (일상생활)', icon: '☕' },
+  { id: 'Bài 4', label: 'Bài 4: Mua sắm (쇼핑)', icon: '🛍️' },
+  { id: 'Bài 5', label: 'Bài 5: Ngày & Thứ (날짜와 요일)', icon: '📅' },
+  { id: 'Bài 6', label: 'Bài 6: Lịch trình (하루 일과)', icon: '⏰' },
+  { id: 'Bài 7', label: 'Bài 7: Thời tiết (날씨)', icon: '☀️' },
+  { id: 'Bài 8', label: 'Bài 8: Điện thoại (전화)', icon: '📞' },
+  { id: 'Bài 9', label: 'Bài 9: Ngày nghỉ (휴일)', icon: '🏖️' },
+];
 
 export const GrammarManager: React.FC = () => {
   const {
     currentLanguage,
     currentLangGrammar,
     addGrammar,
+    batchAddGrammar,
     updateGrammar,
     deleteGrammar,
     selectedLevelFilter,
@@ -32,7 +50,9 @@ export const GrammarManager: React.FC = () => {
   const currentLangInfo = LANGUAGES[currentLanguage];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLevel, setSelectedLevel] = useState(selectedLevelFilter || 'ALL');
+  const [selectedLesson, setSelectedLesson] = useState('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (selectedLevelFilter) {
@@ -121,7 +141,13 @@ export const GrammarManager: React.FC = () => {
     resetForm();
   };
 
-  // Filter & Rank Grammar Items with smart symbol and tone-insensitive search
+  const handleReloadKoreanCurriculum = () => {
+    const count = batchAddGrammar(koreanGrammarSeed as GrammarItem[]);
+    setToastMessage(`Đã nạp đầy đủ ${koreanGrammarSeed.length} ngữ pháp Sơ Cấp 1 (Bài 1 - Bài 9)!`);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Filter & Rank Grammar Items with smart symbol, tone-insensitive search, and lesson tags
   const filteredGrammar = useMemo(() => {
     const scored = currentLangGrammar
       .map((g) => {
@@ -133,6 +159,13 @@ export const GrammarManager: React.FC = () => {
             selectedLevel.toLowerCase().includes(g.cap_do.toLowerCase())
           ));
         if (!matchLevel) return null;
+
+        if (selectedLesson !== 'ALL') {
+          const hasLessonTag = g.tags?.some((t) =>
+            t.toLowerCase().includes(selectedLesson.toLowerCase())
+          );
+          if (!hasLessonTag) return null;
+        }
 
         const res = matchGrammar(g, searchQuery);
         if (!res.matches) return null;
@@ -146,10 +179,10 @@ export const GrammarManager: React.FC = () => {
         if (searchQuery.trim() && b.score !== a.score) {
           return b.score - a.score;
         }
-        return new Date(b.item.created_at || '').getTime() - new Date(a.item.created_at || '').getTime();
+        return (a.item.grammar_id || '').localeCompare(b.item.grammar_id || '');
       })
       .map((entry) => entry.item);
-  }, [currentLangGrammar, selectedLevel, searchQuery]);
+  }, [currentLangGrammar, selectedLevel, selectedLesson, searchQuery]);
 
   return (
     <div className="space-y-8 pb-12">
@@ -166,17 +199,28 @@ export const GrammarManager: React.FC = () => {
             </span>
           </div>
           <p className="text-xs font-mono uppercase tracking-widest text-stone-600 mt-1">
-            Rules, Sentence Patterns, and Syntax Architecture
+            Rules, Sentence Patterns, and Syntax Architecture • Sơ Cấp 1 (Bài 1 → Bài 9)
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {currentLanguage === 'ko' && (
+            <button
+              onClick={handleReloadKoreanCurriculum}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 border-2 border-emerald-800 bg-emerald-100 text-emerald-950 hover:bg-emerald-200 text-xs font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm"
+              title="Đồng bộ lại toàn bộ 38 cấu trúc ngữ pháp Sơ cấp 1 từ Bài 1 đến Bài 9"
+            >
+              <RefreshCw className="w-4 h-4 text-emerald-700" />
+              <span>NẠP SƠ CẤP 1 (BÀI 1-9)</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsTextbookModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2.5 border-2 border-amber-800 bg-amber-100 text-amber-950 hover:bg-amber-200 text-xs font-mono font-bold uppercase tracking-wider transition editorial-shadow-sm"
           >
             <Sparkles className="w-4 h-4 text-amber-700" />
-            <span>🤖 AI ĐỌC SÁCH & TRÍCH XUẤT</span>
+            <span>🤖 AI TRÍCH XUẤT</span>
           </button>
 
           <button
@@ -184,10 +228,65 @@ export const GrammarManager: React.FC = () => {
             className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-xs font-mono font-bold uppercase tracking-widest editorial-shadow-sm transition"
           >
             <Plus className="w-4 h-4" />
-            <span>+ NEW_STRUCTURE</span>
+            <span>+ THÊM NGỮ PHÁP</span>
           </button>
         </div>
       </div>
+
+      {toastMessage && (
+        <div className="flex items-center gap-2 p-3 bg-emerald-600 text-white font-mono text-xs font-bold border-2 border-[#1A1A1A] editorial-shadow-sm animate-pulse">
+          <CheckCircle className="w-4 h-4 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Korean Lesson Filter Chips */}
+      {currentLanguage === 'ko' && (
+        <div className="bg-[#F4F1EA] border-2 border-[#1A1A1A] p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A1A1A] flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-stone-700" />
+              Chọn bài học Sơ Cấp 1 (Giáo trình Tiếng Hàn Sơ Cấp 1):
+            </span>
+            <span className="text-[11px] font-mono text-stone-600">
+              {selectedLesson === 'ALL' ? 'Tất cả bài (1 - 9)' : selectedLesson}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {KOREAN_LESSONS.map((ls) => {
+              const isActive = selectedLesson === ls.id;
+              const countInLesson =
+                ls.id === 'ALL'
+                  ? currentLangGrammar.length
+                  : currentLangGrammar.filter((g) =>
+                      g.tags?.some((t) => t.toLowerCase().includes(ls.id.toLowerCase()))
+                    ).length;
+
+              return (
+                <button
+                  key={ls.id}
+                  onClick={() => setSelectedLesson(ls.id)}
+                  className={`px-2.5 py-1.5 text-xs font-mono font-bold border transition flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-sm'
+                      : 'bg-white text-stone-800 border-stone-300 hover:border-[#1A1A1A] hover:bg-stone-100'
+                  }`}
+                >
+                  <span>{ls.icon}</span>
+                  <span>{ls.label}</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                      isActive ? 'bg-white text-[#1A1A1A]' : 'bg-stone-200 text-stone-700'
+                    }`}
+                  >
+                    {countInLesson}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filter Bar with View Mode Toggle */}
       <div className="bg-white border-2 border-[#1A1A1A] editorial-shadow-sm p-4 sm:p-6 space-y-4">
@@ -248,6 +347,7 @@ export const GrammarManager: React.FC = () => {
         <div className="flex items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono">
           <div className="text-stone-600">
             SHOWING <strong className="text-[#1A1A1A]">{filteredGrammar.length}</strong> OF {currentLangGrammar.length} RULES
+            {selectedLesson !== 'ALL' && <span className="ml-2 text-indigo-700 font-bold">({selectedLesson})</span>}
           </div>
 
           <div className="flex items-center gap-1 border border-[#1A1A1A] p-0.5 bg-[#F9F7F2]">
@@ -348,11 +448,20 @@ export const GrammarManager: React.FC = () => {
                 </p>
 
                 {item.vi_du && (
-                  <div className="p-2.5 bg-[#F9F7F2] border-l-2 border-[#1A1A1A] text-xs">
-                    <p className="font-serif italic text-[#1A1A1A]">"{item.vi_du}"</p>
-                    {item.vi_du_dich && (
-                      <p className="text-stone-600 font-mono text-[10px] mt-0.5">→ {item.vi_du_dich}</p>
-                    )}
+                  <div className="p-2.5 bg-[#F9F7F2] border-l-2 border-[#1A1A1A] text-xs flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-serif italic text-[#1A1A1A]">"{item.vi_du}"</p>
+                      {item.vi_du_dich && (
+                        <p className="text-stone-600 font-mono text-[10px] mt-0.5">→ {item.vi_du_dich}</p>
+                      )}
+                    </div>
+                    <SpeakButton
+                      text={item.vi_du}
+                      language={item.ngon_ngu}
+                      variant="card"
+                      position="left"
+                      buttonClassName="bg-white p-1 shrink-0"
+                    />
                   </div>
                 )}
               </div>

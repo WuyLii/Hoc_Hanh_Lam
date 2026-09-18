@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { SupabaseSettings } from './SupabaseSettings';
 import { GoogleSheetsSettings } from './GoogleSheetsSettings';
+import { GeminiDualKeySettings } from './GeminiDualKeySettings';
 import { useApp } from '../context/AppContext';
-import { Database, FileSpreadsheet, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Database, FileSpreadsheet, Trash2, AlertTriangle, RefreshCw, Cpu, Sparkles } from 'lucide-react';
 
 export const DatabaseSettingsHub: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'supabase' | 'sheets'>('supabase');
+  const [activeTab, setActiveTab] = useState<'supabase' | 'sheets' | 'gemini_keys'>('supabase');
   const { clearAllData } = useApp();
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -27,17 +28,17 @@ export const DatabaseSettingsHub: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="bg-[#1A1A1A] text-[#F9F7F2] text-[10px] font-mono font-bold uppercase px-2.5 py-0.5">
-              Cơ sở dữ liệu Đám mây
+              Cơ sở dữ liệu &amp; AI
             </span>
             <span className="text-xs font-serif italic text-stone-600">
-              Supabase PostgreSQL &amp; Cloud Memory Store
+              Supabase, Google Sheets &amp; 2 Mã Nguồn Gemini API (Vercel)
             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-black tracking-tight text-[#1A1A1A]">
-            Quản Lý Cơ Sở Dữ Liệu
+            Quản Lý Cơ Sở Dữ Liệu &amp; Hệ Thống AI
           </h1>
           <p className="text-xs font-mono uppercase tracking-widest text-stone-600 mt-2 max-w-2xl">
-            Cấu hình đồng bộ dữ liệu hoặc quản lý thiết lập lưu trữ đám mây.
+            Cấu hình đồng bộ dữ liệu, thiết lập đám mây và quản lý 2 mã nguồn Gemini API trên Vercel.
           </p>
         </div>
 
@@ -92,10 +93,10 @@ export const DatabaseSettingsHub: React.FC = () => {
       )}
 
       {/* Tabs Selector */}
-      <div className="flex items-center border-b-2 border-[#1A1A1A] bg-[#F3EFE6] p-1 gap-1">
+      <div className="flex flex-wrap items-center border-b-2 border-[#1A1A1A] bg-[#F3EFE6] p-1 gap-1">
         <button
           onClick={() => setActiveTab('supabase')}
-          className={`flex-1 py-3 px-4 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition border-2 ${
+          className={`flex-1 min-w-[200px] py-3 px-4 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition border-2 ${
             activeTab === 'supabase'
               ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-[2px_2px_0px_0px_#000]'
               : 'bg-white text-stone-700 border-transparent hover:bg-stone-100'
@@ -104,25 +105,42 @@ export const DatabaseSettingsHub: React.FC = () => {
           <Database className="w-4 h-4 text-emerald-400" />
           <span>CSDL Supabase (PostgreSQL)</span>
           <span className="text-[9px] bg-emerald-500 text-stone-950 font-black px-1.5 py-0.5 rounded ml-1">
-            MỚI / KHUYÊN DÙNG
+            MỚI
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('sheets')}
-          className={`flex-1 py-3 px-4 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition border-2 ${
+          className={`flex-1 min-w-[180px] py-3 px-4 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition border-2 ${
             activeTab === 'sheets'
               ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-[2px_2px_0px_0px_#000]'
               : 'bg-white text-stone-700 border-transparent hover:bg-stone-100'
           }`}
         >
           <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-          <span>Google Sheets Database</span>
+          <span>Google Sheets</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('gemini_keys')}
+          className={`flex-1 min-w-[220px] py-3 px-4 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition border-2 ${
+            activeTab === 'gemini_keys'
+              ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-[2px_2px_0px_0px_#000]'
+              : 'bg-white text-stone-700 border-transparent hover:bg-stone-100'
+          }`}
+        >
+          <Cpu className="w-4 h-4 text-amber-400" />
+          <span>2 Mã Nguồn Gemini API</span>
+          <span className="text-[9px] bg-amber-400 text-stone-950 font-black px-1.5 py-0.5 rounded ml-1">
+            VERCEL
+          </span>
         </button>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'supabase' ? <SupabaseSettings /> : <GoogleSheetsSettings />}
+      {activeTab === 'supabase' && <SupabaseSettings />}
+      {activeTab === 'sheets' && <GoogleSheetsSettings />}
+      {activeTab === 'gemini_keys' && <GeminiDualKeySettings />}
     </div>
   );
 };

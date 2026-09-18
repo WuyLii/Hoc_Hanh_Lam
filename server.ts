@@ -15,6 +15,7 @@ import {
   handleCheckJournal,
   handleGenerateMockTest,
   formatGeminiError,
+  getKeysStatus,
 } from './src/server/geminiHandlers.ts';
 import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from './src/utils/deduplicate.ts';
@@ -85,10 +86,20 @@ async function startServer() {
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
+  // 0. Gemini API Keys & Architecture Status
+  app.get('/api/gemini/keys-status', (req, res) => {
+    try {
+      const status = getKeysStatus({ headers: req.headers });
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || 'Lỗi kiểm tra trạng thái khóa API' });
+    }
+  });
+
   // 1. General Language AI Chat & Multi-modal Image Analysis
   app.post('/api/gemini/chat', async (req, res) => {
     try {
-      const result = await handleChat(req.body);
+      const result = await handleChat(req.body, req.headers);
       res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/chat:', error);
@@ -99,7 +110,7 @@ async function startServer() {
   // 2. Vocabulary Enrichment & Auto Example Generator
   app.post('/api/gemini/generate-example', async (req, res) => {
     try {
-      const result = await handleGenerateExample(req.body);
+      const result = await handleGenerateExample(req.body, req.headers);
       res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/generate-example:', error);
@@ -110,7 +121,7 @@ async function startServer() {
   // 3. Situational Roleplay Conversation
   app.post('/api/gemini/roleplay', async (req, res) => {
     try {
-      const result = await handleRoleplay(req.body);
+      const result = await handleRoleplay(req.body, req.headers);
       res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/roleplay:', error);
@@ -121,7 +132,7 @@ async function startServer() {
   // 4. Learning Journal Grammar & Phrasing Review
   const handleJournalReview = async (req: express.Request, res: express.Response) => {
     try {
-      const result = await handleCheckJournal(req.body);
+      const result = await handleCheckJournal(req.body, req.headers);
       res.json(result);
     } catch (error: any) {
       console.error('Error in journal check endpoint:', error);
@@ -135,7 +146,7 @@ async function startServer() {
   // 5. Dynamic Standardized Mock Test Generator (TOEIC/IELTS, TOPIK, HSK)
   app.post('/api/gemini/generate-mock-test', async (req, res) => {
     try {
-      const result = await handleGenerateMockTest(req.body);
+      const result = await handleGenerateMockTest(req.body, req.headers);
       res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/generate-mock-test:', error);
@@ -146,7 +157,7 @@ async function startServer() {
   // 6. OCR Photo Extractor to Vocabulary Deck (Supports Multiple Images)
   app.post('/api/gemini/ocr-extract', async (req, res) => {
     try {
-      const data = await handleOcrExtract(req.body);
+      const data = await handleOcrExtract(req.body, req.headers);
       res.json(data);
     } catch (error: any) {
       console.error('Error in /api/gemini/ocr-extract:', error);
@@ -157,7 +168,7 @@ async function startServer() {
   // 7. Large Textbook & Language Book Full AI Extractor
   app.post('/api/gemini/extract-textbook', async (req, res) => {
     try {
-      const result = await handleExtractTextbook(req.body);
+      const result = await handleExtractTextbook(req.body, req.headers);
       res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/extract-textbook:', error);
@@ -172,7 +183,7 @@ async function startServer() {
   // 7b. AI Auto-fill Missing Bilingual Cross-meanings (Korean <-> English)
   app.post('/api/gemini/fill-missing-bilingual', async (req, res) => {
     try {
-      const result = await handleFillMissingBilingual(req.body);
+      const result = await handleFillMissingBilingual(req.body, req.headers);
       res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/fill-missing-bilingual:', error);
@@ -183,7 +194,7 @@ async function startServer() {
   // 7.5. Deep Academic Bilingual Dictionary Lookup (Anh-Việt, Hàn-Việt, Trung-Việt)
   app.post('/api/gemini/dictionary-lookup', async (req, res) => {
     try {
-      const result = await handleDictionaryLookup(req.body);
+      const result = await handleDictionaryLookup(req.body, req.headers);
       res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/dictionary-lookup:', error);

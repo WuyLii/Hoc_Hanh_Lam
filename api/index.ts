@@ -9,6 +9,7 @@ import {
   handleExtractTextbook,
   handleFillMissingBilingual,
   handleDictionaryLookup,
+  getKeysStatus,
 } from '../src/server/geminiHandlers.js';
 import { fetchPublicSpreadsheet } from '../src/server/sheetsHelper.js';
 import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from '../src/utils/deduplicate.js';
@@ -30,6 +31,16 @@ let memoryStore: Record<string, any> = {
   chatHistory: [],
   lastUpdated: new Date().toISOString(),
 };
+
+// 0. Gemini API Keys & Architecture Status
+app.get('/api/gemini/keys-status', (req, res) => {
+  try {
+    const status = getKeysStatus({ headers: req.headers });
+    res.json(status);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Lỗi kiểm tra trạng thái khóa API' });
+  }
+});
 
 // 1. Cloud Store Sync
 app.get('/api/sync/status', (req, res) => {
@@ -155,7 +166,7 @@ app.post('/api/sheets/fetch-public', async (req, res) => {
 // 3. Gemini Endpoints
 app.post('/api/gemini/ocr-extract', async (req, res) => {
   try {
-    const result = await handleOcrExtract(req.body);
+    const result = await handleOcrExtract(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     console.error('Error in Vercel API /api/gemini/ocr-extract:', error);
@@ -165,7 +176,7 @@ app.post('/api/gemini/ocr-extract', async (req, res) => {
 
 app.post('/api/gemini/chat', async (req, res) => {
   try {
-    const result = await handleChat(req.body);
+    const result = await handleChat(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi chat AI' });
@@ -174,7 +185,7 @@ app.post('/api/gemini/chat', async (req, res) => {
 
 app.post('/api/gemini/generate-example', async (req, res) => {
   try {
-    const result = await handleGenerateExample(req.body);
+    const result = await handleGenerateExample(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi tạo ví dụ' });
@@ -183,7 +194,7 @@ app.post('/api/gemini/generate-example', async (req, res) => {
 
 app.post('/api/gemini/roleplay', async (req, res) => {
   try {
-    const result = await handleRoleplay(req.body);
+    const result = await handleRoleplay(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi roleplay' });
@@ -192,7 +203,7 @@ app.post('/api/gemini/roleplay', async (req, res) => {
 
 app.post('/api/gemini/check-journal', async (req, res) => {
   try {
-    const result = await handleCheckJournal(req.body);
+    const result = await handleCheckJournal(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi chấm bài' });
@@ -201,7 +212,7 @@ app.post('/api/gemini/check-journal', async (req, res) => {
 
 app.post('/api/gemini/correct-journal', async (req, res) => {
   try {
-    const result = await handleCheckJournal(req.body);
+    const result = await handleCheckJournal(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi chấm bài' });
@@ -210,7 +221,7 @@ app.post('/api/gemini/correct-journal', async (req, res) => {
 
 app.post('/api/gemini/mock-test', async (req, res) => {
   try {
-    const result = await handleGenerateMockTest(req.body);
+    const result = await handleGenerateMockTest(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi tạo đề thi' });
@@ -219,7 +230,7 @@ app.post('/api/gemini/mock-test', async (req, res) => {
 
 app.post('/api/gemini/generate-mock-test', async (req, res) => {
   try {
-    const result = await handleGenerateMockTest(req.body);
+    const result = await handleGenerateMockTest(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi tạo đề thi' });
@@ -228,7 +239,7 @@ app.post('/api/gemini/generate-mock-test', async (req, res) => {
 
 app.post('/api/gemini/extract-textbook', async (req, res) => {
   try {
-    const result = await handleExtractTextbook(req.body);
+    const result = await handleExtractTextbook(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     console.error('Error in Vercel API /api/gemini/extract-textbook:', error);
@@ -243,7 +254,7 @@ app.post('/api/gemini/extract-textbook', async (req, res) => {
 // 7b. AI Auto-fill Missing Bilingual Cross-meanings
 app.post('/api/gemini/fill-missing-bilingual', async (req, res) => {
   try {
-    const result = await handleFillMissingBilingual(req.body);
+    const result = await handleFillMissingBilingual(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     console.error('Error in Vercel API /api/gemini/fill-missing-bilingual:', error);
@@ -254,7 +265,7 @@ app.post('/api/gemini/fill-missing-bilingual', async (req, res) => {
 // 7.5. Deep Academic Bilingual Dictionary Lookup (2 Dedicated Isolated Models)
 app.post('/api/gemini/dictionary-lookup', async (req, res) => {
   try {
-    const result = await handleDictionaryLookup(req.body);
+    const result = await handleDictionaryLookup(req.body, req.headers);
     res.json(result);
   } catch (error: any) {
     console.error('Error in Vercel API /api/gemini/dictionary-lookup:', error);

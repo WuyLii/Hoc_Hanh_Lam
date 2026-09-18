@@ -198,7 +198,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (isMounted) {
           if (cachedVocab && cachedVocab.length > 0) setVocabulary(cleanDeduplicateVocab(cachedVocab));
-          if (cachedGrammar && cachedGrammar.length > 0) setGrammar(cleanDeduplicateGrammar(cachedGrammar));
+          const mergedGrammar = cleanDeduplicateGrammar([...INITIAL_GRAMMAR, ...(cachedGrammar || [])]);
+          setGrammar(mergedGrammar);
           if (cachedDecks && cachedDecks.length > 0) setDecks(cleanDeduplicateDecks(cachedDecks));
           if (cachedReviews && cachedReviews.length > 0) setReviewSessions(cachedReviews);
           if (cachedTests && cachedTests.length > 0) setMockTests(cachedTests);
@@ -253,7 +254,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cleanDeduplicateDecks(loadFromStorage('decks', []))
   );
   const [grammar, setGrammar] = useState<GrammarItem[]>(() =>
-    cleanDeduplicateGrammar(loadFromStorage('grammar', []))
+    cleanDeduplicateGrammar([...INITIAL_GRAMMAR, ...loadFromStorage<GrammarItem[]>('grammar', [])])
   );
   const [reviewSessions, setReviewSessions] = useState<ReviewSession[]>(() =>
     loadFromStorage('review_sessions', [])

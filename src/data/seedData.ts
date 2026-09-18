@@ -7,6 +7,9 @@ import {
   RoleplayScenario,
 } from '../types';
 
+import koreanGrammar from './koreanGrammarData.json';
+import englishGrammar from './englishGrammarData.json';
+
 export const INITIAL_USERS: UserProfile[] = [
   {
     user_id: 'user_1',
@@ -34,7 +37,10 @@ export const INITIAL_USERS: UserProfile[] = [
 
 export const INITIAL_VOCABULARY: VocabularyItem[] = [];
 
-export const INITIAL_GRAMMAR: GrammarItem[] = [];
+export const INITIAL_GRAMMAR: GrammarItem[] = [
+  ...(koreanGrammar as GrammarItem[]),
+  ...(englishGrammar as GrammarItem[]),
+];
 
 export const INITIAL_DECKS: Deck[] = [];
 
