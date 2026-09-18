@@ -7,56 +7,41 @@ import {
   handleGenerateMockTest,
   handleOcrExtract,
   handleExtractTextbook,
+  handleFillMissingBilingual,
+  handleDictionaryLookup,
 } from '../src/server/geminiHandlers.js';
 import { fetchPublicSpreadsheet } from '../src/server/sheetsHelper.js';
+import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from '../src/utils/deduplicate.js';
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
 
 // In-memory store for Vercel serverless instance
-let memoryStore: Record<string, any> = {};
-
-function serverDeduplicateVocab(items: any[]): any[] {
-  if (!Array.isArray(items)) return [];
-  const map = new Map<string, any>();
-  items.forEach((item) => {
-    if (!item) return;
-    const wordKey = String(item.tu || '').trim().toLowerCase();
-    const meaningKey = String(item.nghia || '').trim().toLowerCase();
-    const langKey = String(item.ngon_ngu || 'ko').trim().toLowerCase();
-    if (!wordKey && !item.word_id) return;
-    const key = `${langKey}:${wordKey}:${meaningKey}`;
-    if (!map.has(key)) {
-      map.set(key, { ...item, tu: String(item.tu || '').trim(), nghia: String(item.nghia || '').trim() });
-    } else {
-      const existing = map.get(key);
-      map.set(key, { ...existing, ...item });
-    }
-  });
-  return Array.from(map.values());
-}
-
-function serverDeduplicateGrammar(items: any[]): any[] {
-  if (!Array.isArray(items)) return [];
-  const map = new Map<string, any>();
-  items.forEach((item) => {
-    if (!item) return;
-    const structKey = String(item.cau_truc || '').trim().toLowerCase();
-    const meaningKey = String(item.y_nghia || '').trim().toLowerCase();
-    const langKey = String(item.ngon_ngu || 'ko').trim().toLowerCase();
-    if (!structKey) return;
-    const key = `${langKey}:${structKey}:${meaningKey}`;
-    if (!map.has(key)) {
-      map.set(key, { ...item, cau_truc: String(item.cau_truc || '').trim() });
-    } else {
-      const existing = map.get(key);
-      map.set(key, { ...existing, ...item });
-    }
-  });
-  return Array.from(map.values());
-}
+let memoryStore: Record<string, any> = {
+  vocabulary: [],
+  grammar: [],
+  decks: [],
+  reviewSessions: [],
+  mockTests: [],
+  listeningExercises: [],
+  progressLogs: [],
+  journalEntries: [],
+  notifications: [],
+  chatHistory: [],
+  lastUpdated: new Date().toISOString(),
+};
 
 // 1. Cloud Store Sync
+app.get('/api/sync/status', (req, res) => {
+  res.json({
+    success: true,
+    lastUpdated: memoryStore.lastUpdated || '',
+    vocabCount: (memoryStore.vocabulary || []).length,
+    grammarCount: (memoryStore.grammar || []).length,
+    decksCount: (memoryStore.decks || []).length,
+  });
+});
+
 app.get('/api/sync/store', (req, res) => {
   res.json({
     success: true,
@@ -74,8 +59,8 @@ app.post('/api/sync/store', (req, res) => {
           memoryStore[key] = store[key];
         }
       });
-      if (memoryStore.vocabulary) memoryStore.vocabulary = serverDeduplicateVocab(memoryStore.vocabulary);
-      if (memoryStore.grammar) memoryStore.grammar = serverDeduplicateGrammar(memoryStore.grammar);
+      if (memoryStore.vocabulary) memoryStore.vocabulary = cleanDeduplicateVocab(memoryStore.vocabulary);
+      if (memoryStore.grammar) memoryStore.grammar = cleanDeduplicateGrammar(memoryStore.grammar);
       memoryStore.lastUpdated = new Date().toISOString();
     }
     res.json({
@@ -86,6 +71,51 @@ app.post('/api/sync/store', (req, res) => {
   } catch (err: any) {
     console.error('Error in Vercel /api/sync/store:', err);
     res.status(500).json({ error: 'Lỗi khi lưu trữ dữ liệu đám mây' });
+  }
+});
+
+app.post('/api/sync/clear-all', (req, res) => {
+  try {
+    memoryStore = {
+      vocabulary: [],
+      grammar: [],
+      decks: [],
+      reviewSessions: [],
+      mockTests: [],
+      listeningExercises: [],
+      progressLogs: [],
+      journalEntries: [],
+      notifications: [],
+      chatHistory: [],
+      lastUpdated: new Date().toISOString(),
+      isCleared: true,
+    };
+    res.json({
+      success: true,
+      message: 'Đã xóa sạch toàn bộ dữ liệu trên hệ thống máy chủ Cloud',
+      isCleared: true,
+      lastUpdated: memoryStore.lastUpdated,
+    });
+  } catch (err: any) {
+    console.error('Error in Vercel /api/sync/clear-all:', err);
+    res.status(500).json({ error: 'Lỗi khi xóa dữ liệu trên máy chủ' });
+  }
+});
+
+app.post('/api/sync/delete-words', (req, res) => {
+  try {
+    const { wordIds } = req.body;
+    if (Array.isArray(wordIds) && wordIds.length > 0) {
+      const idSet = new Set(wordIds);
+      if (Array.isArray(memoryStore.vocabulary)) {
+        memoryStore.vocabulary = memoryStore.vocabulary.filter((w: any) => !idSet.has(w.word_id));
+      }
+      memoryStore.lastUpdated = new Date().toISOString();
+    }
+    res.json({ success: true, count: wordIds?.length || 0, store: memoryStore });
+  } catch (err: any) {
+    console.error('Error in Vercel /api/sync/delete-words:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -101,11 +131,11 @@ app.post('/api/sheets/fetch-public', async (req, res) => {
     if (resData && resData.data) {
       const vocab = resData.data.vocabulary;
       if (Array.isArray(vocab) && vocab.length > 0) {
-        memoryStore.vocabulary = serverDeduplicateVocab([...(memoryStore.vocabulary || []), ...vocab]);
+        memoryStore.vocabulary = cleanDeduplicateVocab([...(memoryStore.vocabulary || []), ...vocab]);
       }
       const gram = resData.data.grammar;
       if (Array.isArray(gram) && gram.length > 0) {
-        memoryStore.grammar = serverDeduplicateGrammar([...(memoryStore.grammar || []), ...gram]);
+        memoryStore.grammar = cleanDeduplicateGrammar([...(memoryStore.grammar || []), ...gram]);
       }
       const dks = resData.data.decks;
       if (Array.isArray(dks) && dks.length > 0) memoryStore.decks = dks;
@@ -207,6 +237,90 @@ app.post('/api/gemini/extract-textbook', async (req, res) => {
       ? 'Quá trình phân tích tài liệu mất quá nhiều thời gian hoặc tệp quá lớn (Lỗi 503: Quá thời gian chờ). Vui lòng thử lại với một phần chương ngắn hơn hoặc dán nội dung văn bản trực tiếp.'
       : (error?.message || 'Lỗi khi xử lý bóc tách sách');
     res.status(500).json({ error: errorMessage });
+  }
+});
+
+// 7b. AI Auto-fill Missing Bilingual Cross-meanings
+app.post('/api/gemini/fill-missing-bilingual', async (req, res) => {
+  try {
+    const result = await handleFillMissingBilingual(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in Vercel API /api/gemini/fill-missing-bilingual:', error);
+    res.status(500).json({ error: error?.message || 'Lỗi khi bổ sung nghĩa song ngữ đối ứng' });
+  }
+});
+
+// 7.5. Deep Academic Bilingual Dictionary Lookup (2 Dedicated Isolated Models)
+app.post('/api/gemini/dictionary-lookup', async (req, res) => {
+  try {
+    const result = await handleDictionaryLookup(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in Vercel API /api/gemini/dictionary-lookup:', error);
+    res.status(500).json({ error: error?.message || 'Lỗi khi tra cứu từ điển' });
+  }
+});
+
+// Direct Vocabulary REST Endpoints
+app.get('/api/vocabulary', (req, res) => {
+  try {
+    const { lang, search, topic, level, limit, page } = req.query;
+    let list = memoryStore.vocabulary || [];
+    if (lang) {
+      list = list.filter((item: any) => item.ngon_ngu === lang);
+    }
+    if (topic && topic !== 'ALL') {
+      list = list.filter((item: any) => item.chu_de === topic);
+    }
+    if (level && level !== 'ALL') {
+      list = list.filter((item: any) => item.cap_do === level || (item.cap_do && item.cap_do.includes(String(level))));
+    }
+    if (search) {
+      const q = String(search).toLowerCase().trim();
+      list = list.filter((item: any) =>
+        (item.tu && item.tu.toLowerCase().includes(q)) ||
+        (item.nghia && item.nghia.toLowerCase().includes(q)) ||
+        (item.phien_am && item.phien_am.toLowerCase().includes(q))
+      );
+    }
+    const total = list.length;
+    if (limit && page) {
+      const lim = parseInt(String(limit), 10) || 50;
+      const pg = parseInt(String(page), 10) || 1;
+      const start = (pg - 1) * lim;
+      list = list.slice(start, start + lim);
+    }
+    res.json({
+      success: true,
+      total,
+      vocabulary: list,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'Lỗi đọc từ vựng từ máy chủ' });
+  }
+});
+
+app.post('/api/vocabulary', (req, res) => {
+  try {
+    const item = req.body;
+    if (!item || !item.tu) {
+      return res.status(400).json({ error: 'Thiếu thông tin từ vựng' });
+    }
+    if (!item.word_id) {
+      item.word_id = `w_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    }
+    if (!item.created_at) {
+      item.created_at = new Date().toISOString().split('T')[0];
+    }
+    if (!Array.isArray(memoryStore.vocabulary)) {
+      memoryStore.vocabulary = [];
+    }
+    memoryStore.vocabulary = cleanDeduplicateVocab([item, ...memoryStore.vocabulary]);
+    memoryStore.lastUpdated = new Date().toISOString();
+    res.json({ success: true, item, total: memoryStore.vocabulary.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'Lỗi lưu từ vựng' });
   }
 });
 

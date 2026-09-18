@@ -483,15 +483,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    if (idsToDelete.length === 0) {
-      return { success: true, deletedCount: 0, message: 'Kho từ vựng của bạn không có từ bị trùng lặp!' };
+    if (idsToDelete.length > 0) {
+      await batchDeleteVocabulary(idsToDelete);
     }
 
-    await batchDeleteVocabulary(idsToDelete);
+    // Also run cleanDeduplicateVocab to repair any repeating concatenated meanings in remaining items
+    setVocabulary((prev) => {
+      const sanitized = cleanDeduplicateVocab(prev);
+      idbSet('vocabulary', sanitized).catch(() => {});
+      return sanitized;
+    });
+
     return {
       success: true,
       deletedCount: idsToDelete.length,
-      message: `Đã dọn dẹp và xóa sạch thành công ${idsToDelete.length} từ vựng trùng lặp!`,
+      message: idsToDelete.length > 0
+        ? `Đã dọn dẹp và xóa sạch thành công ${idsToDelete.length} từ vựng trùng lặp!`
+        : 'Đã chuẩn hóa và làm sạch tất cả nghĩa từ vựng!',
     };
   };
 
@@ -858,7 +866,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const isImportingRef = useRef<boolean>(false);
+  const lastSupabaseVocabHashRef = useRef<string>('');
+  const lastSupabaseGrammarHashRef = useRef<string>('');
+
   const exportToSupabase = async (): Promise<{ success: boolean; message: string }> => {
+    if (isImportingRef.current) return { success: true, message: 'Đang tải dữ liệu, tạm dừng đẩy tự động' };
     setIsSyncing(true);
     try {
       const res = await SupabaseService.pushAllData({
@@ -881,20 +894,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const importFromSupabase = async (): Promise<{ success: boolean; message: string }> => {
-    setIsSyncing(true);
+  const importFromSupabase = async (silent = false): Promise<{ success: boolean; message: string }> => {
+    if (!silent) setIsSyncing(true);
     try {
+      isImportingRef.current = true;
       const res = await SupabaseService.pullAllData();
       if (res.success && res.data) {
         if (res.data.userProfile) setCurrentUser(res.data.userProfile);
         if (res.data.vocabulary && res.data.vocabulary.length > 0) {
-          setVocabulary((prev) => cleanDeduplicateVocab([...res.data!.vocabulary!, ...prev]));
+          const vocabHash = `${res.data.vocabulary.length}_${res.data.vocabulary[0]?.word_id}_${res.data.vocabulary[res.data.vocabulary.length - 1]?.word_id}`;
+          if (vocabHash !== lastSupabaseVocabHashRef.current) {
+            lastSupabaseVocabHashRef.current = vocabHash;
+            setVocabulary((prev) => {
+              const merged = cleanDeduplicateVocab([...res.data!.vocabulary!, ...prev]);
+              idbSet('vocabulary', merged).catch(() => {});
+              return merged;
+            });
+          }
         }
         if (res.data.grammar && res.data.grammar.length > 0) {
-          setGrammar((prev) => cleanDeduplicateGrammar([...res.data!.grammar!, ...prev]));
+          const gramHash = `${res.data.grammar.length}_${res.data.grammar[0]?.grammar_id}_${res.data.grammar[res.data.grammar.length - 1]?.grammar_id}`;
+          if (gramHash !== lastSupabaseGrammarHashRef.current) {
+            lastSupabaseGrammarHashRef.current = gramHash;
+            setGrammar((prev) => {
+              const merged = cleanDeduplicateGrammar([...res.data!.grammar!, ...prev]);
+              idbSet('grammar', merged).catch(() => {});
+              return merged;
+            });
+          }
         }
         if (res.data.decks && res.data.decks.length > 0) {
-          setDecks((prev) => cleanDeduplicateDecks([...res.data!.decks!, ...prev]));
+          setDecks((prev) => {
+            const merged = cleanDeduplicateDecks([...res.data!.decks!, ...prev]);
+            idbSet('decks', merged).catch(() => {});
+            return merged;
+          });
         }
         if (res.data.reviewSessions && res.data.reviewSessions.length > 0) {
           setReviewSessions(res.data.reviewSessions);
@@ -920,7 +954,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e: any) {
       return { success: false, message: e.message || 'Lỗi khi tải dữ liệu từ Supabase' };
     } finally {
-      setIsSyncing(false);
+      if (!silent) setIsSyncing(false);
+      setTimeout(() => {
+        isImportingRef.current = false;
+      }, 3000);
     }
   };
 
@@ -1135,20 +1172,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const handleInitialSync = async () => {
       await syncWithCloudServer(false);
       if (SupabaseService.isConfigured()) {
-        await importFromSupabase();
+        await importFromSupabase(true);
       }
     };
     handleInitialSync();
   }, []);
 
-  // 2. Real-time background polling every 12 seconds with lightweight status checks
+  // 2. Real-time background polling for cloud server changes (status checked every 15s)
   useEffect(() => {
     const interval = setInterval(() => {
       syncWithCloudServer(true);
-      if (SupabaseService.isConfigured()) {
-        importFromSupabase();
-      }
-    }, 12000);
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1157,7 +1191,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const handleAppFocus = () => {
       syncWithCloudServer(true);
       if (SupabaseService.isConfigured()) {
-        importFromSupabase();
+        importFromSupabase(true);
       }
     };
     window.addEventListener('focus', handleAppFocus);
@@ -1165,7 +1199,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (document.visibilityState === 'visible') {
         syncWithCloudServer(true);
         if (SupabaseService.isConfigured()) {
-          importFromSupabase();
+          importFromSupabase(true);
         }
       }
     };
@@ -1176,14 +1210,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // 4. Fast Auto-Save to Cloud Server & Supabase whenever any state updates
+  // 4. Fast Auto-Save to Cloud Server & Supabase whenever any state updates (guarded against import loops)
   useEffect(() => {
+    if (isImportingRef.current) return;
     const timer = setTimeout(() => {
+      if (isImportingRef.current) return;
       pushToCloudServer();
       if (SupabaseService.isConfigured()) {
         exportToSupabase();
       }
-    }, 2000);
+    }, 2500);
     return () => clearTimeout(timer);
   }, [
     vocabulary,
