@@ -53,6 +53,8 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
 
     setFileName(file.name);
 
+    const detectedMime = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+
     if (file.type.startsWith('image/')) {
       setFileMime('image/jpeg');
       try {
@@ -62,7 +64,7 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
         console.error('Lỗi khi nén ảnh sách:', err);
       }
     } else {
-      setFileMime(file.type);
+      setFileMime(detectedMime);
       const reader = new FileReader();
       reader.onload = () => {
         const base64String = reader.result as string;

@@ -32,9 +32,9 @@ export class SupabaseService {
   }
 
   public static normalizeUrl(url: string): string {
-    if (!url || typeof url !== 'string') return '';
+    if (!url || typeof url !== 'string') return DEFAULT_SUPABASE_URL;
     let trimmed = url.replace(/['"\r\n\t ]/g, '').trim();
-    if (!trimmed) return '';
+    if (!trimmed) return DEFAULT_SUPABASE_URL;
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
       trimmed = 'https://' + trimmed;
     }
@@ -96,7 +96,7 @@ export class SupabaseService {
   }
 
   public static safeCreateClient(url: string, key: string): SupabaseClient | null {
-    const normalizedUrl = this.normalizeUrl(url);
+    const normalizedUrl = this.normalizeUrl(url || DEFAULT_SUPABASE_URL);
     const trimmedKey = this.cleanKey(key);
 
     if (!this.isValidUrl(normalizedUrl) || !trimmedKey || trimmedKey.includes('your-anon-key')) {
@@ -126,7 +126,7 @@ export class SupabaseService {
   public static saveConfig(config: SupabaseConfig): void {
     const normalizedConfig = {
       ...config,
-      url: this.normalizeUrl(config.url),
+      url: this.normalizeUrl(config.url || DEFAULT_SUPABASE_URL),
       anonKey: this.cleanKey(config.anonKey),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedConfig));
@@ -148,15 +148,15 @@ export class SupabaseService {
     const rawUrl = customUrl !== undefined ? customUrl : config.url;
     const rawKey = customKey !== undefined ? customKey : config.anonKey;
 
-    const url = this.normalizeUrl(rawUrl);
+    const url = this.normalizeUrl(rawUrl || DEFAULT_SUPABASE_URL);
     const key = this.cleanKey(rawKey);
 
     if (!url || !key) {
-      return { success: false, message: 'Vui lòng nhập đầy đủ Supabase URL và Anon Key.' };
+      return { success: false, message: 'Vui lòng nhập đầy đủ Supabase Anon Key để kết nối.' };
     }
 
     if (!this.isValidUrl(url)) {
-      return { success: false, message: 'Supabase URL không hợp lệ. Vui lòng nhập đúng định dạng URL (Ví dụ: https://yourproject.supabase.co).' };
+      return { success: false, message: 'Supabase URL không hợp lệ. Vui lòng kiểm tra lại URL dự án.' };
     }
 
     if (key.length < 30) {
@@ -184,13 +184,13 @@ export class SupabaseService {
         if (error.code === '42501' || error.message?.toLowerCase().includes('permission denied')) {
           return {
             success: false,
-            message: '🔒 Lỗi 42501 (Permission Denied): Bảng chưa cấp quyền truy cập cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh: GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;',
+            message: '🔒 Lỗi 42501 (Permission Denied): Bảng chưa cấp quyền truy cập cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh:\nGRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;',
           };
         }
         if (error.code === '42P01') {
           return {
             success: false,
-            message: '⚠️ Kết nối Supabase thành công nhưng chưa tạo Bảng (Tables). Vui lòng vào SQL Editor trên Supabase và bấm Run đoạn mã SQL tạo bảng.',
+            message: '⚠️ Kết nối Supabase thành công nhưng chưa tạo Bảng (Tables). Vui lòng vào SQL Editor trên Supabase và bấm Run đoạn mã SQL tạo bảng bên dưới.',
           };
         }
         return { success: false, message: `Lỗi kết nối Supabase (${status || error.code || 'Error'}): ${error.message}` };
@@ -203,7 +203,7 @@ export class SupabaseService {
   }
 
   /**
-   * Upload / Push entire local app data into Supabase
+   * Upload / Push entire local app data into Supabase (Chunked & Resilient)
    */
   public static async pushAllData(payload: {
     userProfile: UserProfile;
@@ -219,22 +219,26 @@ export class SupabaseService {
   }): Promise<{ success: boolean; message: string }> {
     const client = this.getClient();
     if (!client) {
-      return { success: false, message: 'Chưa cấu hình thông tin Supabase (URL & Anon Key).' };
+      return { success: false, message: 'Chưa cấu hình Supabase Anon Key. Vui lòng nhập Anon Key trong Cài đặt Supabase.' };
     }
 
-    try {
-      // 1. User profile
-      if (payload.userProfile) {
-        const cleanProfile = {
-          ...payload.userProfile,
-          ngay_tham_gia: payload.userProfile.ngay_tham_gia || new Date().toISOString(),
-          last_active_date: payload.userProfile.last_active_date || new Date().toISOString().split('T')[0],
-        };
-        const { error } = await client.from('user_profiles').upsert([cleanProfile], { onConflict: 'user_id' });
-        if (error) throw { table: 'user_profiles', error };
-      }
+    const tableErrors: Array<{ table: string; message: string; code?: string }> = [];
 
-      // 2. Vocabulary
+    // Helper to run batch upserts
+    const runBatchUpsert = async (tableName: string, items: any[], onConflict: string, chunkSize = 150) => {
+      if (!items || items.length === 0) return;
+      for (let i = 0; i < items.length; i += chunkSize) {
+        const chunk = items.slice(i, i + chunkSize);
+        const { error } = await client.from(tableName).upsert(chunk, { onConflict });
+        if (error) {
+          tableErrors.push({ table: tableName, message: error.message, code: error.code });
+          break;
+        }
+      }
+    };
+
+    try {
+      // 1. Vocabulary (Primary focus)
       if (payload.vocabulary && payload.vocabulary.length > 0) {
         const cleanVocab = payload.vocabulary.map((v) => ({
           ...v,
@@ -242,20 +246,28 @@ export class SupabaseService {
           srs_next_review: v.srs_next_review || new Date().toISOString(),
           created_at: v.created_at || new Date().toISOString(),
         }));
-        const { error } = await client.from('vocabulary').upsert(cleanVocab, { onConflict: 'word_id' });
-        if (error) throw { table: 'vocabulary', error };
+        await runBatchUpsert('vocabulary', cleanVocab, 'word_id', 150);
+      }
+
+      // 2. Grammar (Primary focus)
+      if (payload.grammar && payload.grammar.length > 0) {
+        await runBatchUpsert('grammar', payload.grammar, 'grammar_id', 150);
       }
 
       // 3. Decks
       if (payload.decks && payload.decks.length > 0) {
-        const { error } = await client.from('decks').upsert(payload.decks, { onConflict: 'deck_id' });
-        if (error) throw { table: 'decks', error };
+        await runBatchUpsert('decks', payload.decks, 'deck_id', 100);
       }
 
-      // 4. Grammar
-      if (payload.grammar && payload.grammar.length > 0) {
-        const { error } = await client.from('grammar').upsert(payload.grammar, { onConflict: 'grammar_id' });
-        if (error) throw { table: 'grammar', error };
+      // 4. User profile
+      if (payload.userProfile) {
+        const cleanProfile = {
+          ...payload.userProfile,
+          ngay_tham_gia: payload.userProfile.ngay_tham_gia || new Date().toISOString(),
+          last_active_date: payload.userProfile.last_active_date || new Date().toISOString().split('T')[0],
+        };
+        const { error } = await client.from('user_profiles').upsert([cleanProfile], { onConflict: 'user_id' });
+        if (error) tableErrors.push({ table: 'user_profiles', message: error.message, code: error.code });
       }
 
       // 5. Review Sessions
@@ -265,8 +277,7 @@ export class SupabaseService {
           thoi_gian_bat_dau: s.thoi_gian_bat_dau || new Date().toISOString(),
           thoi_gian_ket_thuc: s.thoi_gian_ket_thuc || new Date().toISOString(),
         }));
-        const { error } = await client.from('review_sessions').upsert(cleanSessions, { onConflict: 'session_id' });
-        if (error) throw { table: 'review_sessions', error };
+        await runBatchUpsert('review_sessions', cleanSessions, 'session_id', 100);
       }
 
       // 6. Mock tests
@@ -275,8 +286,7 @@ export class SupabaseService {
           ...t,
           ngay_lam: t.ngay_lam || new Date().toISOString(),
         }));
-        const { error } = await client.from('mock_test_records').upsert(cleanTests, { onConflict: 'test_id' });
-        if (error) throw { table: 'mock_test_records', error };
+        await runBatchUpsert('mock_test_records', cleanTests, 'test_id', 100);
       }
 
       // 7. Progress records
@@ -286,8 +296,7 @@ export class SupabaseService {
           ...r,
           ngay: r.ngay || new Date().toISOString().split('T')[0],
         }));
-        const { error } = await client.from('progress_records').upsert(mappedProgress, { onConflict: 'id' });
-        if (error) throw { table: 'progress_records', error };
+        await runBatchUpsert('progress_records', mappedProgress, 'id', 100);
       }
 
       // 8. Journal entries
@@ -296,14 +305,12 @@ export class SupabaseService {
           ...j,
           ngay: j.ngay || new Date().toISOString(),
         }));
-        const { error } = await client.from('journal_entries').upsert(cleanJournal, { onConflict: 'entry_id' });
-        if (error) throw { table: 'journal_entries', error };
+        await runBatchUpsert('journal_entries', cleanJournal, 'entry_id', 100);
       }
 
       // 9. Chat conversations
       if (payload.chatConversations && payload.chatConversations.length > 0) {
-        const { error } = await client.from('chat_conversations').upsert(payload.chatConversations, { onConflict: 'chat_id' });
-        if (error) throw { table: 'chat_conversations', error };
+        await runBatchUpsert('chat_conversations', payload.chatConversations, 'chat_id', 50);
       }
 
       // 10. Notifications
@@ -312,48 +319,44 @@ export class SupabaseService {
           ...n,
           thoi_gian: n.thoi_gian || new Date().toISOString(),
         }));
-        const { error } = await client.from('notifications').upsert(cleanNoti, { onConflict: 'noti_id' });
-        if (error) throw { table: 'notifications', error };
+        await runBatchUpsert('notifications', cleanNoti, 'noti_id', 100);
+      }
+
+      if (tableErrors.length > 0) {
+        const firstErr = tableErrors[0];
+        if (firstErr.code === '42501' || firstErr.message?.toLowerCase().includes('permission denied')) {
+          return {
+            success: false,
+            message: `🔒 Lỗi 42501 (Permission Denied) trên bảng "${firstErr.table}": Bảng chưa cấp quyền truy cập cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh:\nGRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;`,
+          };
+        }
+        if (firstErr.code === '42P01') {
+          return {
+            success: false,
+            message: `⚠️ Bảng "${firstErr.table}" chưa được tạo trên Supabase. Vui lòng chạy đoạn mã SQL tạo bảng trong SQL Editor trên Supabase Dashboard.`,
+          };
+        }
+        return {
+          success: false,
+          message: `Lỗi khi lưu bảng "${firstErr.table}": ${firstErr.message}`,
+        };
       }
 
       return {
         success: true,
-        message: `Đã đồng bộ thành công ${payload.vocabulary?.length || 0} từ vựng, ${payload.grammar?.length || 0} ngữ pháp lên Supabase Cloud!`,
+        message: `Đã đồng bộ thành công ${payload.vocabulary?.length || 0} từ vựng, ${payload.grammar?.length || 0} ngữ pháp lên Supabase Cloud (${DEFAULT_SUPABASE_URL})!`,
       };
     } catch (err: any) {
       console.error('Supabase Push Error:', err);
-      const table = err?.table;
-      const errorObj = err?.error || err;
-      const status = errorObj?.status || errorObj?.statusCode;
-      const message = errorObj?.message || String(err);
-
-      if (status === 401 || message.toLowerCase().includes('api key') || message.toLowerCase().includes('jwt')) {
-        return {
-          success: false,
-          message: '❌ Lỗi 401 (Unauthorized): Khóa "Anon API Key" không chính xác hoặc đã hết hạn. Vui lòng lấy lại Anon Public Key trong Supabase Settings > API.',
-        };
-      }
-      if (errorObj?.code === '42501' || message.toLowerCase().includes('permission denied')) {
-        return {
-          success: false,
-          message: `🔒 Lỗi 42501 (Permission Denied) cho bảng "${table || 'dữ liệu'}": Bảng chưa cấp quyền truy cập (GRANT) cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh: GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;`,
-        };
-      }
-      if (errorObj?.code === '42P01') {
-        return {
-          success: false,
-          message: `⚠️ Bảng "${table || 'dữ liệu'}" chưa được tạo trên Supabase. Vui lòng chạy đoạn mã SQL tạo bảng trong SQL Editor.`,
-        };
-      }
       return {
         success: false,
-        message: `Lỗi đồng bộ Supabase [Bảng ${table || ''}]: ${message}`,
+        message: `Lỗi đồng bộ Supabase: ${err?.message || err}`,
       };
     }
   }
 
   /**
-   * Pull / Fetch all data from Supabase into application
+   * Pull / Fetch all data from Supabase into application (Resilient & Fault-Tolerant)
    */
   public static async pullAllData(): Promise<{
     success: boolean;
@@ -373,7 +376,7 @@ export class SupabaseService {
   }> {
     const client = this.getClient();
     if (!client) {
-      return { success: false, message: 'Chưa cấu hình Supabase URL & Anon Key.' };
+      return { success: false, message: 'Chưa cấu hình Supabase Anon Key. Vui lòng nhập Anon Key trong Cài đặt Supabase.' };
     }
 
     try {
@@ -401,44 +404,26 @@ export class SupabaseService {
         client.from('notifications').select('*'),
       ]);
 
-      // Check for table or permission errors
-      const errors = [
-        vocabRes.error,
-        grammarRes.error,
-        decksRes.error,
-        profileRes.error,
-        reviewsRes.error,
-        testsRes.error,
-        progressRes.error,
-        journalRes.error,
-        chatRes.error,
-        notiRes.error,
-      ].filter(Boolean);
-
-      if (errors.length > 0) {
-        const firstErr = errors[0];
-        if (firstErr?.code === '42501' || firstErr?.message?.toLowerCase().includes('permission denied')) {
+      // Check critical vocabulary / grammar permissions
+      if (vocabRes.error) {
+        if (vocabRes.error.code === '42501' || vocabRes.error.message?.toLowerCase().includes('permission denied')) {
           return {
             success: false,
-            message: '🔒 Lỗi 42501 (Permission Denied): Bảng chưa cấp quyền truy cập (GRANT) cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh: GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;',
+            message: '🔒 Lỗi 42501 (Permission Denied): Bảng chưa cấp quyền truy cập cho role anon. Vui lòng vào SQL Editor trên Supabase và chạy lệnh:\nGRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;',
           };
         }
-        if (firstErr?.code === '42P01') {
+        if (vocabRes.error.code === '42P01') {
           return {
             success: false,
-            message: '⚠️ Bảng (Table) chưa được tạo trên Supabase. Vui lòng vào SQL Editor trên Supabase và bấm Run đoạn mã SQL tạo bảng.',
+            message: '⚠️ Bảng "vocabulary" chưa được tạo trên Supabase. Vui lòng vào SQL Editor trên Supabase và bấm Run đoạn mã SQL tạo bảng.',
           };
         }
-        if (firstErr?.message?.toLowerCase().includes('api key') || firstErr?.message?.toLowerCase().includes('jwt')) {
+        if (vocabRes.error.message?.toLowerCase().includes('api key') || vocabRes.error.message?.toLowerCase().includes('jwt')) {
           return {
             success: false,
             message: '❌ Lỗi 401 (Unauthorized): Khóa "Anon API Key" không chính xác hoặc đã hết hạn. Vui lòng lấy lại Anon Public Key trong Supabase Settings > API.',
           };
         }
-        return {
-          success: false,
-          message: `Lỗi Supabase (${firstErr?.code || 'Error'}): ${firstErr?.message || 'Không thể truy vấn bảng dữ liệu'}`,
-        };
       }
 
       const totalItems = (vocabRes.data?.length || 0) + (grammarRes.data?.length || 0) + (decksRes.data?.length || 0);

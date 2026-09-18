@@ -1023,11 +1023,12 @@ export async function handleOcrExtract(body: any, headers?: any) {
   const { imageBase64, images, language, customApiKey, customApiKey2 } = body;
   const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
 
-  const prompt = `Bạn là hệ thống OCR Chuyên sâu & Trích xuất Từ vựng Ngôn ngữ (${langName}) với độ chính xác tuyệt đối.
+  const prompt = `Bạn là hệ thống OCR Chuyên sâu & Trích xuất Dữ liệu Ngôn ngữ (${langName}) từ tài liệu/ảnh chụp sách với độ chính xác tuyệt đối.
 
-YÊU CẦU QUAN TRỌNG HÀNG ĐẦU - ĐỌC VÀ TRÍCH XUẤT 100% TOÀN BỘ DỮ LIỆU:
-1. TRÍCH XUẤT ĐẦY ĐỦ 100% CÁC TỪ VỰNG: Đọc lần lượt từng dòng, từng cột từ trên xuống dưới. BẮT BUỘC trích xuất TẤT CẢ các từ vựng vào mảng "words".
-2. QUY TẮC ĐỐI ỨNG ANH - HÀN BẮT BUỘC (Trực tiếp trong lần trích xuất này):
+YÊU CẦU QUAN TRỌNG HÀNG ĐẦU - ĐỌC VÀ TRÍCH XUẤT 100% TOÀN BỘ DỮ LIỆU TỪ ẢNH/TÀI LIỆU:
+1. TRÍCH XUẤT ĐẦY ĐỦ 100% CÁC TỪ VỰNG: Đọc lần lượt từng dòng, từng bảng từ trên xuống dưới. BẮT BUỘC trích xuất TẤT CẢ các từ vựng vào mảng "words".
+2. TRÍCH XUẤT CÁC CẤU TRÚC NGỮ PHÁP (NẾU CÓ): Nếu trong ảnh có bảng ngữ pháp, cấu trúc mẫu câu hoặc điểm ngữ pháp, hãy trích xuất vào mảng "grammar".
+3. QUY TẮC ĐỐI ỨNG ANH - HÀN BẮT BUỘC:
    - Nếu từ vựng là Tiếng Hàn (ko):
      • "tu": Từ tiếng Hàn (Hangul).
      • "phien_am": Phiên âm Romaja chuẩn (ví dụ: [po-gi-ha-da]).
@@ -1040,8 +1041,12 @@ YÊU CẦU QUAN TRỌNG HÀNG ĐẦU - ĐỌC VÀ TRÍCH XUẤT 100% TOÀN BỘ 
      • "nghia": Nghĩa Tiếng Việt chuẩn xác.
      • "nghia_tieng_han": BẮT BUỘC CÓ từ/nghĩa Tiếng Hàn tương ứng kèm Romaja (ví dụ: "아름다운 [a-reum-da-un]").
      • "nghia_tieng_anh": "".
+   - Nếu từ vựng là Tiếng Trung (zh):
+     • "tu": Chữ Hán (giản thể hoặc phồn thể).
+     • "phien_am": Pinyin kèm dấu thanh (ví dụ: nǐ hǎo).
+     • "nghia": Nghĩa Tiếng Việt chuẩn xác (kèm âm Hán Việt nếu có).
 
-Cấu trúc JSON đầu ra:
+Cấu trúc JSON đầu ra bắt buộc:
 {
   "language": "${language}",
   "title": "Tên chủ đề trích xuất",
@@ -1058,24 +1063,210 @@ Cấu trúc JSON đầu ra:
       "vi_du": "Câu ví dụ ngoại ngữ",
       "vi_du_dich": "Dịch ví dụ tiếng Việt"
     }
+  ],
+  "grammar": [
+    {
+      "cau_truc": "Cấu trúc ngữ pháp",
+      "giai_thich": "Ý nghĩa & giải thích bằng tiếng Việt",
+      "cong_thuc": "Công thức kết hợp",
+      "cap_do": "Cấp độ",
+      "chu_de": "Chủ đề",
+      "vi_du": "Câu ví dụ",
+      "vi_du_dich": "Dịch ví dụ"
+    }
   ]
 }`;
+
+  const parseBase64Item = (item: any, defaultMime = 'image/jpeg') => {
+    let dataStr = typeof item === 'string' ? item : (item?.data || '');
+    let mimeType = (typeof item === 'object' && item?.mimeType) ? item.mimeType : defaultMime;
+    if (dataStr.startsWith('data:')) {
+      const match = dataStr.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1] || mimeType;
+        dataStr = match[2];
+      } else {
+        dataStr = dataStr.replace(/^data:[^;]+;base64,/, '');
+      }
+    }
+    return { data: dataStr, mimeType };
+  };
 
   let parts: any[] = [];
   if (Array.isArray(images) && images.length > 0) {
     images.forEach((img) => {
-      parts.push({
-        inlineData: {
-          data: img.data ? img.data.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, '') : img.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
-          mimeType: img.mimeType || 'image/jpeg',
-        },
-      });
+      const parsed = parseBase64Item(img, 'image/jpeg');
+      if (parsed.data) {
+        parts.push({
+          inlineData: {
+            data: parsed.data,
+            mimeType: parsed.mimeType,
+          },
+        });
+      }
     });
   } else if (imageBase64) {
+    const parsed = parseBase64Item(imageBase64, 'image/jpeg');
+    if (parsed.data) {
+      parts.push({
+        inlineData: {
+          data: parsed.data,
+          mimeType: parsed.mimeType,
+        },
+      });
+    }
+  }
+
+  parts.push({ text: prompt });
+
+  const response = await callNonTutorGeminiWithRetry(
+    { customApiKey, customApiKey2, headers },
+    parts,
+    {
+      responseMimeType: 'application/json',
+      temperature: 0.1,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.LOW,
+      },
+    }
+  );
+
+  const parsed = safeParseJSON(response.text || '{}');
+  const words = parsed.words || parsed.vocabulary || parsed.tu_vung || [];
+  const grammar = parsed.grammar || parsed.ngu_phap || [];
+
+  let finalWords = words;
+  if (Array.isArray(finalWords) && finalWords.length > 0) {
+    finalWords = await ensureBilingualCrossMeanings(finalWords, language, { customApiKey, customApiKey2, headers });
+  }
+
+  return {
+    language: parsed.language || language,
+    title: parsed.title || 'Dữ liệu bóc tách từ ảnh',
+    words: finalWords,
+    grammar: Array.isArray(grammar) ? grammar : [],
+  };
+}
+
+export async function handleExtractTextbook(body: any, headers?: any) {
+  const {
+    text,
+    rawText,
+    content,
+    imageBase64,
+    fileBase64,
+    fileMime,
+    fileName,
+    extractMode,
+    customInstruction,
+    language,
+    customApiKey,
+    customApiKey2,
+  } = body;
+
+  const targetLang = language || 'ko';
+  const langName = targetLang === 'en' ? 'Tiếng Anh' : targetLang === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
+  const sourceText = (rawText || text || content || '').trim();
+
+  let modeDirective = 'BẮT BUỘC TRÍCH XUẤT CẢ TỪ VỰNG VÀ CẤU TRÚC NGỮ PHÁP.';
+  if (extractMode === 'vocab') {
+    modeDirective = 'TẬP TRUNG TỐI ĐA VÀO TRÍCH XUẤT ĐẦY ĐỦ TOÀN BỘ TỪ VỰNG (mảng "vocabulary"), không cần trích xuất ngữ pháp.';
+  } else if (extractMode === 'grammar') {
+    modeDirective = 'TẬP TRUNG TỐI ĐA VÀO TRÍCH XUẤT TOÀN BỘ CÁC CẤU TRÚC NGỮ PHÁP (mảng "grammar"), không cần trích xuất từ vựng.';
+  }
+
+  const customReq = customInstruction ? `Yêu cầu riêng từ người dùng: "${customInstruction}"` : '';
+  const fileContext = fileName ? `Tên tệp/sách: "${fileName}"` : '';
+
+  const prompt = `Bạn là hệ thống AI Chuyên gia phân tích sách giáo khoa & tài liệu học ${langName} hàng đầu.
+Nhiệm vụ của bạn là đọc kỹ tài liệu/tệp đính kèm (hoặc văn bản) và trích xuất TOÀN DIỆN, ĐẦY ĐỦ 100% dữ liệu học tập thành định dạng JSON chuẩn xác.
+
+${fileContext}
+${customReq}
+${modeDirective}
+
+${sourceText ? `NỘI DUNG VĂN BẢN ĐÍNH KÈM:\n"""\n${sourceText}\n"""` : 'Hãy đọc kỹ toàn bộ tệp tài liệu/hình ảnh/PDF đính kèm bên dưới.'}
+
+QUY ĐỊNH BẮT BUỘC VỀ DỮ LIỆU:
+1. Từ vựng ("vocabulary"):
+   - "tu": Từ gốc ngoại ngữ (${langName}).
+   - "phien_am": Phiên âm chuẩn (Romaja cho Hàn, IPA cho Anh, Pinyin cho Trung).
+   - "nghia": Nghĩa tiếng Việt chuẩn mực theo ngữ cảnh bài học.
+   - "nghia_tieng_han": Nếu ngôn ngữ là Tiếng Anh, BẮT BUỘC có từ/nghĩa Tiếng Hàn tương ứng kèm Romaja.
+   - "nghia_tieng_anh": Nếu ngôn ngữ là Tiếng Hàn, BẮT BUỘC có từ/nghĩa Tiếng Anh tương ứng.
+   - "loai_tu": Danh từ / Động từ / Tính từ / Phó từ / Cụm từ...
+   - "unit": Tên bài hoặc số chương (ví dụ: "Bài 1 - Giới thiệu", "Unit 3 - Daily Routines").
+   - "cap_do": Sơ cấp 1, Sơ cấp 2, Trung cấp, TOEIC 500, TOPIK 1, HSK 2...
+   - "chu_de": Chủ đề bài học.
+   - "vi_du": Câu ví dụ chuẩn trong sách.
+   - "vi_du_dich": Dịch câu ví dụ sang tiếng Việt.
+
+2. Cấu trúc ngữ pháp ("grammar"):
+   - "cau_truc": Tên cấu trúc hoặc mẫu câu ngữ pháp.
+   - "giai_thich": Ý nghĩa và giải thích cách sử dụng chi tiết bằng tiếng Việt.
+   - "cong_thuc": Công thức kết hợp cụ thể (ví dụ: V + 아/어/여야 하다, S + V + O...).
+   - "unit": Tên bài / Unit.
+   - "cap_do": Cấp độ (Sơ cấp, Trung cấp, v.v.).
+   - "vi_du": Câu ví dụ minh họa tự nhiên trong sách.
+   - "vi_du_dich": Dịch câu ví dụ tiếng Việt.
+   - "ghi_chu": Lưu ý, bất quy tắc hoặc ngữ cảnh dùng đặc biệt.
+
+Cấu trúc JSON phản hồi bắt buộc:
+{
+  "bookTitle": "${fileName ? fileName.replace(/\.[^/.]+$/, '') : `Giáo trình ${langName}`}",
+  "detectedLanguage": "${targetLang}",
+  "level": "Sơ cấp / Trung cấp / Cấp độ tổng quan",
+  "totalUnits": 1,
+  "summary": "Tóm tắt ngắn gọn nội dung kiến thức của tài liệu này",
+  "unitList": ["Danh sách các bài học tìm thấy"],
+  "vocabulary": [
+    {
+      "tu": "từ",
+      "phien_am": "phiên âm",
+      "nghia": "nghĩa tiếng Việt",
+      "nghia_tieng_han": "nghĩa tiếng Hàn kèm Romaja (nếu là tiếng Anh)",
+      "nghia_tieng_anh": "nghĩa tiếng Anh (nếu là tiếng Hàn)",
+      "loai_tu": "loại từ",
+      "unit": "Bài / Unit",
+      "cap_do": "cấp độ",
+      "chu_de": "chủ đề",
+      "vi_du": "câu ví dụ",
+      "vi_du_dich": "dịch ví dụ"
+    }
+  ],
+  "grammar": [
+    {
+      "cau_truc": "cấu trúc ngữ pháp",
+      "giai_thich": "ý nghĩa và giải thích tiếng Việt",
+      "cong_thuc": "công thức kết hợp",
+      "unit": "Bài / Unit",
+      "cap_do": "cấp độ",
+      "vi_du": "câu ví dụ",
+      "vi_du_dich": "dịch ví dụ",
+      "ghi_chu": "lưu ý"
+    }
+  ]
+}`;
+
+  let rawBase64 = fileBase64 || imageBase64 || '';
+  let mime = fileMime || 'application/pdf';
+
+  if (rawBase64.startsWith('data:')) {
+    const match = rawBase64.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      mime = match[1] || mime;
+      rawBase64 = match[2];
+    } else {
+      rawBase64 = rawBase64.replace(/^data:[^;]+;base64,/, '');
+    }
+  }
+
+  let parts: any[] = [];
+  if (rawBase64) {
     parts.push({
       inlineData: {
-        data: imageBase64.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
-        mimeType: 'image/jpeg',
+        data: rawBase64,
+        mimeType: mime,
       },
     });
   }
@@ -1094,80 +1285,24 @@ Cấu trúc JSON đầu ra:
   );
 
   const parsed = safeParseJSON(response.text || '{}');
-  if (Array.isArray(parsed.words)) {
-    parsed.words = await ensureBilingualCrossMeanings(parsed.words, language, { customApiKey, customApiKey2, headers });
+  const vocabulary = parsed.vocabulary || parsed.words || parsed.tu_vung || [];
+  const grammar = parsed.grammar || parsed.ngu_phap || [];
+
+  let finalVocabulary = Array.isArray(vocabulary) ? vocabulary : [];
+  if (finalVocabulary.length > 0) {
+    finalVocabulary = await ensureBilingualCrossMeanings(finalVocabulary, targetLang, { customApiKey, customApiKey2, headers });
   }
 
-  return parsed;
-}
-
-export async function handleExtractTextbook(body: any, headers?: any) {
-  const { text, imageBase64, language, customApiKey, customApiKey2 } = body;
-  const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
-
-  const prompt = `Bạn là hệ thống AI Chuyên gia phân tích tài liệu giáo trình ${langName}.
-Hãy trích xuất TOÀN BỘ từ vựng và ngữ pháp có trong tài liệu dưới đây thành định dạng JSON:
-
-${text ? `Nội dung tài liệu:\n"""\n${text}\n"""` : ''}
-
-Quy định cấu trúc JSON:
-{
-  "vocabulary": [
-    {
-      "tu": "từ",
-      "phien_am": "phiên âm chuẩn",
-      "nghia": "nghĩa tiếng Việt",
-      "nghia_tieng_han": "nghĩa tiếng Hàn kèm Romaja (nếu từ là tiếng Anh)",
-      "nghia_tieng_anh": "nghĩa tiếng Anh (nếu từ là tiếng Hàn)",
-      "loai_tu": "loại từ",
-      "cap_do": "cấp độ",
-      "chu_de": "chủ đề bài học",
-      "vi_du": "câu ví dụ",
-      "vi_du_dich": "dịch ví dụ"
-    }
-  ],
-  "grammar": [
-    {
-      "cau_truc": "cấu trúc ngữ pháp",
-      "y_nghia": "ý nghĩa ngữ pháp bằng tiếng Việt",
-      "giai_thich": "giải thích cách kết hợp chi tiết",
-      "cap_do": "cấp độ",
-      "vi_du": "câu ví dụ chuẩn",
-      "vi_du_dich": "dịch ví dụ",
-      "tags": ["Bài học", "Chủ đề"]
-    }
-  ]
-}`;
-
-  let parts: any[] = [];
-  if (imageBase64) {
-    parts.push({
-      inlineData: {
-        data: imageBase64.replace(/^data:image\/[a-z0-9\+\.-]+;base64,/, ''),
-        mimeType: 'image/jpeg',
-      },
-    });
-  }
-  parts.push({ text: prompt });
-
-  const response = await callNonTutorGeminiWithRetry(
-    { customApiKey, customApiKey2, headers },
-    parts,
-    {
-      responseMimeType: 'application/json',
-      temperature: 0.2,
-      thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
-      },
-    }
-  );
-
-  const parsed = safeParseJSON(response.text || '{}');
-  if (Array.isArray(parsed.vocabulary)) {
-    parsed.vocabulary = await ensureBilingualCrossMeanings(parsed.vocabulary, language, { customApiKey, customApiKey2, headers });
-  }
-
-  return parsed;
+  return {
+    bookTitle: parsed.bookTitle || parsed.title || fileName || `Giáo trình ${langName}`,
+    detectedLanguage: parsed.detectedLanguage || targetLang,
+    level: parsed.level || 'Cơ bản - Tổng hợp',
+    totalUnits: parsed.totalUnits || (parsed.unitList?.length || 1),
+    summary: parsed.summary || 'Đã bóc tách thành công nội dung sách giáo trình.',
+    unitList: parsed.unitList || ['Bài học tổng hợp'],
+    vocabulary: finalVocabulary,
+    grammar: Array.isArray(grammar) ? grammar : [],
+  };
 }
 
 export async function handleFillMissingBilingual(body: any, headers?: any) {

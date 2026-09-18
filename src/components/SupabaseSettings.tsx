@@ -38,18 +38,21 @@ export const SupabaseSettings: React.FC = () => {
 
   const [config, setConfig] = useState<SupabaseConfig>(() => {
     const current = SupabaseService.getConfig();
-    if (!current.url || current.url.includes('example.co') || current.url.includes('your-project-id')) {
-      const updated = { ...current, url: 'https://fzdxabrvddjtpnbjvcii.supabase.co' };
-      SupabaseService.saveConfig(updated);
-      return updated;
-    }
-    return current;
+    // Enforce target supabase URL
+    const updated = {
+      ...current,
+      url: current.url && current.url.startsWith('https://') && !current.url.includes('example') && !current.url.includes('your-project-id')
+        ? current.url
+        : 'https://fzdxabrvddjtpnbjvcii.supabase.co',
+    };
+    SupabaseService.saveConfig(updated);
+    return updated;
   });
 
   useEffect(() => {
-    // Automatically persist to ensure saved state has the target URL
+    // Automatically ensure state and service have the target URL
     const current = SupabaseService.getConfig();
-    if (current.url !== 'https://fzdxabrvddjtpnbjvcii.supabase.co' && (!current.url || current.url.includes('example.co') || current.url.includes('your-project-id'))) {
+    if (!current.url || current.url.includes('example') || current.url.includes('your-project-id')) {
       const updated = { ...current, url: 'https://fzdxabrvddjtpnbjvcii.supabase.co' };
       SupabaseService.saveConfig(updated);
       setConfig(updated);
@@ -372,7 +375,7 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
             <label className="block text-xs font-mono font-bold uppercase text-[#1A1A1A] mb-1">
               Project URL (Supabase URL)
             </label>
-            <div className="relative">
+            <div className="relative flex items-center">
               <Globe2 className="w-4 h-4 absolute left-3 top-3 text-stone-400" />
               <input
                 id="supabase-project-url-input"
@@ -380,8 +383,16 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
                 value={config.url}
                 onChange={(e) => setConfig({ ...config, url: e.target.value.trim() })}
                 placeholder="https://fzdxabrvddjtpnbjvcii.supabase.co"
-                className="w-full pl-9 pr-4 py-2 bg-white border border-[#1A1A1A] font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full pl-9 pr-24 py-2 bg-white border border-[#1A1A1A] font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 font-medium"
               />
+              <button
+                type="button"
+                onClick={() => setConfig({ ...config, url: 'https://fzdxabrvddjtpnbjvcii.supabase.co' })}
+                className="absolute right-1.5 top-1.5 px-2 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-[11px] font-mono border border-stone-300 rounded transition"
+                title="Khôi phục URL dự án mặc định"
+              >
+                Mặc định
+              </button>
             </div>
           </div>
 
