@@ -390,6 +390,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setVocabulary((prev) => [newWord, ...prev]);
+    idbSet('vocabulary', [newWord, ...vocabulary]).catch(() => {});
+
+    // Persist immediately to Supabase Cloud
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveVocabulary(newWord).catch((err) => {
+        console.warn('Lỗi lưu từ vựng vào Supabase:', err);
+      });
+    }
 
     // Give points
     updateUser({ total_points: (currentUser.total_points || 0) + 10 });
@@ -397,7 +405,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateVocabulary = (item: VocabularyItem) => {
-    setVocabulary((prev) => prev.map((w) => (w.word_id === item.word_id ? item : w)));
+    setVocabulary((prev) => {
+      const updated = prev.map((w) => (w.word_id === item.word_id ? item : w));
+      idbSet('vocabulary', updated).catch(() => {});
+      return updated;
+    });
+
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveVocabulary(item).catch((err) => {
+        console.warn('Lỗi cập nhật từ vựng vào Supabase:', err);
+      });
+    }
   };
 
   const batchDeleteVocabulary = async (wordIds: string[]): Promise<number> => {
@@ -544,7 +562,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (newItems.length > 0) {
-      setVocabulary((prev) => cleanDeduplicateVocab([...newItems, ...prev]));
+      setVocabulary((prev) => {
+        const merged = cleanDeduplicateVocab([...newItems, ...prev]);
+        idbSet('vocabulary', merged).catch(() => {});
+        return merged;
+      });
+      if (SupabaseService.isConfigured()) {
+        SupabaseService.saveVocabularyBatch(newItems).catch((err) => {
+          console.warn('Lỗi lưu danh sách từ vựng vào Supabase:', err);
+        });
+      }
       updateUser({ total_points: (currentUser.total_points || 0) + count * 5 });
     }
     return count;
@@ -583,11 +610,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       created_at: new Date().toISOString().split('T')[0],
     };
     setDecks((prev) => [newDeck, ...prev]);
+    idbSet('decks', [newDeck, ...decks]).catch(() => {});
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveDeck(newDeck).catch(() => {});
+    }
     return newDeck;
   };
 
   const updateDeck = (deck: Deck) => {
-    setDecks((prev) => prev.map((d) => (d.deck_id === deck.deck_id ? deck : d)));
+    setDecks((prev) => {
+      const updated = prev.map((d) => (d.deck_id === deck.deck_id ? deck : d));
+      idbSet('decks', updated).catch(() => {});
+      return updated;
+    });
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveDeck(deck).catch(() => {});
+    }
   };
 
   const deleteDeck = (deckId: string) => {
@@ -617,11 +655,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       created_at: new Date().toISOString().split('T')[0],
     };
     setGrammar((prev) => [newGr, ...prev]);
+    idbSet('grammar', [newGr, ...grammar]).catch(() => {});
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveGrammar(newGr).catch(() => {});
+    }
     return newGr;
   };
 
   const updateGrammar = (item: GrammarItem) => {
-    setGrammar((prev) => prev.map((g) => (g.grammar_id === item.grammar_id ? item : g)));
+    setGrammar((prev) => {
+      const updated = prev.map((g) => (g.grammar_id === item.grammar_id ? item : g));
+      idbSet('grammar', updated).catch(() => {});
+      return updated;
+    });
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveGrammar(item).catch(() => {});
+    }
   };
 
   const batchDeleteGrammar = async (grammarIds: string[]): Promise<number> => {
@@ -748,7 +797,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (newItems.length > 0) {
-      setGrammar((prev) => [...newItems, ...prev]);
+      setGrammar((prev) => {
+        const merged = [...newItems, ...prev];
+        idbSet('grammar', merged).catch(() => {});
+        return merged;
+      });
+      if (SupabaseService.isConfigured()) {
+        SupabaseService.saveGrammarBatch(newItems).catch(() => {});
+      }
       updateUser({ total_points: (currentUser.total_points || 0) + count * 8 });
     }
     return count;
@@ -760,48 +816,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...session,
       session_id: `session_${Date.now()}`,
     };
-    setReviewSessions((prev) => [newSession, ...prev]);
+    setReviewSessions((prev) => {
+      const next = [newSession, ...prev];
+      idbSet('review_sessions', next).catch(() => {});
+      return next;
+    });
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveReviewSession(newSession).catch(() => {});
+    }
     updateUser({ total_points: (currentUser.total_points || 0) + session.diem });
   };
 
   const addMockTestRecord = (test: MockTestRecord) => {
-    setMockTests((prev) => [test, ...prev]);
+    setMockTests((prev) => {
+      const next = [test, ...prev];
+      idbSet('mock_tests', next).catch(() => {});
+      return next;
+    });
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveMockTestRecord(test).catch(() => {});
+    }
     const earnedPoints = Math.round((test.diem_so / (test.tong_diem || 100)) * 100);
     updateUser({ total_points: (currentUser.total_points || 0) + earnedPoints });
   };
 
   const addListeningExercise = (ex: ListeningExercise) => {
-    setListeningExercises((prev) => [ex, ...prev]);
+    setListeningExercises((prev) => {
+      const next = [ex, ...prev];
+      idbSet('listening', next).catch(() => {});
+      return next;
+    });
   };
 
   const addStudyTime = (minutes: number, score: number = 0) => {
     const today = new Date().toISOString().split('T')[0];
     setProgressLogs((prev) => {
+      let next: ProgressRecord[];
       const existing = prev.find((p) => p.user_id === currentUser.user_id && p.ngay === today && p.ngon_ngu === currentLanguage);
       if (existing) {
-        return prev.map((p) =>
-          p === existing
-            ? {
-                ...p,
-                thoi_gian_hoc_phut: p.thoi_gian_hoc_phut + minutes,
-                score_earned: p.score_earned + score,
-              }
-            : p
-        );
+        const updatedRecord = {
+          ...existing,
+          thoi_gian_hoc_phut: existing.thoi_gian_hoc_phut + minutes,
+          score_earned: existing.score_earned + score,
+        };
+        next = prev.map((p) => (p === existing ? updatedRecord : p));
+        if (SupabaseService.isConfigured()) {
+          SupabaseService.saveProgressRecord(updatedRecord).catch(() => {});
+        }
       } else {
-        return [
-          {
-            user_id: currentUser.user_id,
-            ngon_ngu: currentLanguage,
-            ngay: today,
-            so_tu_moi: 0,
-            streak: currentUser.streak || 1,
-            thoi_gian_hoc_phut: minutes,
-            score_earned: score,
-          },
-          ...prev,
-        ];
+        const newRecord: ProgressRecord = {
+          user_id: currentUser.user_id,
+          ngon_ngu: currentLanguage,
+          ngay: today,
+          so_tu_moi: 0,
+          streak: currentUser.streak || 1,
+          thoi_gian_hoc_phut: minutes,
+          score_earned: score,
+        };
+        next = [newRecord, ...prev];
+        if (SupabaseService.isConfigured()) {
+          SupabaseService.saveProgressRecord(newRecord).catch(() => {});
+        }
       }
+      idbSet('progress_logs', next).catch(() => {});
+      return next;
     });
   };
 
@@ -811,7 +889,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       entry_id: `journal_${Date.now()}`,
       created_at: new Date().toISOString(),
     };
-    setJournalEntries((prev) => [newEntry, ...prev]);
+    setJournalEntries((prev) => {
+      const next = [newEntry, ...prev];
+      idbSet('journal', next).catch(() => {});
+      return next;
+    });
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveJournalEntry(newEntry).catch(() => {});
+    }
     updateUser({ total_points: (currentUser.total_points || 0) + 50 });
     return newEntry;
   };
@@ -821,23 +906,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...noti,
       noti_id: `noti_${Date.now()}`,
     };
-    setNotifications((prev) => [newNoti, ...prev]);
+    setNotifications((prev) => {
+      const next = [newNoti, ...prev];
+      idbSet('notifications', next).catch(() => {});
+      return next;
+    });
   };
 
   const markNotificationRead = (notiId: string) => {
-    setNotifications((prev) => prev.map((n) => (n.noti_id === notiId ? { ...n, da_doc: true } : n)));
+    setNotifications((prev) => {
+      const next = prev.map((n) => (n.noti_id === notiId ? { ...n, da_doc: true } : n));
+      idbSet('notifications', next).catch(() => {});
+      return next;
+    });
   };
 
   const saveChatConversation = (conv: ChatConversation) => {
     setChatHistory((prev) => {
       const idx = prev.findIndex((c) => c.chat_id === conv.chat_id);
+      let next: ChatConversation[];
       if (idx >= 0) {
-        const next = [...prev];
+        next = [...prev];
         next[idx] = conv;
-        return next;
+      } else {
+        next = [conv, ...prev];
       }
-      return [conv, ...prev];
+      idbSet('chat_history', next).catch(() => {});
+      return next;
     });
+    if (SupabaseService.isConfigured()) {
+      SupabaseService.saveChatConversation(conv).catch(() => {});
+    }
   };
 
   const deleteChatConversation = (chatId: string) => {
@@ -995,53 +1094,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const res = await SupabaseService.pullAllData();
       if (res.success && res.data) {
         if (res.data.userProfile) setCurrentUser(res.data.userProfile);
-        if (res.data.vocabulary && res.data.vocabulary.length > 0) {
-          const vocabHash = `${res.data.vocabulary.length}_${res.data.vocabulary[0]?.word_id}_${res.data.vocabulary[res.data.vocabulary.length - 1]?.word_id}`;
-          if (vocabHash !== lastSupabaseVocabHashRef.current) {
-            lastSupabaseVocabHashRef.current = vocabHash;
-            setVocabulary((prev) => {
-              const merged = cleanDeduplicateVocab([...res.data!.vocabulary!, ...prev]);
-              idbSet('vocabulary', merged).catch(() => {});
-              return merged;
-            });
+
+        if (Array.isArray(res.data.vocabulary)) {
+          if (res.data.vocabulary.length > 0) {
+            const clean = cleanDeduplicateVocab(res.data.vocabulary);
+            setVocabulary(clean);
+            idbSet('vocabulary', clean).catch(() => {});
           }
         }
-        if (res.data.grammar && res.data.grammar.length > 0) {
-          const gramHash = `${res.data.grammar.length}_${res.data.grammar[0]?.grammar_id}_${res.data.grammar[res.data.grammar.length - 1]?.grammar_id}`;
-          if (gramHash !== lastSupabaseGrammarHashRef.current) {
-            lastSupabaseGrammarHashRef.current = gramHash;
-            setGrammar((prev) => {
-              const merged = cleanDeduplicateGrammar([...res.data!.grammar!, ...prev]);
-              idbSet('grammar', merged).catch(() => {});
-              return merged;
-            });
+
+        if (Array.isArray(res.data.grammar)) {
+          if (res.data.grammar.length > 0) {
+            const clean = cleanDeduplicateGrammar(res.data.grammar);
+            setGrammar(clean);
+            idbSet('grammar', clean).catch(() => {});
           }
         }
-        if (res.data.decks && res.data.decks.length > 0) {
-          setDecks((prev) => {
-            const merged = cleanDeduplicateDecks([...res.data!.decks!, ...prev]);
-            idbSet('decks', merged).catch(() => {});
-            return merged;
-          });
+
+        if (Array.isArray(res.data.decks)) {
+          if (res.data.decks.length > 0) {
+            const clean = cleanDeduplicateDecks(res.data.decks);
+            setDecks(clean);
+            idbSet('decks', clean).catch(() => {});
+          }
         }
-        if (res.data.reviewSessions && res.data.reviewSessions.length > 0) {
+
+        if (Array.isArray(res.data.reviewSessions) && res.data.reviewSessions.length > 0) {
           setReviewSessions(res.data.reviewSessions);
+          idbSet('review_sessions', res.data.reviewSessions).catch(() => {});
         }
-        if (res.data.mockTests && res.data.mockTests.length > 0) {
+
+        if (Array.isArray(res.data.mockTests) && res.data.mockTests.length > 0) {
           setMockTests(res.data.mockTests);
+          idbSet('mock_tests', res.data.mockTests).catch(() => {});
         }
-        if (res.data.progressRecords && res.data.progressRecords.length > 0) {
+
+        if (Array.isArray(res.data.progressRecords) && res.data.progressRecords.length > 0) {
           setProgressLogs(res.data.progressRecords);
+          idbSet('progress_logs', res.data.progressRecords).catch(() => {});
         }
-        if (res.data.journalEntries && res.data.journalEntries.length > 0) {
+
+        if (Array.isArray(res.data.journalEntries) && res.data.journalEntries.length > 0) {
           setJournalEntries(res.data.journalEntries);
+          idbSet('journal', res.data.journalEntries).catch(() => {});
         }
-        if (res.data.chatConversations && res.data.chatConversations.length > 0) {
+
+        if (Array.isArray(res.data.chatConversations) && res.data.chatConversations.length > 0) {
           setChatHistory(res.data.chatConversations);
+          idbSet('chat_history', res.data.chatConversations).catch(() => {});
         }
-        if (res.data.notifications && res.data.notifications.length > 0) {
+
+        if (Array.isArray(res.data.notifications) && res.data.notifications.length > 0) {
           setNotifications(res.data.notifications);
+          idbSet('notifications', res.data.notifications).catch(() => {});
         }
+
         return { success: true, message: 'Đã nhập dữ liệu từ Supabase Cloud thành công!' };
       }
       return res;
@@ -1272,12 +1379,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleInitialSync();
   }, []);
 
-  // 2. Real-time background polling for cloud server changes (status checked every 15s)
+  // 2. Real-time background polling for cloud server changes (status checked every 15s) and offline sync queue drainage
   useEffect(() => {
+    const drainQueue = async () => {
+      if (navigator.onLine && SupabaseService.isConfigured()) {
+        await SupabaseService.drainSyncQueue();
+      }
+    };
+
     const interval = setInterval(() => {
       syncWithCloudServer(true);
+      drainQueue();
     }, 15000);
-    return () => clearInterval(interval);
+
+    const handleOnline = () => {
+      drainQueue();
+      syncWithCloudServer(true);
+      if (SupabaseService.isConfigured()) {
+        importFromSupabase(true);
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   // 3. On Window Focus & App Re-open (e.g. Opening PWA on iPhone from home screen)

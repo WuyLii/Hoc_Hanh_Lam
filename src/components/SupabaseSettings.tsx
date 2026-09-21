@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { SupabaseService, SupabaseConfig } from '../services/supabaseService';
+import { SupabaseService, SupabaseConfig, FailedChunk } from '../services/supabaseService';
+import {
+  getSyncQueueCount,
+  clearSyncQueue,
+  getSyncQueue,
+  SyncQueueItem,
+} from '../utils/idbStorage';
 import {
   Database,
   Copy,
@@ -18,6 +24,9 @@ import {
   EyeOff,
   HelpCircle,
   Trash2,
+  ListOrdered,
+  Layers,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const SupabaseSettings: React.FC = () => {
@@ -61,13 +70,29 @@ export const SupabaseSettings: React.FC = () => {
 
   const [showKey, setShowKey] = useState(false);
   const [hasCopiedSql, setHasCopiedSql] = useState(false);
+  const [hasCopiedGrantSql, setHasCopiedGrantSql] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
+  const [failedChunks, setFailedChunks] = useState<FailedChunk[]>([]);
+  const [offlineQueueCount, setOfflineQueueCount] = useState<number>(0);
+  const [isDrainingQueue, setIsDrainingQueue] = useState(false);
+
+  // Refresh queue count
+  const refreshQueueCount = async () => {
+    const count = await getSyncQueueCount();
+    setOfflineQueueCount(count);
+  };
+
+  useEffect(() => {
+    refreshQueueCount();
+    const timer = setInterval(refreshQueueCount, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Read raw SQL script content embedded or defined
   const sqlScriptContent = `-- ====================================================================
--- SUPABASE DATABASE SCHEMA CHO ỨNG DỤNG HỌC HÀNH LẮM (MULTILINGUAL LEARNING)
+-- SUPABASE DATABASE SCHEMA CHO ỨNG DỤNG TINH NGỮ (MULTILINGUAL LEARNING)
 -- ====================================================================
 -- Hướng dẫn cài đặt trên Supabase:
 -- 1. Truy cập vào dự án Supabase của bạn tại https://supabase.com
@@ -75,9 +100,10 @@ export const SupabaseSettings: React.FC = () => {
 -- 3. Mở tab "New Query", dán toàn bộ đoạn mã SQL dưới đây và nhấn "Run".
 -- ====================================================================
 
+-- Kích hoạt tiện ích mở rộng UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. BẢNG THÔNG TIN NGƯỜI DÙNG
+-- 1. BẢNG THÔNG TIN NGƯỜI DÙNG (user_profiles)
 CREATE TABLE IF NOT EXISTS public.user_profiles (
     user_id TEXT PRIMARY KEY,
     ten TEXT NOT NULL DEFAULT 'Học viên',
@@ -95,7 +121,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. BẢNG TỪ VỰNG
+-- 2. BẢNG TỪ VỰNG (vocabulary)
 CREATE TABLE IF NOT EXISTS public.vocabulary (
     word_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL DEFAULT 'shared',
@@ -124,7 +150,7 @@ CREATE TABLE IF NOT EXISTS public.vocabulary (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. BẢNG BỘ TỪ VỰNG
+-- 3. BẢNG BỘ TỪ VỰNG / DECKS (decks)
 CREATE TABLE IF NOT EXISTS public.decks (
     deck_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL DEFAULT 'shared',
@@ -140,7 +166,7 @@ CREATE TABLE IF NOT EXISTS public.decks (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. BẢNG NGỮ PHÁP
+-- 4. BẢNG NGỮ PHÁP (grammar)
 CREATE TABLE IF NOT EXISTS public.grammar (
     grammar_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL DEFAULT 'shared',
@@ -155,7 +181,7 @@ CREATE TABLE IF NOT EXISTS public.grammar (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. BẢNG PHIÊN ÔN TẬP
+-- 5. BẢNG PHIÊN ÔN TẬP (review_sessions)
 CREATE TABLE IF NOT EXISTS public.review_sessions (
     session_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -170,7 +196,7 @@ CREATE TABLE IF NOT EXISTS public.review_sessions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. BẢNG LỊCH SỬ THI THỬ
+-- 6. BẢNG LỊCH SỬ THI THỬ (mock_test_records)
 CREATE TABLE IF NOT EXISTS public.mock_test_records (
     test_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -187,7 +213,7 @@ CREATE TABLE IF NOT EXISTS public.mock_test_records (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 7. BẢNG TIẾN ĐỘ HỌC HÀNG NGÀY
+-- 7. BẢNG TIẾN ĐỘ HỌC HÀNG NGÀY (progress_records)
 CREATE TABLE IF NOT EXISTS public.progress_records (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -201,7 +227,7 @@ CREATE TABLE IF NOT EXISTS public.progress_records (
     UNIQUE(user_id, ngon_ngu, ngay)
 );
 
--- 8. BẢNG NHẬT KÝ VIẾT AI
+-- 8. BẢNG NHẬT KÝ VIẾT AI (journal_entries)
 CREATE TABLE IF NOT EXISTS public.journal_entries (
     entry_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -213,7 +239,7 @@ CREATE TABLE IF NOT EXISTS public.journal_entries (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 9. BẢNG HỘI THOẠI AI CHAT
+-- 9. BẢNG HỘI THOẠI AI CHAT (chat_conversations)
 CREATE TABLE IF NOT EXISTS public.chat_conversations (
     chat_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -226,7 +252,7 @@ CREATE TABLE IF NOT EXISTS public.chat_conversations (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 10. BẢNG THÔNG BÁO
+-- 10. BẢNG THÔNG BÁO (notifications)
 CREATE TABLE IF NOT EXISTS public.notifications (
     noti_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -237,49 +263,175 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- BẢO MẬT VÀ PHÂN QUYỀN TRUY CẬP (CHO PHÉP SELECT, INSERT, UPDATE, DELETE TỪ WEB)
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+-- CHỈ MỤC (INDEXES) TỐI ƯU
+CREATE INDEX IF NOT EXISTS idx_vocabulary_user_lang ON public.vocabulary(user_id, ngon_ngu);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_srs_next ON public.vocabulary(srs_next_review);
+CREATE INDEX IF NOT EXISTS idx_grammar_user_lang ON public.grammar(user_id, ngon_ngu);
+CREATE INDEX IF NOT EXISTS idx_decks_lang ON public.decks(ngon_ngu);
+CREATE INDEX IF NOT EXISTS idx_review_sessions_user ON public.review_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_progress_user_date ON public.progress_records(user_id, ngay);
+CREATE INDEX IF NOT EXISTS idx_journal_user ON public.journal_entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_user ON public.chat_conversations(user_id);
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+-- ====================================================================
+-- PHÂN QUYỀN TỐI THIỂU & ROW LEVEL SECURITY (RLS)
+-- ====================================================================
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM anon, authenticated, public;
 
--- Tắt RLS để ứng dụng web có thể tự do thêm, sửa, xóa dữ liệu qua public Anon Key
-ALTER TABLE IF EXISTS public.user_profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.vocabulary DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.decks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.grammar DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.review_sessions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.mock_test_records DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.progress_records DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.journal_entries DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.chat_conversations DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+
+-- Đặt quyền mặc định cho các bảng/sequences tạo mới trong tương lai
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON ROUTINES FROM anon, authenticated, public;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated;
+
+-- Kích hoạt RLS cho 10 bảng (ĐÃ LOẠI BỎ auth.role() = 'anon' ĐỂ CHỐNG LỖ HỔNG LỘ DỮ LIỆU)
+ALTER TABLE IF EXISTS public.user_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "user_profiles_all_policy" ON public.user_profiles;
+DROP POLICY IF EXISTS "user_profiles_select_policy" ON public.user_profiles;
+DROP POLICY IF EXISTS "user_profiles_insert_policy" ON public.user_profiles;
+DROP POLICY IF EXISTS "user_profiles_update_policy" ON public.user_profiles;
+DROP POLICY IF EXISTS "user_profiles_delete_policy" ON public.user_profiles;
+CREATE POLICY "user_profiles_all_policy" ON public.user_profiles FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.vocabulary ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "vocabulary_all_policy" ON public.vocabulary;
+DROP POLICY IF EXISTS "vocabulary_select_policy" ON public.vocabulary;
+DROP POLICY IF EXISTS "vocabulary_insert_policy" ON public.vocabulary;
+DROP POLICY IF EXISTS "vocabulary_update_policy" ON public.vocabulary;
+DROP POLICY IF EXISTS "vocabulary_delete_policy" ON public.vocabulary;
+CREATE POLICY "vocabulary_select_policy" ON public.vocabulary FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared');
+CREATE POLICY "vocabulary_insert_policy" ON public.vocabulary FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "vocabulary_update_policy" ON public.vocabulary FOR UPDATE USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "vocabulary_delete_policy" ON public.vocabulary FOR DELETE USING (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.decks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "decks_all_policy" ON public.decks;
+DROP POLICY IF EXISTS "decks_select_policy" ON public.decks;
+DROP POLICY IF EXISTS "decks_insert_policy" ON public.decks;
+DROP POLICY IF EXISTS "decks_update_policy" ON public.decks;
+DROP POLICY IF EXISTS "decks_delete_policy" ON public.decks;
+CREATE POLICY "decks_select_policy" ON public.decks FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared' OR che_do_chia_se = 'shared');
+CREATE POLICY "decks_insert_policy" ON public.decks FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "decks_update_policy" ON public.decks FOR UPDATE USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "decks_delete_policy" ON public.decks FOR DELETE USING (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.grammar ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "grammar_all_policy" ON public.grammar;
+DROP POLICY IF EXISTS "grammar_select_policy" ON public.grammar;
+DROP POLICY IF EXISTS "grammar_insert_policy" ON public.grammar;
+DROP POLICY IF EXISTS "grammar_update_policy" ON public.grammar;
+DROP POLICY IF EXISTS "grammar_delete_policy" ON public.grammar;
+CREATE POLICY "grammar_select_policy" ON public.grammar FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared');
+CREATE POLICY "grammar_insert_policy" ON public.grammar FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "grammar_update_policy" ON public.grammar FOR UPDATE USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "grammar_delete_policy" ON public.grammar FOR DELETE USING (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.review_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "review_sessions_all_policy" ON public.review_sessions;
+CREATE POLICY "review_sessions_all_policy" ON public.review_sessions FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.mock_test_records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mock_tests_all_policy" ON public.mock_test_records;
+CREATE POLICY "mock_tests_all_policy" ON public.mock_test_records FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.progress_records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "progress_all_policy" ON public.progress_records;
+CREATE POLICY "progress_all_policy" ON public.progress_records FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.journal_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "journal_all_policy" ON public.journal_entries;
+CREATE POLICY "journal_all_policy" ON public.journal_entries FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.chat_conversations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "chat_all_policy" ON public.chat_conversations;
+CREATE POLICY "chat_all_policy" ON public.chat_conversations FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "notifications_all_policy" ON public.notifications;
+CREATE POLICY "notifications_all_policy" ON public.notifications FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
 `;
 
-  const grantOnlySqlScript = `-- CẤP TOÀN QUYỀN VÀ CHO PHÉP XOÁ/THÊM/SỬA TRÊN SUPABASE (CHỐNG LỖI 42501):
--- 1. Cho phép truy cập và cấp quyền cho anon (khóa web) và authenticated
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+  const grantOnlySqlScript = `-- CẤP QUYỀN TỐI THIỂU & CẬP NHẬT RLS CHỐNG LỖI 42501 (CHẠY TRONG SQL EDITOR):
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM anon, authenticated, public;
 
--- 2. Tắt RLS để web có thể xóa, sửa, thêm từ vựng và ngữ pháp trực tiếp không bị chặn
-ALTER TABLE IF EXISTS public.vocabulary DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.grammar DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.decks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.user_profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.review_sessions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.mock_test_records DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.progress_records DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.journal_entries DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.chat_conversations DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
-  const [hasCopiedGrantSql, setHasCopiedGrantSql] = useState(false);
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON ROUTINES FROM anon, authenticated, public;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated;
+
+-- Thiết lập RLS đảm bảo bảo mật tuyệt đối (chỉ người dùng sở hữu mới đọc/ghi, shared chỉ cho phép đọc từ vựng/ngữ pháp/deck mẫu):
+ALTER TABLE IF EXISTS public.user_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "user_profiles_all_policy" ON public.user_profiles;
+CREATE POLICY "user_profiles_all_policy" ON public.user_profiles FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.vocabulary ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "vocabulary_all_policy" ON public.vocabulary;
+DROP POLICY IF EXISTS "vocabulary_select_policy" ON public.vocabulary;
+DROP POLICY IF EXISTS "vocabulary_insert_policy" ON public.vocabulary;
+DROP POLICY IF EXISTS "vocabulary_update_policy" ON public.vocabulary;
+DROP POLICY IF EXISTS "vocabulary_delete_policy" ON public.vocabulary;
+CREATE POLICY "vocabulary_select_policy" ON public.vocabulary FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared');
+CREATE POLICY "vocabulary_insert_policy" ON public.vocabulary FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "vocabulary_update_policy" ON public.vocabulary FOR UPDATE USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "vocabulary_delete_policy" ON public.vocabulary FOR DELETE USING (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.decks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "decks_all_policy" ON public.decks;
+DROP POLICY IF EXISTS "decks_select_policy" ON public.decks;
+DROP POLICY IF EXISTS "decks_insert_policy" ON public.decks;
+DROP POLICY IF EXISTS "decks_update_policy" ON public.decks;
+DROP POLICY IF EXISTS "decks_delete_policy" ON public.decks;
+CREATE POLICY "decks_select_policy" ON public.decks FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared' OR che_do_chia_se = 'shared');
+CREATE POLICY "decks_insert_policy" ON public.decks FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "decks_update_policy" ON public.decks FOR UPDATE USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "decks_delete_policy" ON public.decks FOR DELETE USING (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.grammar ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "grammar_all_policy" ON public.grammar;
+DROP POLICY IF EXISTS "grammar_select_policy" ON public.grammar;
+DROP POLICY IF EXISTS "grammar_insert_policy" ON public.grammar;
+DROP POLICY IF EXISTS "grammar_update_policy" ON public.grammar;
+DROP POLICY IF EXISTS "grammar_delete_policy" ON public.grammar;
+CREATE POLICY "grammar_select_policy" ON public.grammar FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared');
+CREATE POLICY "grammar_insert_policy" ON public.grammar FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "grammar_update_policy" ON public.grammar FOR UPDATE USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "grammar_delete_policy" ON public.grammar FOR DELETE USING (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.review_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "review_sessions_all_policy" ON public.review_sessions;
+CREATE POLICY "review_sessions_all_policy" ON public.review_sessions FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.mock_test_records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mock_tests_all_policy" ON public.mock_test_records;
+CREATE POLICY "mock_tests_all_policy" ON public.mock_test_records FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.progress_records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "progress_all_policy" ON public.progress_records;
+CREATE POLICY "progress_all_policy" ON public.progress_records FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.journal_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "journal_all_policy" ON public.journal_entries;
+CREATE POLICY "journal_all_policy" ON public.journal_entries FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.chat_conversations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "chat_all_policy" ON public.chat_conversations;
+CREATE POLICY "chat_all_policy" ON public.chat_conversations FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+ALTER TABLE IF EXISTS public.notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "notifications_all_policy" ON public.notifications;
+CREATE POLICY "notifications_all_policy" ON public.notifications FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);`;
 
   const handleCopyGrantSql = () => {
     navigator.clipboard.writeText(grantOnlySqlScript);
@@ -305,15 +457,18 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
     handleSaveConfig();
     setTestingConnection(true);
     setFeedback(null);
+    setFailedChunks([]);
     const result = await SupabaseService.testConnection(config.url, config.anonKey);
     setTestingConnection(false);
     setFeedback(result);
+    refreshQueueCount();
   };
 
   const handlePushToSupabase = async () => {
     handleSaveConfig();
     setIsSyncing(true);
     setFeedback(null);
+    setFailedChunks([]);
 
     const res = await SupabaseService.pushAllData({
       userProfile: currentUser,
@@ -330,16 +485,19 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
 
     setIsSyncing(false);
     setFeedback(res);
+    refreshQueueCount();
   };
 
   const handlePullFromSupabase = async () => {
     handleSaveConfig();
     setIsSyncing(true);
     setFeedback(null);
+    setFailedChunks([]);
 
     const res = await importFromSupabase();
     setIsSyncing(false);
     setFeedback(res);
+    refreshQueueCount();
   };
 
   const handleClearCloudData = async () => {
@@ -351,10 +509,33 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
     handleSaveConfig();
     setIsSyncing(true);
     setFeedback(null);
+    setFailedChunks([]);
 
     const res = await SupabaseService.clearAllCloudData();
     setIsSyncing(false);
     setFeedback(res);
+    refreshQueueCount();
+  };
+
+  const handleDrainOfflineQueue = async () => {
+    setIsDrainingQueue(true);
+    setFeedback(null);
+    const res = await SupabaseService.drainSyncQueue();
+    setIsDrainingQueue(false);
+    setFeedback({
+      success: res.failed === 0,
+      message: `Đã xử lý hàng đợi offline: Thành công ${res.processed} tác vụ, thất bại ${res.failed} tác vụ, còn lại trong hàng đợi ${res.remaining} tác vụ.`,
+    });
+    refreshQueueCount();
+  };
+
+  const handleClearOfflineQueue = async () => {
+    await clearSyncQueue();
+    setOfflineQueueCount(0);
+    setFeedback({
+      success: true,
+      message: 'Đã dọn sạch hàng đợi offline.',
+    });
   };
 
   return (
@@ -504,7 +685,7 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
               {(feedback.message.includes('42501') || feedback.message.toLowerCase().includes('permission denied')) && (
                 <div className="mt-2 pt-2 border-t border-rose-200 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[11px] text-rose-800 font-sans">
-                    👉 Bấm nút bên cạnh để copy mã sửa quyền, sau đó dán vào SQL Editor trên Supabase và bấm Run:
+                    👉 Bấm nút bên cạnh để copy mã siết quyền GRANT + RLS, sau đó dán vào SQL Editor trên Supabase và bấm Run:
                   </span>
                   <button
                     onClick={handleCopyGrantSql}
@@ -513,18 +694,55 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
                     {hasCopiedGrantSql ? (
                       <>
                         <Check className="w-3.5 h-3.5 text-emerald-300" />
-                        <span>Đã Sao Chép Lệnh GRANT!</span>
+                        <span>Đã Sao Chép Lệnh GRANT &amp; RLS!</span>
                       </>
                     ) : (
                       <>
                         <Copy className="w-3.5 h-3.5" />
-                        <span>Sao Chép Lệnh GRANT Sửa Lỗi 42501</span>
+                        <span>Sao Chép Lệnh GRANT &amp; RLS Sửa 42501</span>
                       </>
                     )}
                   </button>
                 </div>
               )}
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Offline Sync Queue Card */}
+      <div className="bg-[#F9F7F2] border-2 border-[#1A1A1A] p-6 shadow-[4px_4px_0px_0px_#1A1A1A]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <h2 className="text-xl font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+            <Layers className="w-5 h-5 text-indigo-700" />
+            <span>Hàng Đợi Lưu Trữ Ngoại Tuyến (Offline Sync Queue)</span>
+          </h2>
+          <span className={`px-2.5 py-1 text-xs font-mono font-bold rounded ${offlineQueueCount > 0 ? 'bg-amber-100 text-amber-900 border border-amber-400' : 'bg-emerald-100 text-emerald-900 border border-emerald-400'}`}>
+            {offlineQueueCount} tác vụ đang chờ
+          </span>
+        </div>
+
+        <p className="text-xs font-mono text-stone-600 mb-4">
+          Khi mạng gián đoạn hoặc Supabase phản hồi lỗi, các thao tác thêm, sửa, xóa từ vựng/ngữ pháp được tự động lưu vào IndexedDB <code>sync_queue</code> và sẽ tự động retry khi kết nối phục hồi.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleDrainOfflineQueue}
+            disabled={isDrainingQueue || offlineQueueCount === 0}
+            className="px-4 py-2 bg-indigo-700 text-white font-mono text-xs font-bold uppercase tracking-wider hover:bg-indigo-800 transition flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000] disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isDrainingQueue ? 'animate-spin' : ''}`} />
+            <span>{isDrainingQueue ? 'Đang đồng bộ...' : 'Đồng Bộ Hàng Đợi Ngay'}</span>
+          </button>
+
+          {offlineQueueCount > 0 && (
+            <button
+              onClick={handleClearOfflineQueue}
+              className="px-3 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 font-mono text-xs font-bold uppercase border border-stone-400 transition"
+            >
+              Xóa Hàng Đợi
+            </button>
           )}
         </div>
       </div>
@@ -537,7 +755,7 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
         </h2>
 
         <p className="text-xs font-mono text-stone-600 mb-6">
-          Chuyển đổi dữ liệu dễ dàng giữa ứng dụng học web và Cơ sở dữ liệu Supabase của bạn.
+          Chuyển đổi dữ liệu dễ dàng giữa ứng dụng học web và Cơ sở dữ liệu Supabase của bạn (sử dụng cơ chế chia khối 100 bản ghi/lần với 3 lần retry exponential backoff).
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -601,50 +819,6 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
             </button>
           </div>
         </div>
-
-        {/* Feedback inside Sync Operations Card */}
-        {feedback && (
-          <div
-            className={`p-3.5 border font-mono text-xs mt-4 flex flex-col gap-2 ${
-              feedback.success
-                ? 'bg-emerald-50 border-emerald-400 text-emerald-950'
-                : 'bg-rose-50 border-rose-400 text-rose-950'
-            }`}
-          >
-            <div className="flex items-start gap-2">
-              {feedback.success ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              ) : (
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              )}
-              <span className="leading-relaxed whitespace-pre-wrap">{feedback.message}</span>
-            </div>
-
-            {(feedback.message.includes('42501') || feedback.message.toLowerCase().includes('permission denied')) && (
-              <div className="mt-2 pt-2 border-t border-rose-200 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[11px] text-rose-800 font-sans">
-                  👉 Lỗi 42501 do thiếu lệnh GRANT. Bấm để copy lệnh sửa quyền và chạy trong Supabase SQL Editor:
-                </span>
-                <button
-                  onClick={handleCopyGrantSql}
-                  className="px-3 py-1.5 bg-rose-700 text-white font-mono text-xs font-bold uppercase tracking-wider hover:bg-rose-800 transition flex items-center gap-1.5 shadow-sm shrink-0"
-                >
-                  {hasCopiedGrantSql ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>Đã Copy Lệnh GRANT!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Sao Chép Lệnh GRANT (Sửa 42501)</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* SQL Setup Script Card */}
@@ -653,10 +827,10 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
           <div>
             <h2 className="text-xl font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
               <Code2 className="w-5 h-5 text-indigo-700" />
-              <span>Mã Nguồn SQL Tạo Bảng (Supabase Schema Script)</span>
+              <span>Mã Nguồn SQL Tạo Bảng &amp; RLS (Supabase Schema Script)</span>
             </h2>
             <p className="text-xs font-mono text-stone-600 mt-1">
-              Sao chép mã SQL bên dưới và dán vào <strong>SQL Editor</strong> trong Supabase Dashboard để tự động khởi tạo 10 bảng dữ liệu chuẩn.
+              Sao chép mã SQL bên dưới và dán vào <strong>SQL Editor</strong> trong Supabase Dashboard để tự động khởi tạo 10 bảng dữ liệu chuẩn và thiết lập phân quyền RLS an toàn.
             </p>
           </div>
 
@@ -683,11 +857,11 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="font-bold text-xs uppercase font-mono text-rose-950 flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-rose-700" />
-                <span>Sửa Nhanh Lỗi 42501: "permission denied for table ..."</span>
+                <ShieldCheck className="w-4 h-4 text-rose-700" />
+                <span>Sửa Nhanh Quyền &amp; Lỗi 42501 (Grant Quyền Tối Thiểu + RLS Policy)</span>
               </div>
               <p className="text-xs text-stone-700 font-sans mt-1">
-                Nếu bạn đã tạo bảng rồi nhưng khi bấm <strong>"Đẩy Dữ Liệu Lên Cloud"</strong> bị báo lỗi <em>permission denied for table user_profiles (42501)</em>, chỉ cần chạy đoạn lệnh GRANT này trong SQL Editor:
+                Đoạn SQL này thu hồi các quyền thừa, cấp đúng SELECT/INSERT/UPDATE/DELETE cho role <code>anon</code> và <code>authenticated</code>, và kích hoạt RLS policy chuẩn cho toàn bộ 10 bảng:
               </p>
             </div>
             <button
@@ -697,12 +871,12 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
               {hasCopiedGrantSql ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>Đã Copy Lệnh GRANT!</span>
+                  <span>Đã Copy Lệnh GRANT &amp; RLS!</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Sao Chép Lệnh GRANT (Sửa 42501)</span>
+                  <span>Sao Chép Lệnh GRANT &amp; RLS</span>
                 </>
               )}
             </button>
@@ -716,7 +890,7 @@ ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;`;
         <div className="bg-amber-50/60 border border-amber-300 p-4 text-xs font-mono space-y-2 text-stone-800">
           <div className="font-bold uppercase text-amber-900 flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-amber-700" />
-            <span>Hướng dẫn 3 bước tạo bảng nhanh trên Supabase:</span>
+            <span>Hướng dẫn 3 bước chạy SQL trên Supabase:</span>
           </div>
           <ol className="list-decimal list-inside space-y-1 text-stone-700 pl-1">
             <li>

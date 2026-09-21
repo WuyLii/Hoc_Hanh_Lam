@@ -183,26 +183,151 @@ CREATE INDEX IF NOT EXISTS idx_journal_user ON public.journal_entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_user ON public.chat_conversations(user_id);
 
 -- ====================================================================
--- BẢO MẬT VÀ PHÂN QUYỀN TRUY CẬP (CHO PHÉP SELECT, INSERT, UPDATE, DELETE TỪ WEB)
+-- BẢO MẬT VÀ PHÂN QUYỀN TRUY CẬP (LEAST PRIVILEGE & ROW LEVEL SECURITY)
 -- ====================================================================
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+-- 1. Thu hồi toàn bộ quyền dư thừa
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM anon, authenticated, public;
 
--- Tắt RLS để ứng dụng web có thể tự do thêm, sửa, xóa dữ liệu qua public Anon Key
-ALTER TABLE IF EXISTS public.user_profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.vocabulary DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.decks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.grammar DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.review_sessions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.mock_test_records DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.progress_records DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.journal_entries DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.chat_conversations DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.notifications DISABLE ROW LEVEL SECURITY;
+-- Cấp quyền bảng tối thiểu (SELECT, INSERT, UPDATE, DELETE) cho anon và authenticated
+-- Quyền truy cập thực tế vào từng dòng dữ liệu được kiểm soát nghiêm ngặt qua RLS bên dưới
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
--- HOÀN TẤT SCHEMA!
+-- Chỉ cấp quyền EXECUTE cho các hàm RPC cụ thể nếu thực sự cần thiết (KHÔNG cấp blanket ALL ROUTINES)
+-- Ví dụ: GRANT EXECUTE ON FUNCTION public.my_custom_rpc(params) TO authenticated;
+
+-- Đặt quyền mặc định cho các bảng/sequences tạo mới trong tương lai
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON ROUTINES FROM anon, authenticated, public;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated;
+
+-- ====================================================================
+-- 2. KÍCH HOẠT VÀ THIẾT LẬP RLS (ROW LEVEL SECURITY) CHO TẤT CẢ 10 BẢNG
+-- Lưu ý: ĐÃ LOẠI BỎ HOÀN TOÀN 'OR auth.role() = anon' ĐỂ CHỐNG LỖ HỔNG LỘ DỮ LIỆU QUA ANON KEY.
+-- Dữ liệu 'shared' CHỈ cho phép đọc (SELECT) ở 3 bảng nội dung mẫu: vocabulary, decks, grammar.
+-- ====================================================================
+
+-- 2.1. user_profiles (Hồ sơ người dùng - Hoàn toàn riêng tư theo auth.uid())
+ALTER TABLE IF EXISTS public.user_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "user_profiles_select_policy" ON public.user_profiles;
+CREATE POLICY "user_profiles_select_policy" ON public.user_profiles
+    FOR SELECT USING (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "user_profiles_insert_policy" ON public.user_profiles;
+CREATE POLICY "user_profiles_insert_policy" ON public.user_profiles
+    FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "user_profiles_update_policy" ON public.user_profiles;
+CREATE POLICY "user_profiles_update_policy" ON public.user_profiles
+    FOR UPDATE USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "user_profiles_delete_policy" ON public.user_profiles;
+CREATE POLICY "user_profiles_delete_policy" ON public.user_profiles
+    FOR DELETE USING (auth.uid()::text = user_id);
+
+-- 2.2. vocabulary (Từ vựng: Chỉ SELECT được từ của mình hoặc từ dùng chung 'shared'; Thêm/Sửa/Xóa chỉ từ của mình)
+ALTER TABLE IF EXISTS public.vocabulary ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "vocabulary_select_policy" ON public.vocabulary;
+CREATE POLICY "vocabulary_select_policy" ON public.vocabulary
+    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared');
+
+DROP POLICY IF EXISTS "vocabulary_insert_policy" ON public.vocabulary;
+CREATE POLICY "vocabulary_insert_policy" ON public.vocabulary
+    FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "vocabulary_update_policy" ON public.vocabulary;
+CREATE POLICY "vocabulary_update_policy" ON public.vocabulary
+    FOR UPDATE USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "vocabulary_delete_policy" ON public.vocabulary;
+CREATE POLICY "vocabulary_delete_policy" ON public.vocabulary
+    FOR DELETE USING (auth.uid()::text = user_id);
+
+-- 2.3. decks (Bộ từ vựng: Chỉ SELECT được bộ của mình hoặc bộ chia sẻ 'shared'; Thêm/Sửa/Xóa chỉ bộ của mình)
+ALTER TABLE IF EXISTS public.decks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "decks_select_policy" ON public.decks;
+CREATE POLICY "decks_select_policy" ON public.decks
+    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared' OR che_do_chia_se = 'shared');
+
+DROP POLICY IF EXISTS "decks_insert_policy" ON public.decks;
+CREATE POLICY "decks_insert_policy" ON public.decks
+    FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "decks_update_policy" ON public.decks;
+CREATE POLICY "decks_update_policy" ON public.decks
+    FOR UPDATE USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "decks_delete_policy" ON public.decks;
+CREATE POLICY "decks_delete_policy" ON public.decks
+    FOR DELETE USING (auth.uid()::text = user_id);
+
+-- 2.4. grammar (Ngữ pháp: Chỉ SELECT được bài của mình hoặc bài mẫu 'shared'; Thêm/Sửa/Xóa chỉ bài của mình)
+ALTER TABLE IF EXISTS public.grammar ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "grammar_select_policy" ON public.grammar;
+CREATE POLICY "grammar_select_policy" ON public.grammar
+    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared');
+
+DROP POLICY IF EXISTS "grammar_insert_policy" ON public.grammar;
+CREATE POLICY "grammar_insert_policy" ON public.grammar
+    FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "grammar_update_policy" ON public.grammar;
+CREATE POLICY "grammar_update_policy" ON public.grammar
+    FOR UPDATE USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "grammar_delete_policy" ON public.grammar;
+CREATE POLICY "grammar_delete_policy" ON public.grammar
+    FOR DELETE USING (auth.uid()::text = user_id);
+
+-- 2.5. review_sessions (Lịch sử ôn tập - Hoàn toàn riêng tư theo auth.uid())
+ALTER TABLE IF EXISTS public.review_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "review_sessions_all_policy" ON public.review_sessions;
+CREATE POLICY "review_sessions_all_policy" ON public.review_sessions
+    FOR ALL USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+-- 2.6. mock_test_records (Lịch sử thi thử - Hoàn toàn riêng tư theo auth.uid())
+ALTER TABLE IF EXISTS public.mock_test_records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mock_tests_all_policy" ON public.mock_test_records;
+CREATE POLICY "mock_tests_all_policy" ON public.mock_test_records
+    FOR ALL USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+-- 2.7. progress_records (Tiến độ học hàng ngày - Hoàn toàn riêng tư theo auth.uid())
+ALTER TABLE IF EXISTS public.progress_records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "progress_all_policy" ON public.progress_records;
+CREATE POLICY "progress_all_policy" ON public.progress_records
+    FOR ALL USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+-- 2.8. journal_entries (Nhật ký viết AI - Hoàn toàn riêng tư theo auth.uid())
+ALTER TABLE IF EXISTS public.journal_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "journal_all_policy" ON public.journal_entries;
+CREATE POLICY "journal_all_policy" ON public.journal_entries
+    FOR ALL USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+-- 2.9. chat_conversations (Lịch sử AI Chat - Hoàn toàn riêng tư theo auth.uid())
+ALTER TABLE IF EXISTS public.chat_conversations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "chat_all_policy" ON public.chat_conversations;
+CREATE POLICY "chat_all_policy" ON public.chat_conversations
+    FOR ALL USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+-- 2.10. notifications (Thông báo cá nhân - Hoàn toàn riêng tư theo auth.uid())
+ALTER TABLE IF EXISTS public.notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "notifications_all_policy" ON public.notifications;
+CREATE POLICY "notifications_all_policy" ON public.notifications
+    FOR ALL USING (auth.uid()::text = user_id)
+    WITH CHECK (auth.uid()::text = user_id);
+
+-- HOÀN TẤT SCHEMA VÀ THIẾT LẬP BẢO MẬT RLS CHUẨN XÁC!
