@@ -290,6 +290,31 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON ROUTINES FROM anon, auth
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated;
 
+-- CÁC HÀM RPC ĐƯỢC CẤP QUYỀN THỰC THI RÕ RÀNG (EXPLICIT RPC ROUTINES)
+CREATE OR REPLACE FUNCTION public.health_check()
+RETURNS JSON LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT json_build_object('status', 'online', 'timestamp', NOW());
+$$;
+GRANT EXECUTE ON FUNCTION public.health_check() TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_user_stats(p_user_id TEXT)
+RETURNS JSON LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    v_vocab_count INT;
+    v_deck_count INT;
+    v_grammar_count INT;
+BEGIN
+    IF auth.uid()::text != p_user_id THEN
+        RAISE EXCEPTION 'Access denied';
+    END IF;
+    SELECT COUNT(*) INTO v_vocab_count FROM public.vocabulary WHERE user_id = p_user_id;
+    SELECT COUNT(*) INTO v_deck_count FROM public.decks WHERE user_id = p_user_id;
+    SELECT COUNT(*) INTO v_grammar_count FROM public.grammar WHERE user_id = p_user_id;
+    RETURN json_build_object('vocab_count', v_vocab_count, 'deck_count', v_deck_count, 'grammar_count', v_grammar_count);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_user_stats(TEXT) TO authenticated;
+
 -- Kích hoạt RLS cho 10 bảng (ĐÃ LOẠI BỎ auth.role() = 'anon' ĐỂ CHỐNG LỖ HỔNG LỘ DỮ LIỆU)
 ALTER TABLE IF EXISTS public.user_profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "user_profiles_all_policy" ON public.user_profiles;
@@ -370,6 +395,31 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON ROUTINES FROM anon, authenticated, public;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated;
+
+-- CÁC HÀM RPC ĐƯỢC CẤP QUYỀN THỰC THI RÕ RÀNG (EXPLICIT RPC ROUTINES)
+CREATE OR REPLACE FUNCTION public.health_check()
+RETURNS JSON LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT json_build_object('status', 'online', 'timestamp', NOW());
+$$;
+GRANT EXECUTE ON FUNCTION public.health_check() TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_user_stats(p_user_id TEXT)
+RETURNS JSON LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    v_vocab_count INT;
+    v_deck_count INT;
+    v_grammar_count INT;
+BEGIN
+    IF auth.uid()::text != p_user_id THEN
+        RAISE EXCEPTION 'Access denied';
+    END IF;
+    SELECT COUNT(*) INTO v_vocab_count FROM public.vocabulary WHERE user_id = p_user_id;
+    SELECT COUNT(*) INTO v_deck_count FROM public.decks WHERE user_id = p_user_id;
+    SELECT COUNT(*) INTO v_grammar_count FROM public.grammar WHERE user_id = p_user_id;
+    RETURN json_build_object('vocab_count', v_vocab_count, 'deck_count', v_deck_count, 'grammar_count', v_grammar_count);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_user_stats(TEXT) TO authenticated;
 
 -- Thiết lập RLS đảm bảo bảo mật tuyệt đối (chỉ người dùng sở hữu mới đọc/ghi, shared chỉ cho phép đọc từ vựng/ngữ pháp/deck mẫu):
 ALTER TABLE IF EXISTS public.user_profiles ENABLE ROW LEVEL SECURITY;

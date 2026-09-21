@@ -198,13 +198,59 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, aut
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
 -- Chỉ cấp quyền EXECUTE cho các hàm RPC cụ thể nếu thực sự cần thiết (KHÔNG cấp blanket ALL ROUTINES)
--- Ví dụ: GRANT EXECUTE ON FUNCTION public.my_custom_rpc(params) TO authenticated;
-
--- Đặt quyền mặc định cho các bảng/sequences tạo mới trong tương lai
+-- Đặt quyền mặc định thu hồi EXECUTE khỏi các hàm tạo mới
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON ROUTINES FROM anon, authenticated, public;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated;
+
+-- ====================================================================
+-- CÁC HÀM RPC ĐƯỢC CẤP QUYỀN THỰC THI RÕ RÀNG (EXPLICIT RPC ROUTINES)
+-- ====================================================================
+
+-- Hàm kiểm tra trạng thái kết nối máy chủ (health check)
+CREATE OR REPLACE FUNCTION public.health_check()
+RETURNS JSON
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT json_build_object('status', 'online', 'timestamp', NOW());
+$$;
+
+-- Cấp quyền gọi health_check cho anon và authenticated
+GRANT EXECUTE ON FUNCTION public.health_check() TO anon, authenticated;
+
+-- Hàm lấy thống kê tổng số lượng dữ liệu của học viên (Bảo mật: chỉ xem được của chính mình)
+CREATE OR REPLACE FUNCTION public.get_user_stats(p_user_id TEXT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_vocab_count INT;
+    v_deck_count INT;
+    v_grammar_count INT;
+BEGIN
+    IF auth.uid()::text != p_user_id THEN
+        RAISE EXCEPTION 'Access denied: You can only query your own statistics';
+    END IF;
+
+    SELECT COUNT(*) INTO v_vocab_count FROM public.vocabulary WHERE user_id = p_user_id;
+    SELECT COUNT(*) INTO v_deck_count FROM public.decks WHERE user_id = p_user_id;
+    SELECT COUNT(*) INTO v_grammar_count FROM public.grammar WHERE user_id = p_user_id;
+
+    RETURN json_build_object(
+        'vocab_count', v_vocab_count,
+        'deck_count', v_deck_count,
+        'grammar_count', v_grammar_count
+    );
+END;
+$$;
+
+-- Chỉ cấp quyền gọi get_user_stats cho người dùng đã đăng nhập (authenticated)
+GRANT EXECUTE ON FUNCTION public.get_user_stats(TEXT) TO authenticated;
 
 -- ====================================================================
 -- 2. KÍCH HOẠT VÀ THIẾT LẬP RLS (ROW LEVEL SECURITY) CHO TẤT CẢ 10 BẢNG
