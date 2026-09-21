@@ -398,22 +398,31 @@ export const VocabularyManager: React.FC = () => {
   }, [scoredWords, searchQuery, sortBy]);
 
   const totalItems = sortedWords.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const isUnlimited = pageSize >= 999999;
+  const effectivePageSize = isUnlimited ? Math.max(1, totalItems) : pageSize;
+  const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize));
   const validPage = Math.min(Math.max(1, currentPage), totalPages);
-  const startIndex = (validPage - 1) * pageSize;
-  const paginatedWords = sortedWords.slice(startIndex, startIndex + pageSize);
+  const startIndex = (validPage - 1) * effectivePageSize;
+  const paginatedWords = isUnlimited ? sortedWords : sortedWords.slice(startIndex, startIndex + effectivePageSize);
 
   const renderPaginationBar = () => {
-    if (totalItems <= pageSize) return null;
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white border-2 border-[#1A1A1A] font-mono text-xs">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="font-bold text-[#1A1A1A]">
-            Hiển thị {startIndex + 1}–{Math.min(startIndex + pageSize, totalItems)} / {totalItems} từ
+            {isUnlimited ? (
+              <span className="text-emerald-700 font-black">
+                ✨ Đang hiển thị toàn bộ: {totalItems} / {totalItems} từ vựng (Mở giới hạn tất cả)
+              </span>
+            ) : (
+              <span>
+                Hiển thị {startIndex + 1}–{Math.min(startIndex + pageSize, totalItems)} / {totalItems} từ
+              </span>
+            )}
           </span>
           <span className="text-stone-400">|</span>
           <label className="flex items-center gap-1.5 text-stone-600">
-            <span>Mỗi trang:</span>
+            <span>Hiển thị mỗi trang:</span>
             <select
               value={pageSize}
               onChange={(e) => {
@@ -422,52 +431,78 @@ export const VocabularyManager: React.FC = () => {
               }}
               className="px-2 py-1 border border-[#1A1A1A] bg-[#F9F7F2] font-bold font-mono text-xs focus:outline-none"
             >
-              <option value={30}>30</option>
-              <option value={60}>60</option>
-              <option value={100}>100</option>
-              <option value={200}>200</option>
-              <option value={500}>500</option>
+              <option value={30}>30 từ/trang</option>
+              <option value={60}>60 từ/trang</option>
+              <option value={100}>100 từ/trang</option>
+              <option value={200}>200 từ/trang</option>
+              <option value={500}>500 từ/trang</option>
+              <option value={1000}>1,000 từ/trang</option>
+              <option value={2000}>2,000 từ/trang</option>
+              <option value={5000}>5,000 từ/trang</option>
+              <option value={999999}>♾️ TẤT CẢ (Không giới hạn)</option>
             </select>
           </label>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (isUnlimited) {
+                setPageSize(60);
+              } else {
+                setPageSize(999999);
+              }
+              setCurrentPage(1);
+            }}
+            className={`px-2.5 py-1 text-[11px] font-bold border transition ${
+              isUnlimited
+                ? 'bg-emerald-700 text-white border-emerald-900 shadow-sm'
+                : 'bg-stone-100 text-stone-800 border-stone-300 hover:bg-stone-200'
+            }`}
+            title="Bật/Tắt chế độ xem toàn bộ từ vựng không giới hạn trang"
+          >
+            {isUnlimited ? '✓ Đang xem toàn bộ (Mở giới hạn)' : '🔓 Mở giới hạn xem tất cả'}
+          </button>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setCurrentPage(1)}
-            disabled={validPage === 1}
-            className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
-            title="Trang đầu"
-          >
-            « Đầu
-          </button>
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={validPage === 1}
-            className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
-            title="Trang trước"
-          >
-            ‹ Trước
-          </button>
-          <span className="px-3 py-1 bg-[#1A1A1A] text-[#F9F7F2] font-bold">
-            Trang {validPage} / {totalPages}
-          </span>
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={validPage === totalPages}
-            className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
-            title="Trang sau"
-          >
-            Sau ›
-          </button>
-          <button
-            onClick={() => setCurrentPage(totalPages)}
-            disabled={validPage === totalPages}
-            className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
-            title="Trang cuối"
-          >
-            Cuối »
-          </button>
-        </div>
+        {!isUnlimited && totalPages > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={validPage === 1}
+              className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
+              title="Trang đầu"
+            >
+              « Đầu
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={validPage === 1}
+              className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
+              title="Trang trước"
+            >
+              ‹ Trước
+            </button>
+            <span className="px-3 py-1 bg-[#1A1A1A] text-[#F9F7F2] font-bold">
+              Trang {validPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={validPage === totalPages}
+              className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
+              title="Trang sau"
+            >
+              Sau ›
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={validPage === totalPages}
+              className="px-2.5 py-1 border border-[#1A1A1A] bg-[#F9F7F2] hover:bg-[#1A1A1A] hover:text-white transition disabled:opacity-30 disabled:pointer-events-none"
+              title="Trang cuối"
+            >
+              Cuối »
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -696,10 +731,46 @@ export const VocabularyManager: React.FC = () => {
 
         {/* Sort & View Mode Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="text-stone-600">
               SHOWING <strong className="text-[#1A1A1A]">{sortedWords.length}</strong> OF {currentLangVocabulary.length} TERMS
             </span>
+
+            {/* If filters are active, show one-click reset button */}
+            {(selectedTopic !== 'ALL' || selectedLevel !== 'ALL' || selectedSrsBox !== 'ALL' || showOnlyDuplicates || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTopic('ALL');
+                  setSelectedLevel('ALL');
+                  setSelectedSrsBox('ALL');
+                  setShowOnlyDuplicates(false);
+                  setSearchQuery('');
+                  setSelectedLevelFilter(null);
+                }}
+                className="px-2 py-0.5 bg-amber-100 border border-amber-400 text-amber-900 text-[10px] font-bold uppercase hover:bg-amber-200 transition flex items-center gap-1"
+                title="Bỏ tất cả bộ lọc để hiển thị toàn bộ từ vựng"
+              >
+                <span>✕ BỎ LỌC (HIỆN TOÀN BỘ TỪ)</span>
+              </button>
+            )}
+
+            {/* Quick All Words Limit Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setPageSize(pageSize >= 999999 ? 60 : 999999);
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1 text-[10px] font-bold font-mono uppercase transition flex items-center gap-1 border ${
+                pageSize >= 999999
+                  ? 'bg-emerald-700 text-white border-emerald-900'
+                  : 'bg-white text-stone-800 border-stone-300 hover:border-[#1A1A1A]'
+              }`}
+              title="Mở toàn bộ danh sách không phân trang"
+            >
+              <span>{pageSize >= 999999 ? '✓ ĐANG MỞ TOÀN BỘ TỪ' : '🔓 MỞ GIỚI HẠN HIỂN THỊ'}</span>
+            </button>
 
             {/* Quick Duplicate Filter Toggle */}
             {duplicateWordSet.size > 0 && (

@@ -277,15 +277,15 @@ DROP POLICY IF EXISTS "user_profiles_delete_policy" ON public.user_profiles;
 CREATE POLICY "user_profiles_delete_policy" ON public.user_profiles
     FOR DELETE USING (auth.uid()::text = user_id);
 
--- 2.2. vocabulary (Từ vựng: Chỉ SELECT được từ của mình hoặc từ dùng chung 'shared'; Thêm/Sửa/Xóa chỉ từ của mình)
+-- 2.2. vocabulary (Từ vựng: SELECT từ của mình hoặc từ dùng chung 'shared'/'system'/'template'; Thêm/Sửa/Xóa từ của mình)
 ALTER TABLE IF EXISTS public.vocabulary ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "vocabulary_select_policy" ON public.vocabulary;
 CREATE POLICY "vocabulary_select_policy" ON public.vocabulary
-    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared');
+    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared' OR user_id = 'system' OR user_id = 'template' OR user_id IS NULL OR user_id = '');
 
 DROP POLICY IF EXISTS "vocabulary_insert_policy" ON public.vocabulary;
 CREATE POLICY "vocabulary_insert_policy" ON public.vocabulary
-    FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+    FOR INSERT WITH CHECK (auth.uid()::text = user_id OR auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "vocabulary_update_policy" ON public.vocabulary;
 CREATE POLICY "vocabulary_update_policy" ON public.vocabulary
@@ -296,15 +296,15 @@ DROP POLICY IF EXISTS "vocabulary_delete_policy" ON public.vocabulary;
 CREATE POLICY "vocabulary_delete_policy" ON public.vocabulary
     FOR DELETE USING (auth.uid()::text = user_id);
 
--- 2.3. decks (Bộ từ vựng: Chỉ SELECT được bộ của mình hoặc bộ chia sẻ 'shared'; Thêm/Sửa/Xóa chỉ bộ của mình)
+-- 2.3. decks (Bộ từ vựng: SELECT bộ của mình hoặc bộ chia sẻ 'shared'/'system'; Thêm/Sửa/Xóa bộ của mình)
 ALTER TABLE IF EXISTS public.decks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "decks_select_policy" ON public.decks;
 CREATE POLICY "decks_select_policy" ON public.decks
-    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared' OR che_do_chia_se = 'shared');
+    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared' OR user_id = 'system' OR user_id = 'template' OR user_id IS NULL OR user_id = '' OR che_do_chia_se = 'shared');
 
 DROP POLICY IF EXISTS "decks_insert_policy" ON public.decks;
 CREATE POLICY "decks_insert_policy" ON public.decks
-    FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+    FOR INSERT WITH CHECK (auth.uid()::text = user_id OR auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "decks_update_policy" ON public.decks;
 CREATE POLICY "decks_update_policy" ON public.decks
@@ -315,15 +315,15 @@ DROP POLICY IF EXISTS "decks_delete_policy" ON public.decks;
 CREATE POLICY "decks_delete_policy" ON public.decks
     FOR DELETE USING (auth.uid()::text = user_id);
 
--- 2.4. grammar (Ngữ pháp: Chỉ SELECT được bài của mình hoặc bài mẫu 'shared'; Thêm/Sửa/Xóa chỉ bài của mình)
+-- 2.4. grammar (Ngữ pháp: SELECT bài của mình hoặc bài mẫu 'shared'/'system'/'template'; Thêm/Sửa/Xóa bài của mình)
 ALTER TABLE IF EXISTS public.grammar ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "grammar_select_policy" ON public.grammar;
 CREATE POLICY "grammar_select_policy" ON public.grammar
-    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared');
+    FOR SELECT USING (auth.uid()::text = user_id OR user_id = 'shared' OR user_id = 'system' OR user_id = 'template' OR user_id IS NULL OR user_id = '');
 
 DROP POLICY IF EXISTS "grammar_insert_policy" ON public.grammar;
 CREATE POLICY "grammar_insert_policy" ON public.grammar
-    FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+    FOR INSERT WITH CHECK (auth.uid()::text = user_id OR auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "grammar_update_policy" ON public.grammar;
 CREATE POLICY "grammar_update_policy" ON public.grammar

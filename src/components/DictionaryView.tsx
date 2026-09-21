@@ -961,10 +961,10 @@ export const DictionaryView: React.FC = () => {
                       onClick={() => setActiveNav('vocabulary')}
                       className="text-[#1A1A1A] font-bold underline"
                     >
-                      Xem tất cả
+                      Mở quản lý từ
                     </button>
                   </div>
-                  {currentLangVocabulary.slice(0, 15).map((v) => (
+                  {currentLangVocabulary.map((v) => (
                     <div
                       key={v.word_id}
                       onClick={() => handleSearch(v.tu)}

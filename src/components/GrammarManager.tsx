@@ -49,6 +49,7 @@ export const GrammarManager: React.FC = () => {
     batchDeleteGrammar,
     cleanAllDuplicateGrammar,
     selectedLevelFilter,
+    setSelectedLevelFilter,
   } = useApp();
 
   const currentLangInfo = LANGUAGES[currentLanguage];
@@ -418,11 +419,54 @@ export const GrammarManager: React.FC = () => {
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono">
-          <div className="text-stone-600">
-            SHOWING <strong className="text-[#1A1A1A]">{filteredGrammar.length}</strong> OF {currentLangGrammar.length} RULES
-            {selectedLesson !== 'ALL' && <span className="ml-2 text-indigo-700 font-bold">({selectedLesson})</span>}
-            {showOnlyDuplicates && <span className="ml-2 text-rose-700 font-bold">(Đang lọc trùng lặp)</span>}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 border-t border-[#1A1A1A]/20 text-xs font-mono gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-stone-600">
+              SHOWING <strong className="text-[#1A1A1A]">{filteredGrammar.length}</strong> OF {currentLangGrammar.length} RULES
+              {selectedLesson !== 'ALL' && <span className="ml-2 text-indigo-700 font-bold">({selectedLesson})</span>}
+              {showOnlyDuplicates && <span className="ml-2 text-rose-700 font-bold">(Đang lọc trùng lặp)</span>}
+            </span>
+
+            {/* Quick Show All / Reset Filters button */}
+            {(selectedLevel !== 'ALL' || selectedLesson !== 'ALL' || showOnlyDuplicates || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedLevel('ALL');
+                  setSelectedLesson('ALL');
+                  setShowOnlyDuplicates(false);
+                  setSearchQuery('');
+                  setSelectedLevelFilter(null);
+                }}
+                className="px-2.5 py-1 bg-amber-100 border border-amber-400 text-amber-900 text-[10px] font-bold uppercase hover:bg-amber-200 transition flex items-center gap-1"
+                title="Bỏ tất cả bộ lọc để hiển thị toàn bộ cấu trúc ngữ pháp"
+              >
+                <span>✕ BỎ LỌC (HIỆN TOÀN BỘ {currentLangGrammar.length} NGỮ PHÁP)</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedLevel('ALL');
+                setSelectedLesson('ALL');
+                setShowOnlyDuplicates(false);
+                setSearchQuery('');
+                setSelectedLevelFilter(null);
+              }}
+              className={`px-2.5 py-1 text-[10px] font-bold font-mono uppercase transition flex items-center gap-1 border ${
+                selectedLevel === 'ALL' && selectedLesson === 'ALL' && !showOnlyDuplicates && !searchQuery
+                  ? 'bg-emerald-700 text-white border-emerald-900'
+                  : 'bg-white text-stone-800 border-stone-300 hover:border-[#1A1A1A]'
+              }`}
+              title="Mở toàn bộ danh sách ngữ pháp"
+            >
+              <span>
+                {selectedLevel === 'ALL' && selectedLesson === 'ALL' && !showOnlyDuplicates && !searchQuery
+                  ? `✨ ĐANG HIỂN THỊ TOÀN BỘ (${currentLangGrammar.length})`
+                  : `🔓 MỞ TẤT CẢ (${currentLangGrammar.length} NGỮ PHÁP)`}
+              </span>
+            </button>
           </div>
 
           <div className="flex items-center gap-1 border border-[#1A1A1A] p-0.5 bg-[#F9F7F2]">
