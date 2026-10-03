@@ -160,6 +160,7 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
           loai_tu: v.loai_tu || 'Danh từ',
           chu_de: v.chu_de || v.unit || 'Sách giáo khoa',
           cap_do: v.cap_do || result.level || 'Cơ bản',
+          bai_hoc: v.unit || 'Bài 1',
           vi_du: v.vi_du || '',
           vi_du_dich: v.vi_du_dich || '',
           ngon_ngu: currentLanguage,
@@ -182,6 +183,7 @@ export const TextbookExtractorModal: React.FC<TextbookExtractorModalProps> = ({ 
           vi_du_dich: g.vi_du_dich || '',
           ghi_chu: g.ghi_chu || g.unit || '',
           cap_do: g.cap_do || result.level || 'Cơ bản',
+          bai_hoc: g.unit || 'Bài 1',
           ngon_ngu: currentLanguage,
           tags: [result.bookTitle || 'Sách giáo khoa AI', g.unit || 'Chương trình học'],
         });

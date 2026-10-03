@@ -250,15 +250,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadFromStorage('current_lang', 'en')
   );
 
-  const [vocabulary, setVocabulary] = useState<VocabularyItem[]>(() =>
-    cleanDeduplicateVocab(loadFromStorage('vocabulary', []))
-  );
+  const [vocabulary, setVocabulary] = useState<VocabularyItem[]>(() => {
+    const loaded = loadFromStorage<VocabularyItem[]>('vocabulary', []);
+    const sourceList = loaded.length > 0 ? loaded : INITIAL_VOCABULARY;
+    const cleaned = cleanDeduplicateVocab(sourceList);
+    return cleaned.map((v, idx) => ({
+      ...v,
+      bai_hoc: v.bai_hoc || `Bài ${Math.floor(idx / 10) + 1}`,
+    }));
+  });
   const [decks, setDecks] = useState<Deck[]>(() =>
     cleanDeduplicateDecks(loadFromStorage('decks', []))
   );
-  const [grammar, setGrammar] = useState<GrammarItem[]>(() =>
-    cleanDeduplicateGrammar([...INITIAL_GRAMMAR, ...loadFromStorage<GrammarItem[]>('grammar', [])])
-  );
+  const [grammar, setGrammar] = useState<GrammarItem[]>(() => {
+    const loaded = loadFromStorage<GrammarItem[]>('grammar', []);
+    const combined = [...INITIAL_GRAMMAR, ...loaded];
+    const cleaned = cleanDeduplicateGrammar(combined);
+    return cleaned.map((g) => {
+      let bai = g.bai_hoc;
+      if (!bai && g.tags) {
+        const found = g.tags.find((t) => /^Bài\s*\d+/i.test(t));
+        if (found) bai = found;
+      }
+      return {
+        ...g,
+        bai_hoc: bai || 'Bài 1',
+      };
+    });
+  });
   const [reviewSessions, setReviewSessions] = useState<ReviewSession[]>(() =>
     loadFromStorage('review_sessions', [])
   );
@@ -378,6 +397,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ngon_ngu: wordLang,
       chu_de: item.chu_de || 'Tổng hợp',
       cap_do: item.cap_do || 'Cơ bản',
+      bai_hoc: item.bai_hoc || 'Bài 1',
       nguon_goc: item.nguon_goc || 'Tự thêm',
       srs_box: 0,
       srs_next_review: new Date().toISOString(),
@@ -548,6 +568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ngon_ngu: wordLang,
         chu_de: item.chu_de || 'Nhập file',
         cap_do: item.cap_do || 'Tổng hợp',
+        bai_hoc: item.bai_hoc || 'Bài 1',
         nguon_goc: item.nguon_goc || 'Import CSV/Excel',
         srs_box: 0,
         srs_next_review: new Date().toISOString(),
@@ -649,6 +670,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       vi_du_dich: item.vi_du_dich || '',
       ngon_ngu: item.ngon_ngu || currentLanguage,
       cap_do: item.cap_do || 'Cơ bản',
+      bai_hoc: item.bai_hoc || (item.tags?.find((t) => /^Bài\s*\d+/i.test(t))) || 'Bài 1',
       ghi_chu: item.ghi_chu || '',
       tags: item.tags || ['Ngữ pháp'],
       user_id: currentUser.user_id,
@@ -788,6 +810,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         vi_du_dich: item.vi_du_dich || '',
         ngon_ngu: item.ngon_ngu || currentLanguage,
         cap_do: item.cap_do || 'Cơ bản',
+        bai_hoc: item.bai_hoc || (item.tags?.find((t) => /^Bài\s*\d+/i.test(t))) || 'Bài 1',
         ghi_chu: item.ghi_chu || '',
         tags: item.tags && item.tags.length > 0 ? item.tags : ['Sách giáo khoa'],
         user_id: currentUser.user_id,

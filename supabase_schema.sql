@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS public.vocabulary (
     ngon_ngu TEXT NOT NULL DEFAULT 'ko',
     chu_de TEXT DEFAULT 'Chung',
     cap_do TEXT DEFAULT 'Sơ cấp',
+    bai_hoc TEXT DEFAULT 'Bài 1',
     nguon_goc TEXT DEFAULT 'Hệ thống',
     srs_box INTEGER DEFAULT 0,
     srs_next_review TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -56,6 +57,9 @@ CREATE TABLE IF NOT EXISTS public.vocabulary (
     last_reviewed TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Tự động thêm cột bai_hoc nếu bảng vocabulary đã tồn tại từ trước
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS bai_hoc TEXT DEFAULT 'Bài 1';
 
 -- 3. BẢNG BỘ TỪ VỰNG / DECKS (decks)
 CREATE TABLE IF NOT EXISTS public.decks (
@@ -83,10 +87,14 @@ CREATE TABLE IF NOT EXISTS public.grammar (
     vi_du_dich TEXT,
     ngon_ngu TEXT NOT NULL DEFAULT 'ko',
     cap_do TEXT DEFAULT 'Sơ cấp',
+    bai_hoc TEXT DEFAULT 'Bài 1',
     ghi_chu TEXT,
     tags JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Tự động thêm cột bai_hoc nếu bảng grammar đã tồn tại từ trước
+ALTER TABLE public.grammar ADD COLUMN IF NOT EXISTS bai_hoc TEXT DEFAULT 'Bài 1';
 
 -- 5. BẢNG PHIÊN ÔN TẬP / LỊCH SỬ GAME (review_sessions)
 CREATE TABLE IF NOT EXISTS public.review_sessions (
@@ -174,8 +182,10 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 -- CHỈ MỤC (INDEXES) TỐI ƯU TỐC ĐỘ TRUY VẤN
 -- ====================================================================
 CREATE INDEX IF NOT EXISTS idx_vocabulary_user_lang ON public.vocabulary(user_id, ngon_ngu);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_bai_hoc ON public.vocabulary(bai_hoc);
 CREATE INDEX IF NOT EXISTS idx_vocabulary_srs_next ON public.vocabulary(srs_next_review);
 CREATE INDEX IF NOT EXISTS idx_grammar_user_lang ON public.grammar(user_id, ngon_ngu);
+CREATE INDEX IF NOT EXISTS idx_grammar_bai_hoc ON public.grammar(bai_hoc);
 CREATE INDEX IF NOT EXISTS idx_decks_lang ON public.decks(ngon_ngu);
 CREATE INDEX IF NOT EXISTS idx_review_sessions_user ON public.review_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_progress_user_date ON public.progress_records(user_id, ngay);

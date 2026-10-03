@@ -91,10 +91,24 @@ export const VocabularyManager: React.FC = () => {
   const [formExampleVi, setFormExampleVi] = useState('');
   const [formLevel, setFormLevel] = useState(currentLangInfo.levels[0] || 'Cơ bản');
   const [formTopic, setFormTopic] = useState('Giao tiếp');
+  const [formLesson, setFormLesson] = useState('Bài 1');
   const [formSource, setFormSource] = useState('Tự học');
 
-  // Unique topics in current list
+  // Filter States
+  const [selectedLesson, setSelectedLesson] = useState('ALL');
+
+  // Unique topics & lessons in current list
   const topics = Array.from(new Set(currentLangVocabulary.map((w) => w.chu_de || 'Tổng hợp'))).filter(Boolean);
+  const lessons = useMemo(() => {
+    const set = new Set<string>();
+    currentLangVocabulary.forEach((w) => {
+      if (w.bai_hoc) set.add(w.bai_hoc);
+    });
+    if (set.size === 0) {
+      return ['Bài 1', 'Bài 2', 'Bài 3', 'Bài 4', 'Bài 5', 'Bài 6', 'Bài 7', 'Bài 8', 'Bài 9', 'Bài 10'];
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [currentLangVocabulary]);
 
   const resetForm = () => {
     setFormWord('');
@@ -107,6 +121,7 @@ export const VocabularyManager: React.FC = () => {
     setFormExampleVi('');
     setFormLevel(currentLangInfo.levels[0] || 'Cơ bản');
     setFormTopic('Giao tiếp');
+    setFormLesson('Bài 1');
     setFormSource('Tự học');
     setEditingItem(null);
     setAiError(null);
@@ -129,6 +144,7 @@ export const VocabularyManager: React.FC = () => {
     setFormExampleVi(item.vi_du_dich);
     setFormLevel(item.cap_do);
     setFormTopic(item.chu_de);
+    setFormLesson(item.bai_hoc || 'Bài 1');
     setFormSource(item.nguon_goc || 'Tự học');
     setAiError(null);
     setIsModalOpen(true);
@@ -198,6 +214,7 @@ export const VocabularyManager: React.FC = () => {
         vi_du_dich: formExampleVi.trim(),
         cap_do: formLevel,
         chu_de: formTopic,
+        bai_hoc: formLesson.trim() || 'Bài 1',
         nguon_goc: formSource,
       });
     } else {
@@ -212,6 +229,7 @@ export const VocabularyManager: React.FC = () => {
         vi_du_dich: formExampleVi.trim(),
         cap_do: formLevel,
         chu_de: formTopic,
+        bai_hoc: formLesson.trim() || 'Bài 1',
         nguon_goc: formSource,
         ngon_ngu: currentLanguage,
       });
@@ -360,6 +378,7 @@ export const VocabularyManager: React.FC = () => {
         if (showOnlyDuplicates && !isDuplicate) return null;
 
         const matchTopic = selectedTopic === 'ALL' || w.chu_de === selectedTopic;
+        const matchLesson = selectedLesson === 'ALL' || w.bai_hoc === selectedLesson || (!w.bai_hoc && selectedLesson === 'Bài 1');
         const matchLevel =
           selectedLevel === 'ALL' ||
           w.cap_do === selectedLevel ||
@@ -373,7 +392,7 @@ export const VocabularyManager: React.FC = () => {
           (selectedSrsBox === 'learning' && w.srs_box >= 1 && w.srs_box <= 3) ||
           (selectedSrsBox === 'mastered' && w.srs_box >= 4);
 
-        if (!matchTopic || !matchLevel || !matchSrs) return null;
+        if (!matchTopic || !matchLesson || !matchLevel || !matchSrs) return null;
 
         const searchRes = matchVocabulary(w, searchQuery, searchScope);
         if (!searchRes.matches) return null;
@@ -381,7 +400,7 @@ export const VocabularyManager: React.FC = () => {
         return { word: w, score: searchRes.score };
       })
       .filter((entry): entry is { word: VocabularyItem; score: number } => entry !== null);
-  }, [currentLangVocabulary, duplicateWordSet, showOnlyDuplicates, selectedTopic, selectedLevel, selectedSrsBox, searchQuery, searchScope]);
+  }, [currentLangVocabulary, duplicateWordSet, showOnlyDuplicates, selectedTopic, selectedLesson, selectedLevel, selectedSrsBox, searchQuery, searchScope]);
 
   const sortedWords = useMemo(() => {
     return [...scoredWords]
@@ -619,12 +638,12 @@ export const VocabularyManager: React.FC = () => {
       <div className="p-4 sm:p-6 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           {/* Search Input with Clear Button */}
-          <div className="sm:col-span-4 relative">
+          <div className="sm:col-span-3 relative">
             <Search className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
             <input
               id="vocabulary-search-input"
               type="text"
-              placeholder="Tìm kiếm tập trung theo từ hoặc nghĩa của từ (có/không dấu)..."
+              placeholder="Tìm kiếm từ hoặc nghĩa..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-8 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white font-mono transition"
@@ -642,8 +661,24 @@ export const VocabularyManager: React.FC = () => {
             )}
           </div>
 
-          {/* Topic Filter */}
+          {/* Lesson Filter (Phân loại theo bài) */}
           <div className="sm:col-span-3">
+            <select
+              value={selectedLesson}
+              onChange={(e) => setSelectedLesson(e.target.value)}
+              className="w-full py-2 px-3 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono font-bold text-[#1A1A1A] focus:outline-none focus:bg-white"
+            >
+              <option value="ALL">📖 TẤT CẢ BÀI HỌC ({lessons.length})</option>
+              {lessons.map((les) => (
+                <option key={les} value={les}>
+                  {les}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Topic Filter */}
+          <div className="sm:col-span-2">
             <select
               value={selectedTopic}
               onChange={(e) => setSelectedTopic(e.target.value)}
@@ -659,7 +694,7 @@ export const VocabularyManager: React.FC = () => {
           </div>
 
           {/* Level Filter */}
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-2">
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
@@ -1016,7 +1051,10 @@ export const VocabularyManager: React.FC = () => {
                 <div>
                   {/* Top Metadata Badges */}
                   <div className="flex items-center justify-between mb-3 border-b border-[#1A1A1A]/10 pb-2">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-300 text-[9px] font-mono font-bold">
+                        📖 {word.bai_hoc || 'Bài 1'}
+                      </span>
                       <span className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-[9px] font-mono font-bold uppercase text-[#1A1A1A]">
                         {word.loai_tu}
                       </span>
@@ -1306,8 +1344,19 @@ export const VocabularyManager: React.FC = () => {
                 />
               </div>
 
-              {/* Topic, Level, Source */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Lesson, Topic, Level, Source */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>
+                  <label className="block text-[9px] font-mono uppercase font-bold text-amber-900 mb-1">Lesson (Bài)</label>
+                  <input
+                    type="text"
+                    placeholder="Bài 1, Bài 2..."
+                    value={formLesson}
+                    onChange={(e) => setFormLesson(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-amber-50/50 border border-amber-300 text-xs font-mono font-bold text-[#1A1A1A] focus:outline-none focus:bg-white"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-[9px] font-mono uppercase font-bold text-stone-600 mb-1">Topic</label>
                   <input

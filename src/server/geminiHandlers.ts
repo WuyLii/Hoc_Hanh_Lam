@@ -606,6 +606,7 @@ Nhiệm vụ của Gia sư AI Chuyên biệt:
 4. Với Tiếng Hàn: Cung cấp Hangul, phiên âm Romaja và phân tích kính ngữ (존댓말/반말).
 5. Với Tiếng Trung: Cung cấp chữ Hán (Giản thể/Phồn thể), Pinyin có dấu thanh và bộ thủ.
 6. Khi xử lý HÌNH ẢNH đính kèm (sách giáo khoa, bảng từ, bài tập): Phân tích chi tiết hình ảnh bằng nhãn quan AI cao cấp nhất, đọc chữ (OCR), dịch nghĩa và giải thích ngữ pháp bài tập sâu sát.
+7. KHẢ NĂNG NHẬN BIẾT & PHÂN LOẠI BÀI HỌC (LESSON CLASSIFICATION): Bạn có khả năng đọc, nhận biết và phân biệt chính xác từ vựng và ngữ pháp thuộc bài học nào (Bài 1, Bài 2, Bài 3... theo giáo trình chuẩn). Khi giải thích hay trả lời người học về bài học cụ thể, hãy ghi rõ vị trí bài học tương ứng.
 
 Nếu trong phản hồi có các từ vựng mới tiêu biểu đáng lưu vào sổ từ, hãy đính kèm ở cuối bài khối JSON:
 ---VOCAB_SUGGESTIONS---
@@ -615,6 +616,7 @@ Nếu trong phản hồi có các từ vựng mới tiêu biểu đáng lưu và
     "meaning": "nghĩa tiếng Việt",
     "phonetic": "phiên âm",
     "type": "loại từ",
+    "bai_hoc": "Bài X (Tên bài học đề xuất, ví dụ: Bài 1: Chào hỏi)",
     "nghia_tieng_han": "Từ/nghĩa tiếng Hàn tương ứng kèm Romaja nếu từ là tiếng Anh (ví dụ: 포기하다 [po-gi-ha-da])",
     "nghia_tieng_anh": "Từ/nghĩa tiếng Anh tương ứng nếu từ là tiếng Hàn (ví dụ: to give up, abandon)",
     "example": "ví dụ",
@@ -834,6 +836,7 @@ Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trú
   "meaning": "Nghĩa tiếng Việt chuẩn, đầy đủ và tự nhiên",
   "phonetic": "Phiên âm chuẩn (IPA cho tiếng Anh, Romaja cho tiếng Hàn, Pinyin có dấu cho tiếng Trung)",
   "type": "Loại từ (Danh từ, Động từ, Tính từ, Trạng từ, Cụm từ, Liên từ...)",
+  "bai_hoc": "Bài học đề xuất (ví dụ: 'Bài 1: Giới thiệu', 'Bài 2: Gia đình', v.v. dựa trên chủ đề và giáo trình)",
   "example": "Câu ví dụ thực tế, tự nhiên sử dụng từ trên",
   "exampleVi": "Dịch nghĩa câu ví dụ sang tiếng Việt",
   "nghia_tieng_han": "Từ / Nghĩa tương đương trong tiếng Hàn kèm Romaja nếu từ gốc là tiếng Anh (ví dụ: 포기하다 [po-gi-ha-da])",
@@ -1060,6 +1063,7 @@ Cấu trúc JSON đầu ra bắt buộc:
       "loai_tu": "Danh từ / Động từ / Tính từ",
       "cap_do": "Cấp độ đề xuất",
       "chu_de": "Chủ đề",
+      "bai_hoc": "Bài 1 (Tên hoặc số bài học trích xuất/nhận diện được)",
       "vi_du": "Câu ví dụ ngoại ngữ",
       "vi_du_dich": "Dịch ví dụ tiếng Việt"
     }
@@ -1071,6 +1075,7 @@ Cấu trúc JSON đầu ra bắt buộc:
       "cong_thuc": "Công thức kết hợp",
       "cap_do": "Cấp độ",
       "chu_de": "Chủ đề",
+      "bai_hoc": "Bài 1 (Tên hoặc số bài học trích xuất)",
       "vi_du": "Câu ví dụ",
       "vi_du_dich": "Dịch ví dụ"
     }

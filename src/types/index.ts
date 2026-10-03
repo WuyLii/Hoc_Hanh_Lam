@@ -80,6 +80,7 @@ export interface VocabularyItem {
   ngon_ngu: LanguageCode;
   chu_de: string;
   cap_do: string;
+  bai_hoc?: string; // Phân loại theo Bài (vd: "Bài 1", "Bài 2: Gia đình", v.v.)
   nguon_goc?: string; // Sách, Phim, Hội thoại, Nhạc, Báo chí...
   // SRS properties
   srs_box: number; // 0: new, 1..5: learned levels
@@ -115,6 +116,7 @@ export interface GrammarItem {
   vi_du_dich: string;
   ngon_ngu: LanguageCode;
   cap_do: string;
+  bai_hoc?: string; // Phân loại theo Bài (vd: "Bài 1", "Bài 2: Gia đình", v.v.)
   ghi_chu?: string;
   tags: string[];
   user_id: string;
@@ -337,6 +339,7 @@ export interface ExtractedVocabItem {
   nghia_tieng_han?: string;
   nghia_tieng_anh?: string;
   unit?: string;
+  bai_hoc?: string;
   vi_du?: string;
   vi_du_dich?: string;
   cap_do?: string;
@@ -349,6 +352,7 @@ export interface ExtractedGrammarItem {
   giai_thich: string;
   cong_thuc?: string;
   unit?: string;
+  bai_hoc?: string;
   cap_do?: string;
   vi_du?: string;
   vi_du_dich?: string;

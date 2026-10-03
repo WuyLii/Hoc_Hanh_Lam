@@ -9,6 +9,7 @@ import {
 
 import koreanGrammar from './koreanGrammarData.json';
 import englishGrammar from './englishGrammarData.json';
+import englishVocab from './englishVocabData.json';
 
 export const INITIAL_USERS: UserProfile[] = [
   {
@@ -35,7 +36,9 @@ export const INITIAL_USERS: UserProfile[] = [
   },
 ];
 
-export const INITIAL_VOCABULARY: VocabularyItem[] = [];
+export const INITIAL_VOCABULARY: VocabularyItem[] = [
+  ...(englishVocab as VocabularyItem[]),
+];
 
 export const INITIAL_GRAMMAR: GrammarItem[] = [
   ...(koreanGrammar as GrammarItem[]),

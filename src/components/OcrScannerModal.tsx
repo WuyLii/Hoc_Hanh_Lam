@@ -30,6 +30,7 @@ interface ExtractedWord {
   loai_tu: string;
   cap_do: string;
   chu_de: string;
+  bai_hoc?: string;
   vi_du: string;
   vi_du_dich: string;
   nghia_tieng_han?: string;
@@ -44,6 +45,7 @@ interface ExtractedGrammar {
   cong_thuc: string;
   cap_do: string;
   chu_de: string;
+  bai_hoc?: string;
   vi_du: string;
   vi_du_dich: string;
   selected: boolean;
@@ -134,6 +136,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
               loai_tu: w.loai_tu || w.type || 'Từ vựng',
               cap_do: w.cap_do || (wordLang === 'en' ? 'TOEIC 500' : wordLang === 'ko' ? 'TOPIK 2' : 'HSK 3'),
               chu_de: w.chu_de || 'Quét OCR Sách',
+              bai_hoc: w.bai_hoc || w.unit || 'Bài 1',
               vi_du: w.vi_du || w.example || '',
               vi_du_dich: w.vi_du_dich || w.exampleVi || '',
               nghia_tieng_han: w.nghia_tieng_han || w.korean || '',
@@ -156,6 +159,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
             cong_thuc: g.cong_thuc || '',
             cap_do: g.cap_do || (scanLanguage === 'en' ? 'TOEIC 600' : scanLanguage === 'ko' ? 'TOPIK 2' : 'HSK 3'),
             chu_de: g.chu_de || 'Quét OCR Sách',
+            bai_hoc: g.bai_hoc || g.unit || 'Bài 1',
             vi_du: g.vi_du || g.example || '',
             vi_du_dich: g.vi_du_dich || g.exampleVi || '',
             selected: true,
@@ -296,6 +300,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
             vi_du_dich: w.vi_du_dich || '',
             cap_do: w.cap_do || 'Cơ bản',
             chu_de: w.chu_de || 'Quét OCR AI',
+            bai_hoc: w.bai_hoc || 'Bài 1',
             ngon_ngu: finalLang,
             nghia_tieng_han: w.nghia_tieng_han || '',
             nghia_tieng_anh: w.nghia_tieng_anh || '',
@@ -314,6 +319,7 @@ export const OcrScannerModal: React.FC<OcrScannerModalProps> = ({ isOpen, onClos
           vi_du: g.vi_du,
           vi_du_dich: g.vi_du_dich,
           cap_do: g.cap_do,
+          bai_hoc: g.bai_hoc || 'Bài 1',
           ngon_ngu: scanLanguage || currentLanguage,
           tags: [g.chu_de, 'Quét OCR AI'],
         }))

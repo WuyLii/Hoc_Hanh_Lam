@@ -103,8 +103,24 @@ export const GrammarManager: React.FC = () => {
   const [formExample, setFormExample] = useState('');
   const [formExampleVi, setFormExampleVi] = useState('');
   const [formLevel, setFormLevel] = useState(currentLangInfo.levels[0] || 'Cơ bản');
+  const [formLesson, setFormLesson] = useState('Bài 1');
   const [formNotes, setFormNotes] = useState('');
   const [formTags, setFormTags] = useState('Ngữ pháp cốt lõi');
+
+  // Dynamic lessons list computed from current language grammar
+  const dynamicLessons = useMemo(() => {
+    const set = new Set<string>();
+    currentLangGrammar.forEach((g) => {
+      if (g.bai_hoc) set.add(g.bai_hoc);
+      g.tags?.forEach((t) => {
+        if (/^Bài\s*\d+/i.test(t)) set.add(t);
+      });
+    });
+    if (set.size === 0) {
+      return ['Bài 1', 'Bài 2', 'Bài 3', 'Bài 4', 'Bài 5', 'Bài 6', 'Bài 7', 'Bài 8', 'Bài 9', 'Bài 10'];
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [currentLangGrammar]);
 
   const resetForm = () => {
     setFormStructure('');
@@ -112,6 +128,7 @@ export const GrammarManager: React.FC = () => {
     setFormExample('');
     setFormExampleVi('');
     setFormLevel(currentLangInfo.levels[0] || 'Cơ bản');
+    setFormLesson('Bài 1');
     setFormNotes('');
     setFormTags('Ngữ pháp cốt lõi');
     setEditingItem(null);
@@ -130,6 +147,7 @@ export const GrammarManager: React.FC = () => {
     setFormExample(item.vi_du);
     setFormExampleVi(item.vi_du_dich);
     setFormLevel(item.cap_do);
+    setFormLesson(item.bai_hoc || item.tags?.find((t) => /^Bài\s*\d+/i.test(t)) || 'Bài 1');
     setFormNotes(item.ghi_chu || '');
     setFormTags(item.tags?.join(', ') || 'Ngữ pháp');
     setFormError(null);
@@ -144,6 +162,10 @@ export const GrammarManager: React.FC = () => {
     }
 
     const tagsArray = formTags.split(',').map((t) => t.trim()).filter(Boolean);
+    const chosenLesson = formLesson.trim() || 'Bài 1';
+    if (!tagsArray.includes(chosenLesson)) {
+      tagsArray.unshift(chosenLesson);
+    }
 
     if (editingItem) {
       updateGrammar({
@@ -153,6 +175,7 @@ export const GrammarManager: React.FC = () => {
         vi_du: formExample.trim(),
         vi_du_dich: formExampleVi.trim(),
         cap_do: formLevel,
+        bai_hoc: chosenLesson,
         ghi_chu: formNotes.trim(),
         tags: tagsArray,
       });
@@ -163,6 +186,7 @@ export const GrammarManager: React.FC = () => {
         vi_du: formExample.trim(),
         vi_du_dich: formExampleVi.trim(),
         cap_do: formLevel,
+        bai_hoc: chosenLesson,
         ghi_chu: formNotes.trim(),
         tags: tagsArray,
         ngon_ngu: currentLanguage,
@@ -191,10 +215,10 @@ export const GrammarManager: React.FC = () => {
         if (!matchLevel) return null;
 
         if (selectedLesson !== 'ALL') {
-          const hasLessonTag = g.tags?.some((t) =>
-            t.toLowerCase().includes(selectedLesson.toLowerCase())
-          );
-          if (!hasLessonTag) return null;
+          const matchLesson =
+            g.bai_hoc === selectedLesson ||
+            g.tags?.some((t) => t.toLowerCase().includes(selectedLesson.toLowerCase()));
+          if (!matchLesson) return null;
         }
 
         const res = matchGrammar(g, searchQuery);
@@ -333,12 +357,12 @@ export const GrammarManager: React.FC = () => {
       {/* Filter Bar with View Mode Toggle */}
       <div className="bg-white border-2 border-[#1A1A1A] editorial-shadow-sm p-4 sm:p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="sm:col-span-8 relative">
+          <div className="sm:col-span-6 relative">
             <Search className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
             <input
               id="grammar-search-input"
               type="text"
-              placeholder="Tìm kiếm tập trung theo cấu trúc hoặc giải thích ngữ pháp (có/không dấu)..."
+              placeholder="Tìm kiếm cấu trúc hoặc giải thích ngữ pháp..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-8 py-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white transition"
@@ -355,7 +379,23 @@ export const GrammarManager: React.FC = () => {
               </button>
             )}
           </div>
-          <div className="sm:col-span-4">
+
+          <div className="sm:col-span-3">
+            <select
+              value={selectedLesson}
+              onChange={(e) => setSelectedLesson(e.target.value)}
+              className="w-full py-2 px-3 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono font-bold text-[#1A1A1A] focus:outline-none"
+            >
+              <option value="ALL">📖 TẤT CẢ BÀI ({dynamicLessons.length})</option>
+              {dynamicLessons.map((les) => (
+                <option key={les} value={les}>
+                  {les}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sm:col-span-3">
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
@@ -546,6 +586,9 @@ export const GrammarManager: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between border-b border-[#1A1A1A]/15 pb-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-300 text-[10px] font-mono font-bold">
+                        📖 {item.bai_hoc || item.tags?.find((t) => /^Bài\s*\d+/i.test(t)) || 'Bài 1'}
+                      </span>
                       <span className="px-2 py-0.5 bg-[#1A1A1A] text-[#F9F7F2] text-[10px] font-mono font-bold uppercase">
                         {item.cap_do}
                       </span>
@@ -805,7 +848,18 @@ export const GrammarManager: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[9px] font-mono uppercase font-bold text-amber-900 mb-1">Lesson (Bài)</label>
+                  <input
+                    type="text"
+                    placeholder="Bài 1, Bài 2..."
+                    value={formLesson}
+                    onChange={(e) => setFormLesson(e.target.value)}
+                    className="w-full px-3 py-2 bg-amber-50/50 border border-amber-300 text-xs font-mono font-bold text-[#1A1A1A] focus:outline-none focus:bg-white"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-[9px] font-mono uppercase font-bold text-stone-600 mb-1">Level</label>
                   <select

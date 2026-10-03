@@ -8,9 +8,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Danh từ có phụ âm cuối (patchim) dùng '은' (ví dụ: 이름은, 선생님은); Danh từ không có phụ âm cuối dùng '는' (ví dụ: 저는, 친구는).",
-    "tags": ["Bài 1", "Sơ cấp 1", "Trợ từ", "Chủ đề", "소개"],
+    "tags": [
+      "Bài 1",
+      "Sơ cấp 1",
+      "Trợ từ",
+      "Chủ đề",
+      "소개"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 1"
   },
   {
     "grammar_id": "ko_gram_02",
@@ -21,9 +28,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Phát âm nối âm 'ㅂ' thành âm [ㅁ]: [임니다], [임니까]. Danh từ có hay không có patchim đều gắn trực tiếp với 입니다/입니까?.",
-    "tags": ["Bài 1", "Sơ cấp 1", "Đuôi câu", "Kính ngữ trang trọng", "소개"],
+    "tags": [
+      "Bài 1",
+      "Sơ cấp 1",
+      "Đuôi câu",
+      "Kính ngữ trang trọng",
+      "소개"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 1"
   },
   {
     "grammar_id": "ko_gram_03",
@@ -34,9 +48,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Danh từ có patchim + 이 아닙니다 (학생이 아닙니다); Danh từ không có patchim + 가 아닙니다 (의사가 아닙니다).",
-    "tags": ["Bài 1", "Sơ cấp 1", "Phủ định", "Kính ngữ trang trọng", "소개"],
+    "tags": [
+      "Bài 1",
+      "Sơ cấp 1",
+      "Phủ định",
+      "Kính ngữ trang trọng",
+      "소개"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 1"
   },
   {
     "grammar_id": "ko_gram_04",
@@ -47,9 +68,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Danh từ có patchim + 과 (선생님과 학생); Danh từ không có patchim + 와 (사과와 바나나). Trong khẩu ngữ thường dùng '하고' hoặc '(이)랑'.",
-    "tags": ["Bài 1", "Sơ cấp 1", "Liên từ", "Nối từ", "소개"],
+    "tags": [
+      "Bài 1",
+      "Sơ cấp 1",
+      "Liên từ",
+      "Nối từ",
+      "소개"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 1"
   },
   {
     "grammar_id": "ko_gram_05",
@@ -60,9 +88,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Rút gọn trong khẩu ngữ: 이것이 -> 이게, 그것이 -> 그거, 저것이 -> 저게; 이것은 -> 이건, 그것은 -> 건, 저것은 -> 저건.",
-    "tags": ["Bài 2", "Sơ cấp 1", "Đại từ chỉ định", "Vị trí", "학교"],
+    "tags": [
+      "Bài 2",
+      "Sơ cấp 1",
+      "Đại từ chỉ định",
+      "Vị trí",
+      "학교"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 2"
   },
   {
     "grammar_id": "ko_gram_06",
@@ -73,9 +108,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Có patchim + 이 (선생님이, 가방이); Không patchim + 가 (시계가, 친구가). Khi kết hợp đại từ: 나+가 -> 내가, 너+가 -> 네가, 저+가 -> 제가, 누구+가 -> 누가.",
-    "tags": ["Bài 2", "Sơ cấp 1", "Trợ từ", "Chủ ngữ", "학교"],
+    "tags": [
+      "Bài 2",
+      "Sơ cấp 1",
+      "Trợ từ",
+      "Chủ ngữ",
+      "학교"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 2"
   },
   {
     "grammar_id": "ko_gram_07",
@@ -86,9 +128,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Danh từ có patchim + 이에요 (책이에요, 학생이에요); Danh từ không có patchim + 예요 (의사예요, 시계예요). Lên giọng cuối câu để hỏi.",
-    "tags": ["Bài 2", "Sơ cấp 1", "Đuôi câu", "Thân mật lịch sự", "학교"],
+    "tags": [
+      "Bài 2",
+      "Sơ cấp 1",
+      "Đuôi câu",
+      "Thân mật lịch sự",
+      "학교"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 2"
   },
   {
     "grammar_id": "ko_gram_08",
@@ -99,9 +148,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Thể trang trọng: 있습니다 / 없습니다. Thể thân mật: 있어요 / 없어요. Cấu trúc địa điểm: [Nơi chốn]에 [Danh từ]이/가 있어요 (Tại đâu có cái gì).",
-    "tags": ["Bài 2", "Sơ cấp 1", "Tồn tại", "Sở hữu", "학교"],
+    "tags": [
+      "Bài 2",
+      "Sơ cấp 1",
+      "Tồn tại",
+      "Sở hữu",
+      "학교"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 2"
   },
   {
     "grammar_id": "ko_gram_09",
@@ -112,9 +168,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Không patchim + -ㅂ니다 (가다 -> 갑니다); Có patchim + -습니다 (먹다 -> 먹습니다). Bất quy tắc 'ㄹ': 살다 -> 삽니다, 만들다 -> 만듭니다.",
-    "tags": ["Bài 3", "Sơ cấp 1", "Đuôi câu", "Kính ngữ trang trọng", "일상생활"],
+    "tags": [
+      "Bài 3",
+      "Sơ cấp 1",
+      "Đuôi câu",
+      "Kính ngữ trang trọng",
+      "일상생활"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 3"
   },
   {
     "grammar_id": "ko_gram_10",
@@ -125,9 +188,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Danh từ có patchim + 을 (밥을, 책을, 음악을); Danh từ không có patchim + 를 (영화를, 사과를, 친구를). Trong khẩu ngữ đôi khi có thể lược bớt.",
-    "tags": ["Bài 3", "Sơ cấp 1", "Trợ từ", "Tân ngữ", "일상생활"],
+    "tags": [
+      "Bài 3",
+      "Sơ cấp 1",
+      "Trợ từ",
+      "Tân ngữ",
+      "일상생활"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 3"
   },
   {
     "grammar_id": "ko_gram_11",
@@ -138,9 +208,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Phân biệt: [Địa điểm] + 에 있다/없다 (chỉ sự tồn tại ở đâu); [Địa điểm] + 에서 + [Động từ hành động] (hành động diễn ra tại đâu).",
-    "tags": ["Bài 3", "Sơ cấp 1", "Trợ từ địa điểm", "Hành động", "일상생활"],
+    "tags": [
+      "Bài 3",
+      "Sơ cấp 1",
+      "Trợ từ địa điểm",
+      "Hành động",
+      "일상생활"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 3"
   },
   {
     "grammar_id": "ko_gram_12",
@@ -151,9 +228,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Biểu thị đích đến của hành trình di chuyển. Đi về nhà: 집에 가다/오다; Đi học/đi làm: 학교에/회사에 다니다.",
-    "tags": ["Bài 3", "Sơ cấp 1", "Trợ từ địa điểm", "Phương hướng", "일상생활"],
+    "tags": [
+      "Bài 3",
+      "Sơ cấp 1",
+      "Trợ từ địa điểm",
+      "Phương hướng",
+      "일상생활"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 3"
   },
   {
     "grammar_id": "ko_gram_13",
@@ -164,9 +248,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Với động từ kết thúc bằng 'Danh từ + 하다' (공부하다, 운동하다), phủ định ngắn đặt '안' trước '하다' (-> 공부 안 해요, 운동 안 해요).",
-    "tags": ["Bài 3", "Sơ cấp 1", "Phủ định", "Động từ", "일상생활"],
+    "tags": [
+      "Bài 3",
+      "Sơ cấp 1",
+      "Phủ định",
+      "Động từ",
+      "일상생활"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 3"
   },
   {
     "grammar_id": "ko_gram_14",
@@ -177,9 +268,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "1. Nguyên âm kết thúc là ㅏ, ㅗ -> + -아요 (가다->가요, 보다->봐요, 살다->살아요). 2. Nguyên âm khác (ㅓ, ㅜ, ㅡ, ㅣ...) -> + -어요 (먹다->먹어요, 마시다->마셔요). 3. 하다 -> 해요 (공부해요).",
-    "tags": ["Bài 4", "Sơ cấp 1", "Đuôi câu", "Thân mật lịch sự", "쇼핑"],
+    "tags": [
+      "Bài 4",
+      "Sơ cấp 1",
+      "Đuôi câu",
+      "Thân mật lịch sự",
+      "쇼핑"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 4"
   },
   {
     "grammar_id": "ko_gram_15",
@@ -190,9 +288,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Khi kết hợp với động từ: V + -아/어 주세요 mang nghĩa 'Xin hãy làm việc gì đó giúp tôi' (도와주세요: Xin hãy giúp tôi; 가르쳐 주세요: Xin hãy dạy tôi).",
-    "tags": ["Bài 4", "Sơ cấp 1", "Yêu cầu", "Mua sắm", "쇼핑"],
+    "tags": [
+      "Bài 4",
+      "Sơ cấp 1",
+      "Yêu cầu",
+      "Mua sắm",
+      "쇼핑"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 4"
   },
   {
     "grammar_id": "ko_gram_16",
@@ -203,9 +308,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Danh từ có patchim hay không đều gắn trực tiếp với '하고'. Khi mang nghĩa 'cùng với', thường đi kèm '같이' (ví dụ: 친구하고 같이 영화를 봐요).",
-    "tags": ["Bài 4", "Sơ cấp 1", "Liên từ", "Nối từ", "쇼핑"],
+    "tags": [
+      "Bài 4",
+      "Sơ cấp 1",
+      "Liên từ",
+      "Nối từ",
+      "쇼핑"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 4"
   },
   {
     "grammar_id": "ko_gram_17",
@@ -216,9 +328,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Biến âm các số thuần Hàn trước đơn vị đếm: 하나 -> 한, 둘 -> 두, 셋 -> 세, 넷 -> 네, 스물 -> 스무 (ví dụ: 한 개, 두 명, 세 권, 네 병, 스무 살).",
-    "tags": ["Bài 4", "Sơ cấp 1", "Số đếm", "Đơn vị", "쇼핑"],
+    "tags": [
+      "Bài 4",
+      "Sơ cấp 1",
+      "Số đếm",
+      "Đơn vị",
+      "쇼핑"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 4"
   },
   {
     "grammar_id": "ko_gram_18",
@@ -229,9 +348,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "TUYỆT ĐỐI KHÔNG gắn '에' sau các từ chỉ thời gian tương đối: 오늘 (hôm nay), 어제 (hôm qua), 내일 (ngày mai), 지금 (bây giờ), 언제 (khi nào).",
-    "tags": ["Bài 5", "Sơ cấp 1", "Trợ từ thời gian", "Thời gian", "날짜와 요일"],
+    "tags": [
+      "Bài 5",
+      "Sơ cấp 1",
+      "Trợ từ thời gian",
+      "Thời gian",
+      "날짜와 요일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 5"
   },
   {
     "grammar_id": "ko_gram_19",
@@ -242,9 +368,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "1. Nguyên âm ㅏ, ㅗ -> + -았어요 (가다->갔어요, 보다->봤어요, 만나다->만났어요). 2. Nguyên âm khác -> + -었어요 (먹다->먹었어요, 마시다->마셨어요). 3. 하다 -> 했어요 (운동했어요).",
-    "tags": ["Bài 5", "Sơ cấp 1", "Thì quá khứ", "Động từ", "날짜와 요일"],
+    "tags": [
+      "Bài 5",
+      "Sơ cấp 1",
+      "Thì quá khứ",
+      "Động từ",
+      "날짜와 요일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 5"
   },
   {
     "grammar_id": "ko_gram_20",
@@ -255,9 +388,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "'부터' chỉ mốc bắt đầu thời gian; '까지' chỉ mốc kết thúc. Có thể dùng riêng lẻ: 9시부터 (từ 9 giờ), 1시까지 (đến 1 giờ).",
-    "tags": ["Bài 5", "Sơ cấp 1", "Khoảng thời gian", "Thời gian", "날짜와 요일"],
+    "tags": [
+      "Bài 5",
+      "Sơ cấp 1",
+      "Khoảng thời gian",
+      "Thời gian",
+      "날짜와 요일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 5"
   },
   {
     "grammar_id": "ko_gram_21",
@@ -268,9 +408,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Phân biệt: [Thời gian] + 부터~까지 (về thời gian); [Địa điểm] + 에서~까지 (về không gian/địa điểm).",
-    "tags": ["Bài 6", "Sơ cấp 1", "Khoảng cách", "Địa điểm", "하루 일과"],
+    "tags": [
+      "Bài 6",
+      "Sơ cấp 1",
+      "Khoảng cách",
+      "Địa điểm",
+      "하루 일과"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 6"
   },
   {
     "grammar_id": "ko_gram_22",
@@ -281,9 +428,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Gốc động từ không patchim hoặc có patchim 'ㄹ' + -ㄹ 거예요 (가다->갈 거예요, 살다->살 거예요); Có patchim khác + -을 거예요 (먹다->먹을 거예요, 읽다->읽을 거예요). Dạng trang trọng: -(으)ㄹ 겁니다.",
-    "tags": ["Bài 6", "Sơ cấp 1", "Thì tương lai", "Kế hoạch", "하루 일과"],
+    "tags": [
+      "Bài 6",
+      "Sơ cấp 1",
+      "Thì tương lai",
+      "Kế hoạch",
+      "하루 일과"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 6"
   },
   {
     "grammar_id": "ko_gram_23",
@@ -294,9 +448,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Gắn trực tiếp vào thân động/tính từ không cần xét patchim (가고, 먹고, 예쁘고). Thì quá khứ chỉ chia ở động từ cuối cùng của câu.",
-    "tags": ["Bài 6", "Sơ cấp 1", "Liên từ nối", "Trình tự", "하루 일과"],
+    "tags": [
+      "Bài 6",
+      "Sơ cấp 1",
+      "Liên từ nối",
+      "Trình tự",
+      "하루 일과"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 6"
   },
   {
     "grammar_id": "ko_gram_24",
@@ -307,9 +468,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "듣다 + 어요 -> 들어요, 걷다 + 어요 -> 걸어요, 묻다 + 어요 -> 물어요. Lưu ý các từ có quy tắc thông thường (không đổi): 닫다->닫아요 (đóng), 받다->받아요 (nhận), 믿다->믿어요 (tin tưởng).",
-    "tags": ["Bài 6", "Sơ cấp 1", "Bất quy tắc", "Biến âm", "하루 일과"],
+    "tags": [
+      "Bài 6",
+      "Sơ cấp 1",
+      "Bất quy tắc",
+      "Biến âm",
+      "하루 일과"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 6"
   },
   {
     "grammar_id": "ko_gram_25",
@@ -320,9 +488,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "춥다 + 어요 -> 추 + 우 + 어요 -> 추워요; 덥다 -> 더워요; 어렵다 -> 어려워요; 고맙다 -> 고마워요. Ngoại lệ có quy tắc (không đổi): 입다->입어요 (mặc), 잡다->잡아요 (bắt), 씹다->씹어요 (nhai).",
-    "tags": ["Bài 7", "Sơ cấp 1", "Bất quy tắc", "Tính từ", "날씨"],
+    "tags": [
+      "Bài 7",
+      "Sơ cấp 1",
+      "Bất quy tắc",
+      "Tính từ",
+      "날씨"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 7"
   },
   {
     "grammar_id": "ko_gram_26",
@@ -333,9 +508,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Gắn trực tiếp vào gốc động/tính từ không phân biệt patchim (크지만, 작지만). Có thể chia thì quá khứ ở vế trước: -았/었지만 (비가 왔지만 산에 갔어요).",
-    "tags": ["Bài 7", "Sơ cấp 1", "Liên từ", "Tương phản", "날씨"],
+    "tags": [
+      "Bài 7",
+      "Sơ cấp 1",
+      "Liên từ",
+      "Tương phản",
+      "날씨"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 7"
   },
   {
     "grammar_id": "ko_gram_27",
@@ -346,9 +528,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Không patchim + -ㄹ까요? (가다->갈까요?, 보다->볼까요?); Có patchim + -을까요? (먹다->먹을까요?, 앉다->앉을까요?). Đề nghị giúp: 제가 창문을 닫을까요? (Tôi đóng cửa sổ nhé?).",
-    "tags": ["Bài 7", "Sơ cấp 1", "Đuôi câu rủ rê", "Hỏi ý kiến", "날씨"],
+    "tags": [
+      "Bài 7",
+      "Sơ cấp 1",
+      "Đuôi câu rủ rê",
+      "Hỏi ý kiến",
+      "날씨"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 7"
   },
   {
     "grammar_id": "ko_gram_28",
@@ -359,9 +548,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Không patchim + -ㅂ시다 (가다->갑시다); Có patchim + -읍시다 (먹다->먹읍시다). CHỈ dùng với bạn bè, người bằng tuổi hoặc bề dưới. KHÔNG dùng với người lớn tuổi/cấp trên.",
-    "tags": ["Bài 7", "Sơ cấp 1", "Đuôi câu đề nghị", "Trang trọng", "날씨"],
+    "tags": [
+      "Bài 7",
+      "Sơ cấp 1",
+      "Đuôi câu đề nghị",
+      "Trang trọng",
+      "날씨"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 7"
   },
   {
     "grammar_id": "ko_gram_29",
@@ -372,9 +568,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Không patchim + -세요 (가세요, 보세요); Có patchim + -으세요 (앉으세요, 읽으세요). Dạng cực kỳ trang trọng dùng trên biển báo, sân bay, hội trường là -(으)십시오.",
-    "tags": ["Bài 8", "Sơ cấp 1", "Mệnh lệnh", "Kính ngữ", "전화"],
+    "tags": [
+      "Bài 8",
+      "Sơ cấp 1",
+      "Mệnh lệnh",
+      "Kính ngữ",
+      "전화"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 8"
   },
   {
     "grammar_id": "ko_gram_30",
@@ -385,9 +588,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Gắn trực tiếp vào gốc động từ không cần phân biệt patchim (가지 마세요, 먹지 마세요, 담배를 피우지 마세요). Thể trang trọng: -지 마십시오.",
-    "tags": ["Bài 8", "Sơ cấp 1", "Cấm đoán", "Lịch sự", "전화"],
+    "tags": [
+      "Bài 8",
+      "Sơ cấp 1",
+      "Cấm đoán",
+      "Lịch sự",
+      "전화"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 8"
   },
   {
     "grammar_id": "ko_gram_31",
@@ -398,9 +608,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Không patchim hoặc patchim 'ㄹ' + -로 (버스로, 지하철로, 연필로); Có patchim khác + -으로 (비행기로, 한국어로, 식당으로).",
-    "tags": ["Bài 8", "Sơ cấp 1", "Trợ từ phương tiện", "Công cụ", "전화"],
+    "tags": [
+      "Bài 8",
+      "Sơ cấp 1",
+      "Trợ từ phương tiện",
+      "Công cụ",
+      "전화"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 8"
   },
   {
     "grammar_id": "ko_gram_32",
@@ -411,9 +628,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "- 에게: Dùng phổ biến trong văn viết và giao tiếp chuẩn mực. - 한테: Dùng nhiều trong khẩu ngữ hàng ngày. - 께: Kính ngữ bắt buộc khi gửi/tặng cho người bề trên (ông bà, cha mẹ, thầy cô).",
-    "tags": ["Bài 8", "Sơ cấp 1", "Trợ từ đối tượng", "Kính ngữ", "전화"],
+    "tags": [
+      "Bài 8",
+      "Sơ cấp 1",
+      "Trợ từ đối tượng",
+      "Kính ngữ",
+      "전화"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 8"
   },
   {
     "grammar_id": "ko_gram_33",
@@ -424,9 +648,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Gắn trực tiếp vào gốc động từ (가고 싶어요, 먹고 싶어요). Khi chủ ngữ là ngôi thứ ba (anh ấy, cô ấy), BẮT BUỘC dùng: V + -고 싶어하다 (ví dụ: 제 동생은 한국에 가고 싶어해요).",
-    "tags": ["Bài 9", "Sơ cấp 1", "Mong muốn", "Động từ", "휴일"],
+    "tags": [
+      "Bài 9",
+      "Sơ cấp 1",
+      "Mong muốn",
+      "Động từ",
+      "휴일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 9"
   },
   {
     "grammar_id": "ko_gram_34",
@@ -437,9 +668,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Không patchim hoặc patchim 'ㄹ' + -러 가다/오다 (만나러 가다, 놀러 오다); Có patchim khác + -으러 가다/오다 (먹으러 가다, 읽으러 가다). Vế sau CHỈ đi với động từ di chuyển (가다, 오다, 다니다, 나가다).",
-    "tags": ["Bài 9", "Sơ cấp 1", "Mục đích di chuyển", "Động từ", "휴일"],
+    "tags": [
+      "Bài 9",
+      "Sơ cấp 1",
+      "Mục đích di chuyển",
+      "Động từ",
+      "휴일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 9"
   },
   {
     "grammar_id": "ko_gram_35",
@@ -450,9 +688,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "바쁘다 -> 바빠요 (vì âm trước là '바' có ㅏ); 예쁘다 -> 예뻐요 (vì âm trước là '예'); 크다 -> 커요 (từ 1 âm tiết); 쓰다 -> 써요 / 썼어요.",
-    "tags": ["Bài 9", "Sơ cấp 1", "Bất quy tắc", "Nguyên âm", "휴일"],
+    "tags": [
+      "Bài 9",
+      "Sơ cấp 1",
+      "Bất quy tắc",
+      "Nguyên âm",
+      "휴일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 9"
   },
   {
     "grammar_id": "ko_gram_36",
@@ -463,9 +708,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Không patchim hoặc patchim 'ㄹ' + -ㄹ 수 있다/없다 (만들 수 있어요, 갈 수 있어요); Có patchim khác + -을 수 있다/없다 (읽을 수 있어요, 먹을 수 없어요). -(으)ㄹ 수 없다 tương đương '못 + Động từ'.",
-    "tags": ["Bài 9", "Sơ cấp 1", "Khả năng", "Động từ", "휴일"],
+    "tags": [
+      "Bài 9",
+      "Sơ cấp 1",
+      "Khả năng",
+      "Động từ",
+      "휴일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 9"
   },
   {
     "grammar_id": "ko_gram_37",
@@ -476,9 +728,16 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "Danh từ có patchim + 이나 (수박이나 사과, 밥이나 빵); Danh từ không có patchim + 나 (커피나 차, 주스나 우유).",
-    "tags": ["Bài 9", "Sơ cấp 1", "Liên từ", "Lựa chọn", "휴일"],
+    "tags": [
+      "Bài 9",
+      "Sơ cấp 1",
+      "Liên từ",
+      "Lựa chọn",
+      "휴일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 9"
   },
   {
     "grammar_id": "ko_gram_38",
@@ -489,8 +748,15 @@
     "ngon_ngu": "ko",
     "cap_do": "TOPIK 1 (Sơ cấp 1)",
     "ghi_chu": "1. Nguyên âm ㅏ, ㅗ -> + -아서 (좋아서, 비싸서). 2. Nguyên âm khác -> + -어서 (맛있어서, 추워서). 3. 하다 -> 해서 (바빠서). Lưu ý: KHÔNG chia thì quá khứ (-았/었-) trước -아/어서.",
-    "tags": ["Bài 9", "Sơ cấp 1", "Nguyên nhân kết quả", "Liên từ", "휴일"],
+    "tags": [
+      "Bài 9",
+      "Sơ cấp 1",
+      "Nguyên nhân kết quả",
+      "Liên từ",
+      "휴일"
+    ],
     "user_id": "system",
-    "created_at": "2026-09-01"
+    "created_at": "2026-09-01",
+    "bai_hoc": "Bài 9"
   }
 ]
