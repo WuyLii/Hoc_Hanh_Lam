@@ -1,4 +1,5 @@
 import { DictionaryResult, DictionaryHistoryItem, LanguageCode } from '../types';
+import { SupabaseService } from './supabaseService';
 
 const HISTORY_KEY = 'hochanhlam_dictionary_history_v3';
 const CACHE_KEY = 'hochanhlam_dictionary_cache_v3';
@@ -130,7 +131,41 @@ export function getDictionaryHistory(): DictionaryHistoryItem[] {
   }
 }
 
-export function saveDictionaryHistory(item: Omit<DictionaryHistoryItem, 'id' | 'timestamp'>): DictionaryHistoryItem[] {
+export async function syncDictionaryHistoryFromSupabase(userId = 'shared'): Promise<DictionaryHistoryItem[]> {
+  try {
+    const remote = await SupabaseService.fetchDictionaryHistory(userId);
+    if (!remote || remote.length === 0) return getDictionaryHistory();
+
+    const local = getDictionaryHistory();
+    const map = new Map<string, DictionaryHistoryItem>();
+
+    // Put local first
+    local.forEach((item) => map.set(item.id, item));
+    // Merge remote
+    remote.forEach((item) => {
+      if (!map.has(item.id)) {
+        map.set(item.id, item);
+      } else {
+        const existing = map.get(item.id)!;
+        map.set(item.id, {
+          ...existing,
+          isStarred: existing.isStarred || item.isStarred,
+        });
+      }
+    });
+
+    const merged = Array.from(map.values())
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 100);
+
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(merged));
+    return merged;
+  } catch {
+    return getDictionaryHistory();
+  }
+}
+
+export function saveDictionaryHistory(item: Omit<DictionaryHistoryItem, 'id' | 'timestamp'>, userId = 'shared'): DictionaryHistoryItem[] {
   try {
     const current = getDictionaryHistory();
     const filtered = current.filter(
@@ -143,8 +178,12 @@ export function saveDictionaryHistory(item: Omit<DictionaryHistoryItem, 'id' | '
       timestamp: new Date().toISOString(),
     };
 
-    const updated = [newItem, ...filtered].slice(0, 50); // Keep last 50
+    const updated = [newItem, ...filtered].slice(0, 100); // Keep last 100
     localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+
+    // Save to Supabase
+    SupabaseService.saveDictionaryHistoryItem(newItem, userId).catch(() => {});
+
     return updated;
   } catch (e) {
     console.error('Failed to save dictionary history:', e);
@@ -152,13 +191,23 @@ export function saveDictionaryHistory(item: Omit<DictionaryHistoryItem, 'id' | '
   }
 }
 
-export function toggleStarHistoryItem(id: string): DictionaryHistoryItem[] {
+export function toggleStarHistoryItem(id: string, userId = 'shared'): DictionaryHistoryItem[] {
   try {
     const current = getDictionaryHistory();
-    const updated = current.map((item) =>
-      item.id === id ? { ...item, isStarred: !item.isStarred } : item
-    );
+    let updatedItem: DictionaryHistoryItem | null = null;
+    const updated = current.map((item) => {
+      if (item.id === id) {
+        updatedItem = { ...item, isStarred: !item.isStarred };
+        return updatedItem;
+      }
+      return item;
+    });
     localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+
+    if (updatedItem) {
+      SupabaseService.saveDictionaryHistoryItem(updatedItem, userId).catch(() => {});
+    }
+
     return updated;
   } catch (e) {
     console.error('Failed to toggle star:', e);
@@ -171,6 +220,9 @@ export function removeHistoryItem(id: string): DictionaryHistoryItem[] {
     const current = getDictionaryHistory();
     const updated = current.filter((item) => item.id !== id);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+
+    SupabaseService.deleteDictionaryHistoryItem(id).catch(() => {});
+
     return updated;
   } catch (e) {
     console.error('Failed to remove history item:', e);
@@ -178,9 +230,10 @@ export function removeHistoryItem(id: string): DictionaryHistoryItem[] {
   }
 }
 
-export function clearDictionaryHistory(): void {
+export function clearDictionaryHistory(userId = 'shared'): void {
   try {
     localStorage.removeItem(HISTORY_KEY);
+    SupabaseService.clearDictionaryHistory(userId).catch(() => {});
   } catch (e) {
     console.error('Failed to clear dictionary history:', e);
   }

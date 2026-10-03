@@ -11,6 +11,7 @@ import {
   JournalEntry,
   ChatConversation,
   NotificationItem,
+  DictionaryHistoryItem,
 } from '../types';
 import {
   enqueueSyncTask,
@@ -1265,6 +1266,162 @@ export class SupabaseService {
   }
 
   /**
+   * Delete a chat conversation from Supabase
+   */
+  public static async deleteChatConversation(chatId: string): Promise<{ success: boolean; message: string }> {
+    if (!chatId) return { success: true, message: 'Chat ID hợp lệ' };
+    const client = this.getClient();
+    if (!client) {
+      await enqueueSyncTask({
+        type: 'delete',
+        table: 'chat_conversations',
+        data: [chatId],
+      });
+      return { success: true, message: 'Đã lưu yêu cầu xóa hội thoại vào hàng đợi offline' };
+    }
+    try {
+      const { error } = await client.from('chat_conversations').delete().eq('chat_id', chatId);
+      if (error) {
+        await enqueueSyncTask({
+          type: 'delete',
+          table: 'chat_conversations',
+          data: [chatId],
+        });
+      }
+      return { success: true, message: 'Đã xóa hội thoại khỏi Supabase Cloud' };
+    } catch (e: any) {
+      await enqueueSyncTask({
+        type: 'delete',
+        table: 'chat_conversations',
+        data: [chatId],
+      });
+      return { success: false, message: e?.message || String(e) };
+    }
+  }
+
+  /**
+   * Save dictionary history item into Supabase
+   */
+  public static async saveDictionaryHistoryItem(
+    item: DictionaryHistoryItem,
+    userId = 'shared'
+  ): Promise<{ success: boolean; error?: string }> {
+    const clean = {
+      id: item.id || `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      user_id: userId || 'shared',
+      query: item.query,
+      word: item.word || item.query,
+      meaning: item.meaning || '',
+      language: item.language || 'ko',
+      is_starred: Boolean(item.isStarred),
+      timestamp: item.timestamp || new Date().toISOString(),
+    };
+    const client = this.getClient();
+    if (!client) {
+      await enqueueSyncTask({
+        type: 'upsert',
+        table: 'dictionary_history',
+        data: clean,
+        onConflict: 'id',
+      });
+      return { success: false, error: 'Chưa cấu hình Supabase' };
+    }
+    try {
+      const { error } = await client.from('dictionary_history').upsert([clean], { onConflict: 'id' });
+      if (error) {
+        await enqueueSyncTask({
+          type: 'upsert',
+          table: 'dictionary_history',
+          data: clean,
+          onConflict: 'id',
+        });
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (e: any) {
+      await enqueueSyncTask({
+        type: 'upsert',
+        table: 'dictionary_history',
+        data: clean,
+        onConflict: 'id',
+      });
+      return { success: false, error: e?.message || String(e) };
+    }
+  }
+
+  /**
+   * Fetch dictionary history from Supabase
+   */
+  public static async fetchDictionaryHistory(userId = 'shared'): Promise<DictionaryHistoryItem[]> {
+    const client = this.getClient();
+    if (!client) return [];
+    try {
+      const { data, error } = await client
+        .from('dictionary_history')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (error || !data) return [];
+
+      return data.map((d: any) => ({
+        id: d.id,
+        query: d.query,
+        word: d.word || d.query,
+        meaning: d.meaning || '',
+        language: d.language || 'ko',
+        timestamp: d.timestamp || d.created_at || new Date().toISOString(),
+        isStarred: Boolean(d.is_starred),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Delete single dictionary history item from Supabase
+   */
+  public static async deleteDictionaryHistoryItem(id: string): Promise<{ success: boolean }> {
+    if (!id) return { success: true };
+    const client = this.getClient();
+    if (!client) {
+      await enqueueSyncTask({
+        type: 'delete',
+        table: 'dictionary_history',
+        data: [id],
+      });
+      return { success: true };
+    }
+    try {
+      const { error } = await client.from('dictionary_history').delete().eq('id', id);
+      if (error) {
+        await enqueueSyncTask({
+          type: 'delete',
+          table: 'dictionary_history',
+          data: [id],
+        });
+      }
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  /**
+   * Clear all dictionary history from Supabase
+   */
+  public static async clearDictionaryHistory(userId = 'shared'): Promise<{ success: boolean }> {
+    const client = this.getClient();
+    if (!client) return { success: true };
+    try {
+      await client.from('dictionary_history').delete().neq('id', '___nonexistent___');
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  /**
    * Save user profile
    */
   public static async saveUserProfile(profile: UserProfile): Promise<{ success: boolean; error?: string }> {
@@ -1326,6 +1483,7 @@ export class SupabaseService {
       { name: 'journal_entries', pk: 'entry_id' },
       { name: 'chat_conversations', pk: 'chat_id' },
       { name: 'notifications', pk: 'noti_id' },
+      { name: 'dictionary_history', pk: 'id' },
     ];
 
     try {

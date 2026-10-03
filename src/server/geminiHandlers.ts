@@ -741,6 +741,7 @@ Hãy cung cấp:
 17. "conjugationsOrForms": Dạng chia động từ hoặc biến thể quan trọng (ví dụ tiếng Hàn: dạng kính ngữ trang trọng, dạng thân mật, quá khứ, tương lai; tiếng Anh: V1, V2, V3, danh từ liên quan; tiếng Trung: từ ghép hay gặp). Mảng các object: {"form": "tên dạng", "description": "từ biến thể"}.
 18. "grammarNotes": Ghi chú ngữ pháp hoặc lưu ý tránh dùng sai (nếu có).
 19. "mnemonic": Mẹo ghi nhớ từ vựng dễ thuộc hoặc liên tưởng thú vị.
+20. "bai_hoc": Phân loại bài học đề xuất theo giáo trình chuẩn (ví dụ: "Bài 1: Chào hỏi", "Bài 2: Gia đình", "Unit 1", v.v.).
 
 Trả về duy nhất định dạng JSON chuẩn:
 {
@@ -750,6 +751,7 @@ Trả về duy nhất định dạng JSON chuẩn:
   "phonetic": "phiên âm",
   "partOfSpeech": "loại từ",
   "level": "cấp độ",
+  "bai_hoc": "Bài 1 (Phân loại bài học)",
   "primaryMeaning": "nghĩa chính",
   "additionalMeanings": ["nghĩa 1", "nghĩa 2"],
   "hanVietOrRoot": "âm Hán Việt",

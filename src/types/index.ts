@@ -391,6 +391,7 @@ export interface DictionaryResult {
   phonetic?: string;
   partOfSpeech?: string;
   level?: string;
+  bai_hoc?: string;
   primaryMeaning: string;
   additionalMeanings?: string[];
   hanVietOrRoot?: string;

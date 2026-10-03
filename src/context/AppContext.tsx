@@ -464,13 +464,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Không thể gửi yêu cầu xóa từ vựng lên máy chủ:', e);
     }
 
-    // 3. Immediately delete from Supabase Cloud if configured
-    if (SupabaseService.isConfigured()) {
-      try {
-        await SupabaseService.deleteVocabulary(wordIds);
-      } catch (e) {
-        console.warn('Lỗi khi xóa từ vựng khỏi Supabase Cloud:', e);
-      }
+    // 3. Immediately delete from Supabase Cloud
+    try {
+      await SupabaseService.deleteVocabulary(wordIds);
+    } catch (e) {
+      console.warn('Lỗi khi xóa từ vựng khỏi Supabase Cloud:', e);
     }
 
     return wordIds.length;
@@ -721,13 +719,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Không thể gửi yêu cầu xóa ngữ pháp lên máy chủ:', e);
     }
 
-    // 3. Immediately delete from Supabase Cloud if configured
-    if (SupabaseService.isConfigured()) {
-      try {
-        await SupabaseService.deleteGrammar(grammarIds);
-      } catch (e) {
-        console.warn('Lỗi khi xóa ngữ pháp khỏi Supabase Cloud:', e);
-      }
+    // 3. Immediately delete from Supabase Cloud
+    try {
+      await SupabaseService.deleteGrammar(grammarIds);
+    } catch (e) {
+      console.warn('Lỗi khi xóa ngữ pháp khỏi Supabase Cloud:', e);
     }
 
     return grammarIds.length;
@@ -957,13 +953,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       idbSet('chat_history', next).catch(() => {});
       return next;
     });
-    if (SupabaseService.isConfigured()) {
-      SupabaseService.saveChatConversation(conv).catch(() => {});
-    }
+    SupabaseService.saveChatConversation(conv).catch(() => {});
   };
 
   const deleteChatConversation = (chatId: string) => {
-    setChatHistory((prev) => prev.filter((c) => c.chat_id !== chatId));
+    setChatHistory((prev) => {
+      const next = prev.filter((c) => c.chat_id !== chatId);
+      idbSet('chat_history', next).catch(() => {});
+      return next;
+    });
+    SupabaseService.deleteChatConversation(chatId).catch(() => {});
   };
 
   const clearChatHistory = () => {

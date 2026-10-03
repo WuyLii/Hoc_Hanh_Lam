@@ -4,6 +4,7 @@ import { LANGUAGES, LanguageCode, DictionaryResult, DictionaryHistoryItem, Vocab
 import {
   lookupDictionaryApi,
   getDictionaryHistory,
+  syncDictionaryHistoryFromSupabase,
   saveDictionaryHistory,
   toggleStarHistoryItem,
   removeHistoryItem,
@@ -70,7 +71,7 @@ const SUGGESTED_WORDS: Record<LanguageCode, { word: string; meaning: string }[]>
 };
 
 export const DictionaryView: React.FC = () => {
-  const { currentLanguage, setCurrentLanguage, currentLangVocabulary, addVocabulary, setActiveNav } = useApp();
+  const { currentUser, currentLanguage, setCurrentLanguage, currentLangVocabulary, addVocabulary, setActiveNav } = useApp();
   const currentLangInfo = LANGUAGES[currentLanguage];
 
   const [query, setQuery] = useState('');
@@ -86,10 +87,13 @@ export const DictionaryView: React.FC = () => {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load history on mount
+  // Load history on mount & sync from Supabase
   useEffect(() => {
     setHistory(getDictionaryHistory());
-  }, []);
+    syncDictionaryHistoryFromSupabase(currentUser.user_id).then((synced) => {
+      setHistory(synced);
+    });
+  }, [currentUser.user_id]);
 
   // Filter history items by current language
   const currentLangHistory = useMemo(() => {

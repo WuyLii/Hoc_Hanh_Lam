@@ -178,6 +178,19 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 11. BẢNG LỊCH SỬ TRA CỨU TỪ ĐIỂN (dictionary_history)
+CREATE TABLE IF NOT EXISTS public.dictionary_history (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'shared',
+    query TEXT NOT NULL,
+    word TEXT,
+    meaning TEXT,
+    language TEXT NOT NULL DEFAULT 'ko',
+    is_starred BOOLEAN DEFAULT FALSE,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ====================================================================
 -- CHỈ MỤC (INDEXES) TỐI ƯU TỐC ĐỘ TRUY VẤN
 -- ====================================================================
@@ -191,6 +204,7 @@ CREATE INDEX IF NOT EXISTS idx_review_sessions_user ON public.review_sessions(us
 CREATE INDEX IF NOT EXISTS idx_progress_user_date ON public.progress_records(user_id, ngay);
 CREATE INDEX IF NOT EXISTS idx_journal_user ON public.journal_entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_user ON public.chat_conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_user ON public.dictionary_history(user_id, language);
 
 -- ====================================================================
 -- BẢO MẬT VÀ PHÂN QUYỀN TRUY CẬP (LEAST PRIVILEGE & ROW LEVEL SECURITY)
@@ -385,5 +399,12 @@ DROP POLICY IF EXISTS "notifications_all_policy" ON public.notifications;
 CREATE POLICY "notifications_all_policy" ON public.notifications
     FOR ALL USING (auth.uid()::text = user_id)
     WITH CHECK (auth.uid()::text = user_id);
+
+-- 2.11. dictionary_history (Lịch sử tra từ điển)
+ALTER TABLE IF EXISTS public.dictionary_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "dictionary_history_all_policy" ON public.dictionary_history;
+CREATE POLICY "dictionary_history_all_policy" ON public.dictionary_history
+    FOR ALL USING (auth.uid()::text = user_id OR user_id = 'shared' OR user_id = 'user_1' OR user_id IS NULL OR user_id = '')
+    WITH CHECK (auth.uid()::text = user_id OR user_id = 'shared' OR user_id = 'user_1' OR auth.uid() IS NOT NULL);
 
 -- HOÀN TẤT SCHEMA VÀ THIẾT LẬP BẢO MẬT RLS CHUẨN XÁC!
