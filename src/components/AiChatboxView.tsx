@@ -212,7 +212,7 @@ export const AiChatboxView: React.FC = () => {
       ngon_ngu: currentLanguage,
       is_added_today_flashcard: true,
       added_to_today_flashcard_at: new Date().toISOString(),
-      retention_level: 'chua_thuoc',
+      retention_level: 'chua_danh_gia',
     });
     setSavedWordsMap((prev) => ({ ...prev, [item.word]: true }));
   };

@@ -51,6 +51,7 @@ interface AppContextType {
   recordSRSRating: (wordId: string, rating: RecallQuality) => void;
   toggleTodayFlashcard: (itemOrId: string | Partial<VocabularyItem>) => VocabularyItem | null;
   updateRetentionLevel: (wordId: string, level: VocabularyRetentionLevel) => void;
+  resetAllRetentionToUnrated: (language?: LanguageCode) => void;
 
   decks: Deck[];
   currentLangDecks: Deck[];
@@ -203,7 +204,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]);
 
         if (isMounted) {
-          if (cachedVocab && cachedVocab.length > 0) setVocabulary(cleanDeduplicateVocab(cachedVocab));
+          if (cachedVocab && cachedVocab.length > 0) {
+            const cleaned = cleanDeduplicateVocab(cachedVocab);
+            setVocabulary(cleaned.map((v) => ({
+              ...v,
+              retention_level: (v.times_reviewed && v.times_reviewed > 0 && v.retention_level && v.retention_level !== 'chua_thuoc')
+                ? v.retention_level
+                : (v.retention_level === 'nho' || v.retention_level === 'hoi_nho' || v.retention_level === 'quen')
+                  ? v.retention_level
+                  : 'chua_danh_gia',
+            })));
+          }
           const mergedGrammar = cleanDeduplicateGrammar([...INITIAL_GRAMMAR, ...(cachedGrammar || [])]);
           setGrammar(mergedGrammar);
           if (cachedDecks && cachedDecks.length > 0) setDecks(cleanDeduplicateDecks(cachedDecks));
@@ -260,8 +271,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return cleaned.map((v, idx) => ({
       ...v,
       bai_hoc: v.bai_hoc || `Bài ${Math.floor(idx / 10) + 1}`,
+      retention_level: (v.times_reviewed && v.times_reviewed > 0 && v.retention_level && v.retention_level !== 'chua_thuoc')
+        ? v.retention_level
+        : (v.retention_level === 'nho' || v.retention_level === 'hoi_nho' || v.retention_level === 'quen')
+          ? v.retention_level
+          : 'chua_danh_gia',
     }));
   });
+
+  // One-time automatic migration: ensure all existing unreviewed/unrated words are 'chua_danh_gia'
+  useEffect(() => {
+    const hasMigratedRetention = localStorage.getItem('polyglot_migrate_retention_unrated_v6');
+    if (!hasMigratedRetention && vocabulary.length > 0) {
+      setVocabulary((prev) => {
+        const updated = prev.map((w) => {
+          const hasReviewHistory = w.times_reviewed && w.times_reviewed > 0;
+          return {
+            ...w,
+            retention_level: hasReviewHistory && w.retention_level && w.retention_level !== 'chua_thuoc'
+              ? w.retention_level
+              : (w.retention_level === 'nho' || w.retention_level === 'hoi_nho' || w.retention_level === 'quen')
+                ? w.retention_level
+                : 'chua_danh_gia',
+          };
+        });
+        idbSet('vocabulary', updated).catch(() => {});
+        return updated;
+      });
+      localStorage.setItem('polyglot_migrate_retention_unrated_v6', 'true');
+    }
+  }, [vocabulary.length]);
   const [decks, setDecks] = useState<Deck[]>(() =>
     cleanDeduplicateDecks(loadFromStorage('decks', []))
   );
@@ -402,6 +441,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cap_do: item.cap_do || 'Cơ bản',
       bai_hoc: item.bai_hoc || 'Bài 1',
       nguon_goc: item.nguon_goc || 'Tự thêm',
+      retention_level: item.retention_level || 'chua_danh_gia',
+      is_added_today_flashcard: Boolean(item.is_added_today_flashcard || item.is_starred),
+      is_starred: Boolean(item.is_starred || item.is_added_today_flashcard),
+      added_to_today_flashcard_at: item.added_to_today_flashcard_at || ((item.is_added_today_flashcard || item.is_starred) ? new Date().toISOString() : undefined),
       srs_box: 0,
       srs_next_review: new Date().toISOString(),
       srs_interval: 0,
@@ -571,6 +614,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cap_do: item.cap_do || 'Tổng hợp',
         bai_hoc: item.bai_hoc || 'Bài 1',
         nguon_goc: item.nguon_goc || 'Import CSV/Excel',
+        retention_level: item.retention_level || 'chua_danh_gia',
+        is_added_today_flashcard: Boolean(item.is_added_today_flashcard || item.is_starred),
+        is_starred: Boolean(item.is_starred || item.is_added_today_flashcard),
+        added_to_today_flashcard_at: item.added_to_today_flashcard_at || ((item.is_added_today_flashcard || item.is_starred) ? new Date().toISOString() : undefined),
         srs_box: 0,
         srs_next_review: new Date().toISOString(),
         srs_interval: 0,
@@ -627,10 +674,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof itemOrId === 'string') {
       const existing = vocabulary.find((w) => w.word_id === itemOrId);
       if (existing) {
-        const nextVal = !existing.is_added_today_flashcard;
+        const nextVal = !(existing.is_added_today_flashcard || existing.is_starred);
         const updated: VocabularyItem = {
           ...existing,
           is_added_today_flashcard: nextVal,
+          is_starred: nextVal,
           added_to_today_flashcard_at: nextVal ? new Date().toISOString() : undefined,
         };
         updateVocabulary(updated);
@@ -645,20 +693,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           (searchWord && w.tu.trim().toLowerCase() === searchWord && w.ngon_ngu === (itemOrId.ngon_ngu || currentLanguage))
       );
       if (existing) {
-        const nextVal = !existing.is_added_today_flashcard;
+        const nextVal = typeof itemOrId.is_added_today_flashcard === 'boolean'
+          ? itemOrId.is_added_today_flashcard
+          : typeof itemOrId.is_starred === 'boolean'
+          ? itemOrId.is_starred
+          : !(existing.is_added_today_flashcard || existing.is_starred);
         const updated: VocabularyItem = {
           ...existing,
           is_added_today_flashcard: nextVal,
-          added_to_today_flashcard_at: nextVal ? new Date().toISOString() : undefined,
+          is_starred: nextVal,
+          added_to_today_flashcard_at: nextVal ? (existing.added_to_today_flashcard_at || new Date().toISOString()) : undefined,
         };
         updateVocabulary(updated);
         return updated;
       } else {
+        if (itemOrId.is_added_today_flashcard === false || itemOrId.is_starred === false) {
+          return null;
+        }
         const added = addVocabulary({
           ...itemOrId,
           is_added_today_flashcard: true,
+          is_starred: true,
           added_to_today_flashcard_at: new Date().toISOString(),
-          retention_level: itemOrId.retention_level || 'chua_thuoc',
+          retention_level: itemOrId.retention_level || 'chua_danh_gia',
         });
         return added;
       }
@@ -673,6 +730,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       retention_level: level,
     };
     updateVocabulary(updatedWord);
+  };
+
+  const resetAllRetentionToUnrated = (targetLang?: LanguageCode) => {
+    setVocabulary((prev) => {
+      const updated = prev.map((w) => {
+        if (!targetLang || w.ngon_ngu === targetLang) {
+          return {
+            ...w,
+            retention_level: 'chua_danh_gia' as VocabularyRetentionLevel,
+          };
+        }
+        return w;
+      });
+      idbSet('vocabulary', updated).catch(() => {});
+      return updated;
+    });
   };
 
   // Deck operations
@@ -1561,6 +1634,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recordSRSRating,
         toggleTodayFlashcard,
         updateRetentionLevel,
+        resetAllRetentionToUnrated,
 
         decks,
         currentLangDecks,

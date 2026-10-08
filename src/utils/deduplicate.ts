@@ -99,6 +99,9 @@ export function cleanDeduplicateVocab(items: VocabularyItem[]): VocabularyItem[]
         nghia_tieng_han: cleanNghiaHan,
         nghia_tieng_anh: cleanNghiaAnh,
         word_id: item.word_id || `w_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        retention_level: item.retention_level || 'chua_danh_gia',
+        is_added_today_flashcard: Boolean(item.is_added_today_flashcard),
+        is_starred: Boolean(item.is_starred),
       });
     } else {
       // Merge properties if duplicate exists, retaining highest SRS and richer fields
@@ -129,6 +132,9 @@ export function cleanDeduplicateVocab(items: VocabularyItem[]): VocabularyItem[]
         phien_am_tieng_han: primary.phien_am_tieng_han || secondary.phien_am_tieng_han || '',
         chu_de: primary.chu_de || secondary.chu_de || 'Tổng hợp',
         cap_do: primary.cap_do || secondary.cap_do || 'Cơ bản',
+        retention_level: primary.retention_level || secondary.retention_level || 'chua_danh_gia',
+        is_added_today_flashcard: Boolean(primary.is_added_today_flashcard || secondary.is_added_today_flashcard),
+        is_starred: Boolean(primary.is_starred || secondary.is_starred),
         srs_box: Math.max(existingSrs, incomingSrs),
         times_reviewed: (existing.times_reviewed || 0) + (item.times_reviewed || 0),
         times_correct: (existing.times_correct || 0) + (item.times_correct || 0),

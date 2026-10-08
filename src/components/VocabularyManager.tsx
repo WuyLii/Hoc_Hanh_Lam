@@ -42,6 +42,7 @@ export const VocabularyManager: React.FC = () => {
     setSelectedGameMode,
     toggleTodayFlashcard,
     updateRetentionLevel,
+    resetAllRetentionToUnrated,
   } = useApp();
 
   const currentLangInfo = LANGUAGES[currentLanguage];
@@ -397,8 +398,8 @@ export const VocabularyManager: React.FC = () => {
 
         const matchRetention =
           selectedRetentionLevel === 'ALL' ||
-          (selectedRetentionLevel === 'today_only' && w.is_added_today_flashcard) ||
-          (selectedRetentionLevel !== 'today_only' && (w.retention_level || 'chua_thuoc') === selectedRetentionLevel);
+          (selectedRetentionLevel === 'today_only' && Boolean(w.is_added_today_flashcard || w.is_starred)) ||
+          (selectedRetentionLevel !== 'today_only' && (w.retention_level || 'chua_danh_gia') === selectedRetentionLevel);
 
         if (!matchTopic || !matchLesson || !matchLevel || !matchSrs || !matchRetention) return null;
 
@@ -725,7 +726,8 @@ export const VocabularyManager: React.FC = () => {
               className="w-full py-2 px-3 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono font-bold text-[#1A1A1A] focus:outline-none focus:bg-white"
             >
               <option value="ALL">MỨC ĐỘ GHI NHỚ (TẤT CẢ)</option>
-              <option value="today_only">⭐ ĐÃ THÊM FLASHCARD HÔM NAY</option>
+              <option value="today_only">⭐ ĐÃ ĐÁNH SAO / FLASHCARD HÔM NAY</option>
+              <option value="chua_danh_gia">⚪ CHƯA ĐÁNH GIÁ (CHƯA CHƠI)</option>
               <option value="chua_thuoc">🔴 1. CHƯA THUỘC</option>
               <option value="quen">🟠 2. QUÊN</option>
               <option value="hoi_nho">🔵 3. HƠI NHỚ</option>
@@ -861,6 +863,21 @@ export const VocabularyManager: React.FC = () => {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
+            {/* Reset All to Unrated Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Bạn có chắc muốn đặt lại tất cả ${currentLangVocabulary.length} từ vựng của ${currentLangInfo.name} về trạng thái "Chưa đánh giá" để bắt đầu theo dõi tiến độ mới?`)) {
+                  resetAllRetentionToUnrated(currentLanguage);
+                  alert(`Đã chuyển toàn bộ từ vựng ${currentLangInfo.name} sang trạng thái "Chưa đánh giá"!`);
+                }
+              }}
+              className="px-2.5 py-1.5 border border-stone-400 bg-white hover:bg-stone-100 text-stone-800 text-[10px] font-mono font-bold uppercase transition flex items-center gap-1"
+              title="Đặt toàn bộ từ vựng của ngôn ngữ này về trạng thái Chưa đánh giá"
+            >
+              <span>⚪ GÁN TẤT CẢ VỀ CHƯA ĐÁNH GIÁ</span>
+            </button>
+
             {/* Flashcard Quick Launch Button for Filtered Words */}
             <button
               type="button"
@@ -1026,7 +1043,7 @@ export const VocabularyManager: React.FC = () => {
                     </td>
                     <td className="p-3.5 font-mono text-xs">
                       <select
-                        value={word.retention_level || 'chua_thuoc'}
+                        value={word.retention_level || 'chua_danh_gia'}
                         onChange={(e) => updateRetentionLevel(word.word_id, e.target.value as any)}
                         className={`px-2 py-1 border text-[11px] font-mono font-bold uppercase cursor-pointer ${
                           word.retention_level === 'nho'
@@ -1035,9 +1052,12 @@ export const VocabularyManager: React.FC = () => {
                             ? 'bg-indigo-50 text-indigo-900 border-indigo-400'
                             : word.retention_level === 'quen'
                             ? 'bg-amber-50 text-amber-900 border-amber-400'
-                            : 'bg-rose-50 text-rose-900 border-rose-400'
+                            : word.retention_level === 'chua_thuoc'
+                            ? 'bg-rose-50 text-rose-900 border-rose-400'
+                            : 'bg-stone-100 text-stone-700 border-stone-300'
                         }`}
                       >
+                        <option value="chua_danh_gia">⚪ Chưa đánh giá</option>
                         <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
                         <option value="quen">🟠 2. Quên</option>
                         <option value="hoi_nho">🔵 3. Hơi nhớ</option>
@@ -1049,12 +1069,13 @@ export const VocabularyManager: React.FC = () => {
                         type="button"
                         onClick={() => toggleTodayFlashcard(word.word_id)}
                         className={`px-2.5 py-1 border text-[10px] font-mono font-bold uppercase transition flex items-center gap-1 ${
-                          word.is_added_today_flashcard
+                          (word.is_added_today_flashcard || word.is_starred)
                             ? 'bg-amber-400 text-amber-950 border-amber-600'
                             : 'bg-stone-50 text-stone-600 border-stone-300 hover:border-[#1A1A1A]'
                         }`}
+                        title={(word.is_added_today_flashcard || word.is_starred) ? 'Đã đánh dấu sao / Thêm vào Flashcard Hôm Nay' : 'Đánh dấu sao thêm vào Flashcard Hôm Nay'}
                       >
-                        <span>{word.is_added_today_flashcard ? '★ Đã thêm' : '☆ + Flashcard'}</span>
+                        <span>{(word.is_added_today_flashcard || word.is_starred) ? '★ Đã đánh sao' : '☆ Đánh sao'}</span>
                       </button>
                     </td>
                     <td className="p-3.5 font-mono text-xs text-stone-700 uppercase">{word.chu_de}</td>
@@ -1121,13 +1142,13 @@ export const VocabularyManager: React.FC = () => {
                         type="button"
                         onClick={() => toggleTodayFlashcard(word.word_id)}
                         className={`px-2 py-0.5 border text-[9px] font-mono font-bold uppercase transition flex items-center gap-1 ${
-                          word.is_added_today_flashcard
+                          (word.is_added_today_flashcard || word.is_starred)
                             ? 'bg-amber-400 text-amber-950 border-amber-600'
                             : 'bg-stone-50 text-stone-600 border-stone-300 hover:border-[#1A1A1A]'
                         }`}
-                        title={word.is_added_today_flashcard ? 'Đã trong Flashcard Hôm Nay (Nhấn để hủy)' : 'Thêm vào Flashcard Hôm Nay'}
+                        title={(word.is_added_today_flashcard || word.is_starred) ? 'Đã đánh dấu sao / Flashcard Hôm Nay (Nhấn để hủy)' : 'Đánh dấu sao thêm vào Flashcard Hôm Nay'}
                       >
-                        <span>{word.is_added_today_flashcard ? '★ Flashcard' : '☆ Flashcard'}</span>
+                        <span>{(word.is_added_today_flashcard || word.is_starred) ? '★ Đã đánh sao' : '☆ Đánh sao'}</span>
                       </button>
                       {duplicateWordSet.has(word.tu.trim().toLowerCase()) && (
                         <span className="px-1.5 py-0.5 bg-rose-100 text-rose-900 border border-rose-800 text-[9px] font-mono font-bold">
@@ -1211,7 +1232,7 @@ export const VocabularyManager: React.FC = () => {
                 <div className="mt-5 pt-3 border-t border-[#1A1A1A] flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
                   <div className="flex items-center gap-1.5">
                     <select
-                      value={word.retention_level || 'chua_thuoc'}
+                      value={word.retention_level || 'chua_danh_gia'}
                       onChange={(e) => updateRetentionLevel(word.word_id, e.target.value as any)}
                       className={`px-1.5 py-0.5 border text-[10px] font-mono font-bold uppercase cursor-pointer ${
                         word.retention_level === 'nho'
@@ -1220,9 +1241,12 @@ export const VocabularyManager: React.FC = () => {
                           ? 'bg-indigo-50 text-indigo-900 border-indigo-400'
                           : word.retention_level === 'quen'
                           ? 'bg-amber-50 text-amber-900 border-amber-400'
-                          : 'bg-rose-50 text-rose-900 border-rose-400'
+                          : word.retention_level === 'chua_thuoc'
+                          ? 'bg-rose-50 text-rose-900 border-rose-400'
+                          : 'bg-stone-100 text-stone-700 border-stone-300'
                       }`}
                     >
+                      <option value="chua_danh_gia">⚪ Chưa đánh giá</option>
                       <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
                       <option value="quen">🟠 2. Quên</option>
                       <option value="hoi_nho">🔵 3. Hơi nhớ</option>

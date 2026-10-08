@@ -20,6 +20,7 @@ import {
   ArrowLeftRight,
   HelpCircle,
   Eye,
+  Star,
 } from 'lucide-react';
 
 export type FlashcardDirectionMode = 'random_alternate' | 'term_to_meaning' | 'meaning_to_term';
@@ -28,6 +29,8 @@ export type CardDirection = 'term_to_meaning' | 'meaning_to_term';
 interface FlashcardGameProps {
   words: VocabularyItem[];
   language: LanguageCode;
+  initialRetentionFilter?: string;
+  initialWords?: VocabularyItem[];
   onFinish: (correctCount: number, totalCount: number, score: number) => void;
   onRecordSRS: (wordId: string, rating: RecallQuality) => void;
   onExit: () => void;
@@ -36,6 +39,8 @@ interface FlashcardGameProps {
 export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   words,
   language,
+  initialRetentionFilter,
+  initialWords,
   onFinish,
   onRecordSRS,
   onExit,
@@ -49,7 +54,9 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const [selectedContext, setSelectedContext] = useState<string>('ALL');
   const [selectedLevel, setSelectedLevel] = useState<string>('ALL');
   const [selectedSrsStatus, setSelectedSrsStatus] = useState<string>('ALL');
-  const [selectedRetentionLevel, setSelectedRetentionLevel] = useState<string>('ALL');
+  const [selectedRetentionLevel, setSelectedRetentionLevel] = useState<string>(
+    initialRetentionFilter || 'ALL'
+  );
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   
   const [showFilterBar, setShowFilterBar] = useState<boolean>(false);
@@ -59,32 +66,36 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const availablePos = useMemo(() => Array.from(new Set(words.map((w) => w.loai_tu || 'Khác'))).filter(Boolean), [words]);
   const availableContexts = useMemo(() => Array.from(new Set(words.map((w) => w.chu_de || 'Tổng hợp'))).filter(Boolean), [words]);
   const availableLevels = useMemo(() => Array.from(new Set(words.map((w) => w.cap_do || 'Cơ bản'))).filter(Boolean), [words]);
+  const starredTodayCount = useMemo(() => words.filter((w) => Boolean(w.is_added_today_flashcard || (w as any).is_starred)).length, [words]);
 
   // Candidate words matching current filter criteria
   const candidateWords = useMemo(() => {
     let list = words.filter((w) => {
-      if (selectedPos !== 'ALL' && w.loai_tu !== selectedPos) return false;
-      if (selectedContext !== 'ALL' && w.chu_de !== selectedContext) return false;
-      if (selectedLevel !== 'ALL' && w.cap_do !== selectedLevel) return false;
-
       if (selectedRetentionLevel === 'today_flashcard') {
-        if (!w.is_added_today_flashcard) return false;
-      } else if (selectedRetentionLevel !== 'ALL') {
-        const retLevel = w.retention_level || 'chua_thuoc';
-        if (retLevel !== selectedRetentionLevel) return false;
-      }
+        const isToday = Boolean(w.is_added_today_flashcard || (w as any).is_starred);
+        if (!isToday) return false;
+      } else {
+        if (selectedPos !== 'ALL' && w.loai_tu !== selectedPos) return false;
+        if (selectedContext !== 'ALL' && w.chu_de !== selectedContext) return false;
+        if (selectedLevel !== 'ALL' && w.cap_do !== selectedLevel) return false;
 
-      if (selectedSrsStatus === 'due') {
-        const now = new Date();
-        const isDue = !w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0;
-        if (!isDue) return false;
-      } else if (selectedSrsStatus === 'new') {
-        if (w.srs_box !== 0 && w.times_reviewed) return false;
-      } else if (selectedSrsStatus === 'difficult') {
-        const isDifficult = (w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1;
-        if (!isDifficult) return false;
-      } else if (selectedSrsStatus === 'mastered') {
-        if ((w.srs_box || 0) < 4) return false;
+        if (selectedRetentionLevel !== 'ALL') {
+          const retLevel = w.retention_level || 'chua_danh_gia';
+          if (retLevel !== selectedRetentionLevel) return false;
+        }
+
+        if (selectedSrsStatus === 'due') {
+          const now = new Date();
+          const isDue = !w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0;
+          if (!isDue) return false;
+        } else if (selectedSrsStatus === 'new') {
+          if (w.srs_box !== 0 && w.times_reviewed) return false;
+        } else if (selectedSrsStatus === 'difficult') {
+          const isDifficult = (w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1;
+          if (!isDifficult) return false;
+        } else if (selectedSrsStatus === 'mastered') {
+          if ((w.srs_box || 0) < 4) return false;
+        }
       }
 
       if (searchKeyword.trim()) {
@@ -114,22 +125,32 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
       list = list.slice(0, lim);
     }
     return list;
-  }, [words, selectedPos, selectedContext, selectedLevel, selectedSrsStatus, searchKeyword, selectedLimit]);
+  }, [words, selectedPos, selectedContext, selectedLevel, selectedRetentionLevel, selectedSrsStatus, searchKeyword, selectedLimit]);
 
   // Pending selected word IDs for checkbox selection inside drawer
   const [pendingWordIds, setPendingWordIds] = useState<Set<string>>(() => {
+    if (initialWords && initialWords.length > 0) {
+      return new Set(initialWords.map((w) => w.word_id));
+    }
+    if (initialRetentionFilter === 'today_flashcard') {
+      const todayWords = words.filter((w) => Boolean(w.is_added_today_flashcard || (w as any).is_starred));
+      if (todayWords.length > 0) return new Set(todayWords.map((w) => w.word_id));
+    }
     return new Set(words.map((w) => w.word_id));
   });
 
-  // Keep pendingWordIds synced when candidateWords change if user hasn't manually customized
+  // Keep pendingWordIds synced when candidateWords change
   useEffect(() => {
-    if (candidateWords.length > 0) {
-      setPendingWordIds(new Set(candidateWords.map((w) => w.word_id)));
-    }
+    setPendingWordIds(new Set(candidateWords.map((w) => w.word_id)));
   }, [candidateWords]);
 
   // Applied words array currently rendered in the Flashcard deck
   const [activeWords, setActiveWords] = useState<VocabularyItem[]>(() => {
+    if (initialWords && initialWords.length > 0) return initialWords;
+    if (initialRetentionFilter === 'today_flashcard') {
+      const todayWords = words.filter((w) => Boolean(w.is_added_today_flashcard || (w as any).is_starred));
+      if (todayWords.length > 0) return todayWords;
+    }
     return words.length > 0 ? words : [];
   });
 
@@ -279,14 +300,19 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const handleApplySelectionAndReload = () => {
     let finalChosen = candidateWords.filter((w) => pendingWordIds.has(w.word_id));
     
-    // Fallback if none checked: use candidateWords or entire words list
+    // Fallback if none checked: use candidateWords
     if (finalChosen.length === 0) {
       if (candidateWords.length > 0) {
         finalChosen = candidateWords;
         setPendingWordIds(new Set(candidateWords.map((w) => w.word_id)));
       } else {
-        finalChosen = words;
-        setPendingWordIds(new Set(words.map((w) => w.word_id)));
+        if (selectedRetentionLevel === 'today_flashcard') {
+          setReloadNotice('⚠️ Chưa có từ nào được đánh dấu sao hoặc thêm vào Flashcard Hôm Nay! Hãy bấm [★ Đánh sao] ở Sổ Từ Vựng hoặc Tra Từ Điển.');
+        } else {
+          setReloadNotice('⚠️ Không tìm thấy từ nào phù hợp với bộ lọc đã chọn! Vui lòng chọn lại.');
+        }
+        setTimeout(() => setReloadNotice(null), 5000);
+        return;
       }
     }
 
@@ -319,11 +345,23 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   };
 
   if (!activeWords || activeWords.length === 0) {
+    const isTodayFilter = selectedRetentionLevel === 'today_flashcard';
     return (
       <div className="p-8 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-4 max-w-md mx-auto my-8">
-        <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">Không tìm thấy từ vựng nào</h3>
-        <p className="text-xs font-mono text-stone-500">Vui lòng chọn hoặc đặt lại bộ lọc để tải thẻ flashcard.</p>
-        <div className="flex gap-2 justify-center pt-2">
+        <div className={`w-14 h-14 border-2 border-[#1A1A1A] flex items-center justify-center mx-auto text-2xl ${
+          isTodayFilter ? 'bg-amber-100 text-amber-800 border-amber-600' : 'bg-[#F9F7F2] text-[#1A1A1A]'
+        }`}>
+          {isTodayFilter ? '⭐' : '🎴'}
+        </div>
+        <h3 className="font-serif font-bold text-lg text-[#1A1A1A]">
+          {isTodayFilter ? 'Chưa có từ nào trong Thẻ Flashcard Hôm Nay' : 'Không tìm thấy từ vựng nào'}
+        </h3>
+        <p className="text-xs font-mono text-stone-600 leading-relaxed">
+          {isTodayFilter
+            ? 'Bạn chưa đánh dấu sao cho từ vựng nào hôm nay. Hãy vào Sổ Từ Vựng hoặc mục Tra Từ Điển, nhấn nút [★ Đánh sao] ở các từ cần ôn tập để đưa vào danh sách này!'
+            : 'Vui lòng chọn hoặc đặt lại bộ lọc để tải thẻ flashcard.'}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
           <button
             onClick={() => {
               setSelectedLimit('ALL');
@@ -331,6 +369,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               setSelectedContext('ALL');
               setSelectedLevel('ALL');
               setSelectedSrsStatus('ALL');
+              setSelectedRetentionLevel('ALL');
               setSearchKeyword('');
               const allIds = new Set(words.map((w) => w.word_id));
               setPendingWordIds(allIds);
@@ -338,10 +377,10 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               setCurrentIndex(0);
               setIsCompleted(false);
             }}
-            className="px-4 py-2 border border-[#1A1A1A] bg-stone-100 hover:bg-[#1A1A1A] hover:text-white text-[#1A1A1A] text-xs font-mono uppercase font-bold transition flex items-center gap-1.5"
+            className="px-4 py-2 border border-[#1A1A1A] bg-amber-400 hover:bg-amber-500 text-amber-950 text-xs font-mono uppercase font-bold transition flex items-center justify-center gap-1.5"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>ĐẶT LẠI TẤT CẢ BỘ LỌC</span>
+            <span>NẠP TẤT CẢ TỪ VỰNG ({words.length})</span>
           </button>
           <button
             onClick={onExit}
@@ -459,7 +498,43 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
           <span>THOÁT RA</span>
         </button>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Quick Starred Today Flashcard Button */}
+          <button
+            onClick={() => {
+              const todayWords = words.filter((w) => Boolean(w.is_added_today_flashcard || (w as any).is_starred));
+              if (todayWords.length === 0) {
+                setReloadNotice('⚠️ Chưa có từ nào được đánh dấu sao hoặc thêm vào Flashcard Hôm Nay! Hãy bấm [★ Đánh sao] ở Sổ Từ Vựng hoặc Tra Từ Điển.');
+                setTimeout(() => setReloadNotice(null), 5000);
+                return;
+              }
+              setSelectedRetentionLevel('today_flashcard');
+              setActiveWords(todayWords);
+              setPendingWordIds(new Set(todayWords.map((w) => w.word_id)));
+              setCurrentIndex(0);
+              setIsFlipped(false);
+              setSessionResults([]);
+              setIsCompleted(false);
+              setReloadNotice(`★ Đã nạp thành công ${todayWords.length} thẻ Flashcard đã đánh dấu sao hôm nay!`);
+              setTimeout(() => setReloadNotice(null), 4000);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 border-2 text-xs font-mono uppercase font-bold transition editorial-shadow-sm ${
+              selectedRetentionLevel === 'today_flashcard'
+                ? 'bg-amber-400 text-amber-950 border-amber-800'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-[#1A1A1A]'
+            }`}
+            title="Nạp ngay các từ đã đánh dấu sao vào Flashcard hôm nay"
+          >
+            <Star
+              className={`w-3.5 h-3.5 ${
+                selectedRetentionLevel === 'today_flashcard'
+                  ? 'fill-amber-950 text-amber-950'
+                  : 'fill-amber-500 text-amber-600'
+              }`}
+            />
+            <span>Thẻ Đã Đánh Sao ({starredTodayCount})</span>
+          </button>
+
           <button
             onClick={() => setShowFilterBar(!showFilterBar)}
             className={`flex items-center gap-1.5 px-3 py-1.5 border-2 text-xs font-mono uppercase font-bold transition editorial-shadow-sm ${
@@ -587,7 +662,8 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                 className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white font-bold"
               >
                 <option value="ALL">Tất cả cấp độ</option>
-                <option value="today_flashcard">⭐ Thẻ Flashcard Hôm Nay</option>
+                <option value="today_flashcard">⭐ Thẻ Flashcard Hôm Nay (Đã đánh sao)</option>
+                <option value="chua_danh_gia">⚪ Chưa đánh giá (Chưa chơi)</option>
                 <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
                 <option value="quen">🟠 2. Quên</option>
                 <option value="hoi_nho">🔵 3. Hơi nhớ</option>
@@ -740,8 +816,17 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
           {/* Checkbox Table / Grid List of Candidate Words */}
           <div className="max-h-56 overflow-y-auto border border-[#1A1A1A] bg-[#F9F7F2] p-2 space-y-1 divide-y divide-stone-200 text-xs font-mono">
             {candidateWords.length === 0 ? (
-              <div className="p-4 text-center text-stone-500 font-serif italic">
-                Không tìm thấy từ vựng khớp với bộ lọc hiện tại. Vui lòng thay đổi các tùy chọn lọc ở trên.
+              <div className="p-6 text-center text-stone-600 font-mono text-xs space-y-1">
+                {selectedRetentionLevel === 'today_flashcard' ? (
+                  <>
+                    <p className="font-bold text-amber-900 text-sm">⭐ Chưa có từ nào được đánh dấu sao hoặc thêm vào Flashcard Hôm Nay!</p>
+                    <p className="text-stone-500 text-[11px]">
+                      Bạn hãy vào <strong>Sổ Từ Vựng</strong> hoặc <strong>Tra Từ Điển</strong>, nhấn nút <strong>[★ Đánh sao]</strong> cạnh từ cần ôn để thêm vào đây.
+                    </p>
+                  </>
+                ) : (
+                  <p className="font-serif italic">Không tìm thấy từ vựng khớp với bộ lọc hiện tại. Vui lòng thay đổi các tùy chọn lọc ở trên.</p>
+                )}
               </div>
             ) : (
               candidateWords.map((word) => {
@@ -774,6 +859,34 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {(word.is_added_today_flashcard || (word as any).is_starred) && (
+                        <span className="px-1.5 py-0.5 bg-amber-200 text-amber-950 border border-amber-500 text-[9px] font-bold">
+                          ★ Đã đánh sao
+                        </span>
+                      )}
+                      <span
+                        className={`px-1.5 py-0.5 border text-[9px] font-bold uppercase ${
+                          word.retention_level === 'nho'
+                            ? 'bg-emerald-50 text-emerald-900 border-emerald-400'
+                            : word.retention_level === 'hoi_nho'
+                            ? 'bg-indigo-50 text-indigo-900 border-indigo-400'
+                            : word.retention_level === 'quen'
+                            ? 'bg-amber-50 text-amber-900 border-amber-400'
+                            : word.retention_level === 'chua_thuoc'
+                            ? 'bg-rose-50 text-rose-900 border-rose-400'
+                            : 'bg-stone-100 text-stone-700 border-stone-300'
+                        }`}
+                      >
+                        {word.retention_level === 'nho'
+                          ? '🟢 Nhớ'
+                          : word.retention_level === 'hoi_nho'
+                          ? '🔵 Hơi nhớ'
+                          : word.retention_level === 'quen'
+                          ? '🟠 Quên'
+                          : word.retention_level === 'chua_thuoc'
+                          ? '🔴 Chưa thuộc'
+                          : '⚪ Chưa đánh giá'}
+                      </span>
                       <span className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 text-[9px] uppercase">
                         {word.loai_tu || 'Từ vựng'}
                       </span>
@@ -871,7 +984,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
         >
           {/* Top metadata */}
           <div className="flex items-center justify-between border-b border-[#1A1A1A]/15 pb-3">
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span
                 className={`px-2 py-0.5 border text-[9px] font-mono font-bold uppercase ${
                   currentDirection === 'meaning_to_term'
@@ -883,6 +996,38 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                   ? '💡 NHÌN NGHĨA → ĐOÁN TỪ'
                   : '🔤 NHÌN TỪ → ĐOÁN NGHĨA'}
               </span>
+
+              {/* Retention Level Badge */}
+              <span
+                className={`px-2 py-0.5 border text-[9px] font-mono font-bold uppercase ${
+                  currentWord.retention_level === 'nho'
+                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
+                    : currentWord.retention_level === 'hoi_nho'
+                    ? 'bg-indigo-100 text-indigo-900 border-indigo-400'
+                    : currentWord.retention_level === 'quen'
+                    ? 'bg-amber-100 text-amber-900 border-amber-400'
+                    : currentWord.retention_level === 'chua_thuoc'
+                    ? 'bg-rose-100 text-rose-900 border-rose-400'
+                    : 'bg-stone-100 text-stone-700 border-stone-300'
+                }`}
+              >
+                {currentWord.retention_level === 'nho'
+                  ? '🟢 Nhớ'
+                  : currentWord.retention_level === 'hoi_nho'
+                  ? '🔵 Hơi nhớ'
+                  : currentWord.retention_level === 'quen'
+                  ? '🟠 Quên'
+                  : currentWord.retention_level === 'chua_thuoc'
+                  ? '🔴 Chưa thuộc'
+                  : '⚪ Chưa đánh giá'}
+              </span>
+
+              {(currentWord.is_added_today_flashcard || (currentWord as any).is_starred) && (
+                <span className="px-1.5 py-0.5 bg-amber-300 text-amber-950 border border-amber-600 text-[9px] font-mono font-bold">
+                  ★ Đã đánh sao
+                </span>
+              )}
+
               <span className="px-2 py-0.5 bg-[#F9F7F2] border border-stone-300 text-[9px] font-mono uppercase text-stone-700">
                 {currentWord.loai_tu || 'Từ vựng'} • {currentWord.cap_do || 'Cơ bản'}
               </span>

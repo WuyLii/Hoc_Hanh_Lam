@@ -176,6 +176,24 @@ export const DictionaryView: React.FC = () => {
     e.stopPropagation();
     const updated = toggleStarHistoryItem(id);
     setHistory(updated);
+    const item = updated.find((h) => h.id === id);
+    if (item) {
+      toggleTodayFlashcard({
+        tu: item.word,
+        nghia: item.meaning,
+        ngon_ngu: item.language || currentLanguage,
+        chu_de: 'Từ điển tra cứu',
+        nguon_goc: 'Đại từ điển v3.0',
+        retention_level: 'chua_danh_gia',
+        is_added_today_flashcard: Boolean(item.isStarred),
+        is_starred: Boolean(item.isStarred),
+      });
+      if (item.isStarred) {
+        showToast(`★ Đã đánh sao từ "${item.word}" và thêm vào Flashcard Hôm Nay!`);
+      } else {
+        showToast(`☆ Đã bỏ đánh sao từ "${item.word}" khỏi Flashcard Hôm Nay.`);
+      }
+    }
   };
 
   const handleRemoveHistory = (id: string, e: React.MouseEvent) => {
@@ -572,17 +590,23 @@ export const DictionaryView: React.FC = () => {
                   <button
                     onClick={handleToggleTodayFlashcardAction}
                     className={`flex items-center gap-1.5 px-3.5 py-2 border-2 border-[#1A1A1A] text-xs font-mono font-bold uppercase transition editorial-shadow-sm ${
-                      isAlreadyInVocab?.is_added_today_flashcard
+                      (isAlreadyInVocab?.is_added_today_flashcard || isAlreadyInVocab?.is_starred)
                         ? 'bg-amber-400 text-amber-950 border-amber-800'
                         : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-[#1A1A1A]'
                     }`}
-                    title="Thêm từ này vào danh sách Flashcard Ôn Tập Hôm Nay"
+                    title="Đánh dấu sao và thêm từ này vào danh sách Flashcard Hôm Nay"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                    <Star
+                      className={`w-3.5 h-3.5 ${
+                        (isAlreadyInVocab?.is_added_today_flashcard || isAlreadyInVocab?.is_starred)
+                          ? 'fill-amber-950 text-amber-950'
+                          : 'text-amber-700'
+                      }`}
+                    />
                     <span>
-                      {isAlreadyInVocab?.is_added_today_flashcard
-                        ? '★ ĐÃ THÊM FLASHCARD HÔM NAY'
-                        : '+ THÊM VÀO FLASHCARD HÔM NAY'}
+                      {(isAlreadyInVocab?.is_added_today_flashcard || isAlreadyInVocab?.is_starred)
+                        ? '★ ĐÃ ĐÁNH SAO (FLASHCARD HÔM NAY)'
+                        : '☆ ĐÁNH SAO / FLASHCARD HÔM NAY'}
                     </span>
                   </button>
 

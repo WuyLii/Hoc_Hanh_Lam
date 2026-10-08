@@ -37,7 +37,7 @@ export const GameReviewHub: React.FC = () => {
   const [activeTopicFilter, setActiveTopicFilter] = useState<string>('ALL');
   const [activePosFilter, setActivePosFilter] = useState<string>('ALL');
   const [activeLimitFilter, setActiveLimitFilter] = useState<string>('ALL');
-  const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'due' | 'difficult'>('due');
+  const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'due' | 'difficult' | 'today_flashcard'>('all');
 
   const [shuffleKey, setShuffleKey] = useState<number>(0);
 
@@ -59,7 +59,9 @@ export const GameReviewHub: React.FC = () => {
       return false;
     }
 
-    if (activeStatusFilter === 'due') {
+    if (activeStatusFilter === 'today_flashcard') {
+      return Boolean(w.is_added_today_flashcard || (w as any).is_starred);
+    } else if (activeStatusFilter === 'due') {
       const now = new Date();
       return !w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0;
     } else if (activeStatusFilter === 'difficult') {
@@ -69,7 +71,9 @@ export const GameReviewHub: React.FC = () => {
     return true;
   });
 
-  const filteredPool = reviewWords.length > 0 ? reviewWords : currentLangVocabulary;
+  const filteredPool = activeStatusFilter === 'today_flashcard'
+    ? reviewWords
+    : (reviewWords.length > 0 ? reviewWords : currentLangVocabulary);
   
   // Dynamic random shuffle every time filters change or user clicks shuffle
   const finalWordsToPlay = React.useMemo(() => {
@@ -86,7 +90,7 @@ export const GameReviewHub: React.FC = () => {
   React.useEffect(() => {
     if (selectedGameMode) {
       if (!sessionWords || sessionWords.length === 0) {
-        setSessionWords(finalWordsToPlay.length > 0 ? finalWordsToPlay : currentLangVocabulary);
+        setSessionWords(finalWordsToPlay.length > 0 ? finalWordsToPlay : (activeStatusFilter === 'today_flashcard' ? [] : currentLangVocabulary));
       }
     } else {
       if (sessionWords) {
@@ -191,7 +195,9 @@ export const GameReviewHub: React.FC = () => {
       case 'flashcard':
         return (
           <FlashcardGame
-            words={activeWordsForGame}
+            words={currentLangVocabulary}
+            initialWords={activeStatusFilter === 'today_flashcard' ? reviewWords : undefined}
+            initialRetentionFilter={activeStatusFilter === 'today_flashcard' ? 'today_flashcard' : undefined}
             language={currentLanguage}
             onFinish={handleFinishGame}
             onRecordSRS={recordSRSRating}
@@ -331,9 +337,10 @@ export const GameReviewHub: React.FC = () => {
               onChange={(e: any) => setActiveStatusFilter(e.target.value)}
               className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
             >
-              <option value="due">Cần ôn hôm nay</option>
-              <option value="difficult">Từ khó nhớ</option>
+              <option value="today_flashcard">⭐ Thẻ Hôm Nay (Đã đánh sao)</option>
               <option value="all">Toàn bộ kho từ</option>
+              <option value="due">Cần ôn hôm nay (SRS)</option>
+              <option value="difficult">Từ khó nhớ</option>
             </select>
           </div>
 
@@ -414,6 +421,20 @@ export const GameReviewHub: React.FC = () => {
             </select>
           </div>
         </div>
+
+        {activeStatusFilter === 'today_flashcard' && (
+          <div className={`mt-3 p-3 border text-xs font-mono flex items-center justify-between ${
+            reviewWords.length === 0
+              ? 'bg-amber-50 border-amber-300 text-amber-900'
+              : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+          }`}>
+            <span>
+              {reviewWords.length === 0
+                ? `⚠️ Chưa có từ nào được đánh dấu sao hôm nay trong kho từ vựng ${currentLangInfo.name}! Hãy vào mục Tra Từ Điển hoặc Sổ Từ Vựng, bấm biểu tượng [★ Đánh sao] ở các từ cần học để nạp vào đây.`
+                : `⭐ Đang lọc ${reviewWords.length} thẻ Flashcard đã đánh dấu sao hôm nay. Chọn chế độ bất kỳ bên dưới để ôn tập ngay!`}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 8 Game Mode Grid Cards */}
