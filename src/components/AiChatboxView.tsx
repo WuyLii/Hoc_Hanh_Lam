@@ -27,6 +27,7 @@ export const AiChatboxView: React.FC = () => {
     currentUser,
     currentLanguage,
     addVocabulary,
+    toggleTodayFlashcard,
     chatHistory,
     saveChatConversation,
     deleteChatConversation,
@@ -199,7 +200,7 @@ export const AiChatboxView: React.FC = () => {
   };
 
   const handleSaveSuggestedWord = (item: { word: string; meaning: string; phonetic?: string; nghia_tieng_han?: string; nghia_tieng_anh?: string }) => {
-    addVocabulary({
+    toggleTodayFlashcard({
       tu: item.word,
       nghia: item.meaning,
       phien_am: item.phonetic || '',
@@ -209,6 +210,9 @@ export const AiChatboxView: React.FC = () => {
       cap_do: 'Gia sư AI',
       chu_de: 'Tư vấn AI',
       ngon_ngu: currentLanguage,
+      is_added_today_flashcard: true,
+      added_to_today_flashcard_at: new Date().toISOString(),
+      retention_level: 'chua_thuoc',
     });
     setSavedWordsMap((prev) => ({ ...prev, [item.word]: true }));
   };

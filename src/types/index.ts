@@ -64,6 +64,8 @@ export interface UserProfile {
   total_points: number;
 }
 
+export type VocabularyRetentionLevel = 'chua_thuoc' | 'quen' | 'hoi_nho' | 'nho';
+
 export interface VocabularyItem {
   word_id: string;
   tu: string;
@@ -82,6 +84,11 @@ export interface VocabularyItem {
   cap_do: string;
   bai_hoc?: string; // Phân loại theo Bài (vd: "Bài 1", "Bài 2: Gia đình", v.v.)
   nguon_goc?: string; // Sách, Phim, Hội thoại, Nhạc, Báo chí...
+  // Cấp độ đánh giá ghi nhớ: 'chua_thuoc' | 'quen' | 'hoi_nho' | 'nho'
+  retention_level?: VocabularyRetentionLevel;
+  // Ôn tập Flashcard Hôm Nay
+  is_added_today_flashcard?: boolean;
+  added_to_today_flashcard_at?: string;
   // SRS properties
   srs_box: number; // 0: new, 1..5: learned levels
   srs_next_review: string; // ISO date string

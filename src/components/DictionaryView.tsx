@@ -71,7 +71,7 @@ const SUGGESTED_WORDS: Record<LanguageCode, { word: string; meaning: string }[]>
 };
 
 export const DictionaryView: React.FC = () => {
-  const { currentUser, currentLanguage, setCurrentLanguage, currentLangVocabulary, addVocabulary, setActiveNav } = useApp();
+  const { currentUser, currentLanguage, setCurrentLanguage, currentLangVocabulary, addVocabulary, toggleTodayFlashcard, setActiveNav } = useApp();
   const currentLangInfo = LANGUAGES[currentLanguage];
 
   const [query, setQuery] = useState('');
@@ -221,6 +221,34 @@ export const DictionaryView: React.FC = () => {
 
     addVocabulary(newVocab);
     showToast(`✅ Đã lưu từ "${result.word}" vào kho từ vựng và kích hoạt chu trình SRS!`);
+  };
+
+  const handleToggleTodayFlashcardAction = () => {
+    if (!result || !result.word) return;
+    const firstExample = result.examples && result.examples.length > 0 ? result.examples[0] : null;
+
+    const resItem = toggleTodayFlashcard({
+      word_id: isAlreadyInVocab?.word_id,
+      tu: result.word,
+      nghia: result.primaryMeaning || '',
+      phien_am: result.phonetic || '',
+      loai_tu: result.partOfSpeech || 'Từ vựng',
+      vi_du: firstExample ? firstExample.sentence : '',
+      vi_du_dich: firstExample ? firstExample.translation : '',
+      nghia_tieng_han: result.koreanMeaning || (currentLanguage === 'ko' ? result.hanVietOrRoot : '') || '',
+      nghia_tieng_anh: result.englishMeaning || '',
+      phien_am_tieng_han: currentLanguage === 'ko' ? result.hanVietOrRoot : '',
+      cap_do: result.level || 'Cơ bản',
+      chu_de: 'Từ điển tra cứu',
+      ngon_ngu: currentLanguage,
+      nguon_goc: 'Đại từ điển v3.0',
+    });
+
+    if (resItem?.is_added_today_flashcard) {
+      showToast(`★ Đã thêm từ "${result.word}" vào Flashcard Ôn Tập Hôm Nay & CSDL!`);
+    } else {
+      showToast(`☆ Đã bỏ từ "${result.word}" khỏi danh sách Flashcard Hôm Nay.`);
+    }
   };
 
   const handleCopyResult = () => {
@@ -541,6 +569,23 @@ export const DictionaryView: React.FC = () => {
 
                 {/* Top Action Buttons */}
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleToggleTodayFlashcardAction}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 border-2 border-[#1A1A1A] text-xs font-mono font-bold uppercase transition editorial-shadow-sm ${
+                      isAlreadyInVocab?.is_added_today_flashcard
+                        ? 'bg-amber-400 text-amber-950 border-amber-800'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-[#1A1A1A]'
+                    }`}
+                    title="Thêm từ này vào danh sách Flashcard Ôn Tập Hôm Nay"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                    <span>
+                      {isAlreadyInVocab?.is_added_today_flashcard
+                        ? '★ ĐÃ THÊM FLASHCARD HÔM NAY'
+                        : '+ THÊM VÀO FLASHCARD HÔM NAY'}
+                    </span>
+                  </button>
+
                   <button
                     onClick={handleSaveToVocabulary}
                     className={`flex items-center gap-1.5 px-3.5 py-2 border border-[#1A1A1A] text-xs font-mono font-bold uppercase transition ${

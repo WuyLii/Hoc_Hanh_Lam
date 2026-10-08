@@ -49,6 +49,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const [selectedContext, setSelectedContext] = useState<string>('ALL');
   const [selectedLevel, setSelectedLevel] = useState<string>('ALL');
   const [selectedSrsStatus, setSelectedSrsStatus] = useState<string>('ALL');
+  const [selectedRetentionLevel, setSelectedRetentionLevel] = useState<string>('ALL');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   
   const [showFilterBar, setShowFilterBar] = useState<boolean>(false);
@@ -65,6 +66,13 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
       if (selectedPos !== 'ALL' && w.loai_tu !== selectedPos) return false;
       if (selectedContext !== 'ALL' && w.chu_de !== selectedContext) return false;
       if (selectedLevel !== 'ALL' && w.cap_do !== selectedLevel) return false;
+
+      if (selectedRetentionLevel === 'today_flashcard') {
+        if (!w.is_added_today_flashcard) return false;
+      } else if (selectedRetentionLevel !== 'ALL') {
+        const retLevel = w.retention_level || 'chua_thuoc';
+        if (retLevel !== selectedRetentionLevel) return false;
+      }
 
       if (selectedSrsStatus === 'due') {
         const now = new Date();
@@ -299,6 +307,17 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     }, 4000);
   };
 
+  const handleReplayShuffled = (mode?: FlashcardDirectionMode) => {
+    // Shuffle activeWords randomly
+    const shuffled = [...activeWords].sort(() => Math.random() - 0.5);
+    setActiveWords(shuffled);
+    if (mode) setDirectionMode(mode);
+    setCurrentIndex(0);
+    setIsCompleted(false);
+    setSessionResults([]);
+    setIsFlipped(false);
+  };
+
   if (!activeWords || activeWords.length === 0) {
     return (
       <div className="p-8 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-4 max-w-md mx-auto my-8">
@@ -364,20 +383,46 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={() => {
-              setCurrentIndex(0);
-              setIsCompleted(false);
-              setSessionResults([]);
-            }}
-            className="flex-1 py-3 border border-[#1A1A1A] bg-white hover:bg-stone-200 text-xs font-mono font-bold uppercase text-[#1A1A1A]"
-          >
-            HỌC LẠI PHIÊN NÀY
-          </button>
+        <div className="space-y-2 pt-2 border-t border-[#1A1A1A]">
+          <span className="text-[11px] font-mono font-bold uppercase text-stone-600 block">
+            CHỌN CÁCH ÔN LẠI BỘ {activeWords.length} TỪ NÀY:
+          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+            <button
+              onClick={() => handleReplayShuffled('random_alternate')}
+              className="p-2.5 border-2 border-[#1A1A1A] bg-amber-50 hover:bg-amber-100 text-[#1A1A1A] font-bold uppercase transition flex items-center justify-center gap-1.5"
+            >
+              <Shuffle className="w-3.5 h-3.5 text-amber-700" />
+              <span>🔀 Xáo trộn ngẫu nhiên</span>
+            </button>
+            <button
+              onClick={() => handleReplayShuffled('meaning_to_term')}
+              className="p-2.5 border-2 border-[#1A1A1A] bg-indigo-50 hover:bg-indigo-100 text-[#1A1A1A] font-bold uppercase transition flex items-center justify-center gap-1.5"
+            >
+              <Eye className="w-3.5 h-3.5 text-indigo-700" />
+              <span>💡 Nhìn Nghĩa → Đoán Từ</span>
+            </button>
+            <button
+              onClick={() => handleReplayShuffled('term_to_meaning')}
+              className="p-2.5 border-2 border-[#1A1A1A] bg-emerald-50 hover:bg-emerald-100 text-[#1A1A1A] font-bold uppercase transition flex items-center justify-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
+              <span>🔤 Nhìn Từ → Đoán Nghĩa</span>
+            </button>
+            <button
+              onClick={() => handleReplayShuffled()}
+              className="p-2.5 border border-[#1A1A1A] bg-white hover:bg-stone-100 text-[#1A1A1A] font-bold uppercase transition flex items-center justify-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>🔄 Giữ nguyên thứ tự</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="pt-2">
           <button
             onClick={onExit}
-            className="flex-1 py-3 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm"
+            className="w-full py-3.5 border-2 border-[#1A1A1A] bg-[#1A1A1A] text-[#F9F7F2] hover:bg-stone-800 text-xs font-mono font-bold uppercase tracking-wider editorial-shadow-sm transition"
           >
             KẾT THÚC ÔN TẬP →
           </button>
@@ -529,6 +574,25 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                   className="w-full pl-8 pr-2 py-1.5 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white focus:outline-none"
                 />
               </div>
+            </div>
+
+            {/* Retention Level Filter */}
+            <div>
+              <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
+                Mức độ ghi nhớ:
+              </label>
+              <select
+                value={selectedRetentionLevel}
+                onChange={(e) => setSelectedRetentionLevel(e.target.value)}
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white font-bold"
+              >
+                <option value="ALL">Tất cả cấp độ</option>
+                <option value="today_flashcard">⭐ Thẻ Flashcard Hôm Nay</option>
+                <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
+                <option value="quen">🟠 2. Quên</option>
+                <option value="hoi_nho">🔵 3. Hơi nhớ</option>
+                <option value="nho">🟢 4. Nhớ</option>
+              </select>
             </div>
 
             {/* SRS Status Filter */}
@@ -991,7 +1055,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
           {/* Bottom Card Footer */}
           <div className="text-center text-[10px] font-mono uppercase tracking-wider text-stone-500 border-t border-[#1A1A1A]/15 pt-2">
             {isFlipped
-              ? 'ĐÁNH GIÁ MỨC ĐỘ GHI NHỚ: [1] QUÊN • [2] KHÓ • [3] NHỚ TỐT • [4] RẤT DỄ'
+              ? 'ĐÁNH GIÁ MỨC ĐỘ GHI NHỚ: [1] CHƯA THUỘC • [2] QUÊN • [3] HƠI NHỚ • [4] NHỚ'
               : `MÃ TỪ #${currentWord.word_id.slice(-4)} • [SPACEBAR / CHẠM ĐỂ LẬT]`}
           </div>
         </div>
@@ -1004,32 +1068,32 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
             onClick={() => handleRate('again')}
             className="p-3 border-2 border-rose-800 bg-rose-50 hover:bg-rose-900 hover:text-white text-rose-900 transition text-center flex flex-col items-center justify-between"
           >
-            <span className="text-xs font-mono font-bold uppercase">QUÊN</span>
-            <span className="text-[9px] font-mono mt-1 opacity-70">1 NGÀY</span>
+            <span className="text-xs font-mono font-bold uppercase">1. CHƯA THUỘC</span>
+            <span className="text-[9px] font-mono mt-1 opacity-70">ÔN TẬP NGAY</span>
           </button>
 
           <button
             onClick={() => handleRate('hard')}
             className="p-3 border-2 border-amber-800 bg-amber-50 hover:bg-amber-900 hover:text-white text-amber-900 transition text-center flex flex-col items-center justify-between"
           >
-            <span className="text-xs font-mono font-bold uppercase">KHÓ</span>
-            <span className="text-[9px] font-mono mt-1 opacity-70">2 NGÀY</span>
+            <span className="text-xs font-mono font-bold uppercase">2. QUÊN</span>
+            <span className="text-[9px] font-mono mt-1 opacity-70">ÔN TRONG 1 NGÀY</span>
           </button>
 
           <button
             onClick={() => handleRate('good')}
             className="p-3 border-2 border-indigo-800 bg-indigo-50 hover:bg-indigo-900 hover:text-white text-indigo-900 transition text-center flex flex-col items-center justify-between"
           >
-            <span className="text-xs font-mono font-bold uppercase">NHỚ TỐT</span>
-            <span className="text-[9px] font-mono mt-1 opacity-70">4 NGÀY</span>
+            <span className="text-xs font-mono font-bold uppercase">3. HƠI NHỚ</span>
+            <span className="text-[9px] font-mono mt-1 opacity-70">ÔN TRONG 3 NGÀY</span>
           </button>
 
           <button
             onClick={() => handleRate('easy')}
             className="p-3 border-2 border-emerald-800 bg-emerald-50 hover:bg-emerald-900 hover:text-white text-emerald-900 transition text-center flex flex-col items-center justify-between"
           >
-            <span className="text-xs font-mono font-bold uppercase">RẤT DỄ</span>
-            <span className="text-[9px] font-mono mt-1 opacity-70">7+ NGÀY</span>
+            <span className="text-xs font-mono font-bold uppercase">4. NHỚ</span>
+            <span className="text-[9px] font-mono mt-1 opacity-70">ÔN TRONG 7 NGÀY</span>
           </button>
         </div>
       ) : (

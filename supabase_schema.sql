@@ -55,11 +55,17 @@ CREATE TABLE IF NOT EXISTS public.vocabulary (
     times_reviewed INTEGER DEFAULT 0,
     times_correct INTEGER DEFAULT 0,
     last_reviewed TIMESTAMP WITH TIME ZONE,
+    retention_level TEXT DEFAULT 'chua_thuoc',
+    is_added_today_flashcard BOOLEAN DEFAULT FALSE,
+    added_to_today_flashcard_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Tự động thêm cột bai_hoc nếu bảng vocabulary đã tồn tại từ trước
+-- Tự động thêm cột nâng cấp nếu bảng vocabulary đã tồn tại từ trước
 ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS bai_hoc TEXT DEFAULT 'Bài 1';
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS retention_level TEXT DEFAULT 'chua_thuoc';
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS is_added_today_flashcard BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS added_to_today_flashcard_at TIMESTAMP WITH TIME ZONE;
 
 -- 3. BẢNG BỘ TỪ VỰNG / DECKS (decks)
 CREATE TABLE IF NOT EXISTS public.decks (

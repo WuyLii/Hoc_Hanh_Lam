@@ -40,6 +40,8 @@ export const VocabularyManager: React.FC = () => {
     setSelectedLevelFilter,
     setActiveNav,
     setSelectedGameMode,
+    toggleTodayFlashcard,
+    updateRetentionLevel,
   } = useApp();
 
   const currentLangInfo = LANGUAGES[currentLanguage];
@@ -51,6 +53,7 @@ export const VocabularyManager: React.FC = () => {
   const [selectedTopic, setSelectedTopic] = useState('ALL');
   const [selectedLevel, setSelectedLevel] = useState(selectedLevelFilter || 'ALL');
   const [selectedSrsBox, setSelectedSrsBox] = useState('ALL');
+  const [selectedRetentionLevel, setSelectedRetentionLevel] = useState<string>('ALL');
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical' | 'srs'>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -392,7 +395,12 @@ export const VocabularyManager: React.FC = () => {
           (selectedSrsBox === 'learning' && w.srs_box >= 1 && w.srs_box <= 3) ||
           (selectedSrsBox === 'mastered' && w.srs_box >= 4);
 
-        if (!matchTopic || !matchLesson || !matchLevel || !matchSrs) return null;
+        const matchRetention =
+          selectedRetentionLevel === 'ALL' ||
+          (selectedRetentionLevel === 'today_only' && w.is_added_today_flashcard) ||
+          (selectedRetentionLevel !== 'today_only' && (w.retention_level || 'chua_thuoc') === selectedRetentionLevel);
+
+        if (!matchTopic || !matchLesson || !matchLevel || !matchSrs || !matchRetention) return null;
 
         const searchRes = matchVocabulary(w, searchQuery, searchScope);
         if (!searchRes.matches) return null;
@@ -400,7 +408,7 @@ export const VocabularyManager: React.FC = () => {
         return { word: w, score: searchRes.score };
       })
       .filter((entry): entry is { word: VocabularyItem; score: number } => entry !== null);
-  }, [currentLangVocabulary, duplicateWordSet, showOnlyDuplicates, selectedTopic, selectedLesson, selectedLevel, selectedSrsBox, searchQuery, searchScope]);
+  }, [currentLangVocabulary, duplicateWordSet, showOnlyDuplicates, selectedTopic, selectedLesson, selectedLevel, selectedSrsBox, selectedRetentionLevel, searchQuery, searchScope]);
 
   const sortedWords = useMemo(() => {
     return [...scoredWords]
@@ -709,6 +717,22 @@ export const VocabularyManager: React.FC = () => {
             </select>
           </div>
 
+          {/* Retention Level Filter */}
+          <div className="sm:col-span-2">
+            <select
+              value={selectedRetentionLevel}
+              onChange={(e) => setSelectedRetentionLevel(e.target.value)}
+              className="w-full py-2 px-3 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono font-bold text-[#1A1A1A] focus:outline-none focus:bg-white"
+            >
+              <option value="ALL">MỨC ĐỘ GHI NHỚ (TẤT CẢ)</option>
+              <option value="today_only">⭐ ĐÃ THÊM FLASHCARD HÔM NAY</option>
+              <option value="chua_thuoc">🔴 1. CHƯA THUỘC</option>
+              <option value="quen">🟠 2. QUÊN</option>
+              <option value="hoi_nho">🔵 3. HƠI NHỚ</option>
+              <option value="nho">🟢 4. NHỚ</option>
+            </select>
+          </div>
+
           {/* SRS Filter */}
           <div className="sm:col-span-2">
             <select
@@ -945,6 +969,8 @@ export const VocabularyManager: React.FC = () => {
                 {currentLanguage === 'en' && <th className="p-3.5 border-b border-[#1A1A1A]">Korean (KR 🇰🇷)</th>}
                 {currentLanguage === 'ko' && <th className="p-3.5 border-b border-[#1A1A1A]">English (EN 🇬🇧)</th>}
                 <th className="p-3.5 border-b border-[#1A1A1A]">Type / Level</th>
+                <th className="p-3.5 border-b border-[#1A1A1A]">Mức Độ Ghi Nhớ</th>
+                <th className="p-3.5 border-b border-[#1A1A1A]">Flashcard Hôm Nay</th>
                 <th className="p-3.5 border-b border-[#1A1A1A]">Topic</th>
                 <th className="p-3.5 border-b border-[#1A1A1A]">SRS</th>
                 <th className="p-3.5 border-b border-[#1A1A1A] text-right">Actions</th>
@@ -997,6 +1023,39 @@ export const VocabularyManager: React.FC = () => {
                     <td className="p-3.5 font-mono text-xs">
                       <span className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] mr-1">{word.loai_tu}</span>
                       <span className="text-stone-500">{word.cap_do}</span>
+                    </td>
+                    <td className="p-3.5 font-mono text-xs">
+                      <select
+                        value={word.retention_level || 'chua_thuoc'}
+                        onChange={(e) => updateRetentionLevel(word.word_id, e.target.value as any)}
+                        className={`px-2 py-1 border text-[11px] font-mono font-bold uppercase cursor-pointer ${
+                          word.retention_level === 'nho'
+                            ? 'bg-emerald-50 text-emerald-900 border-emerald-400'
+                            : word.retention_level === 'hoi_nho'
+                            ? 'bg-indigo-50 text-indigo-900 border-indigo-400'
+                            : word.retention_level === 'quen'
+                            ? 'bg-amber-50 text-amber-900 border-amber-400'
+                            : 'bg-rose-50 text-rose-900 border-rose-400'
+                        }`}
+                      >
+                        <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
+                        <option value="quen">🟠 2. Quên</option>
+                        <option value="hoi_nho">🔵 3. Hơi nhớ</option>
+                        <option value="nho">🟢 4. Nhớ</option>
+                      </select>
+                    </td>
+                    <td className="p-3.5 font-mono text-xs">
+                      <button
+                        type="button"
+                        onClick={() => toggleTodayFlashcard(word.word_id)}
+                        className={`px-2.5 py-1 border text-[10px] font-mono font-bold uppercase transition flex items-center gap-1 ${
+                          word.is_added_today_flashcard
+                            ? 'bg-amber-400 text-amber-950 border-amber-600'
+                            : 'bg-stone-50 text-stone-600 border-stone-300 hover:border-[#1A1A1A]'
+                        }`}
+                      >
+                        <span>{word.is_added_today_flashcard ? '★ Đã thêm' : '☆ + Flashcard'}</span>
+                      </button>
                     </td>
                     <td className="p-3.5 font-mono text-xs text-stone-700 uppercase">{word.chu_de}</td>
                     <td className="p-3.5 font-mono text-xs">
@@ -1058,9 +1117,18 @@ export const VocabularyManager: React.FC = () => {
                       <span className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-[9px] font-mono font-bold uppercase text-[#1A1A1A]">
                         {word.loai_tu}
                       </span>
-                      <span className="px-2 py-0.5 bg-[#F9F7F2] border border-[#1A1A1A] text-[9px] font-mono text-stone-600">
-                        {word.cap_do}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleTodayFlashcard(word.word_id)}
+                        className={`px-2 py-0.5 border text-[9px] font-mono font-bold uppercase transition flex items-center gap-1 ${
+                          word.is_added_today_flashcard
+                            ? 'bg-amber-400 text-amber-950 border-amber-600'
+                            : 'bg-stone-50 text-stone-600 border-stone-300 hover:border-[#1A1A1A]'
+                        }`}
+                        title={word.is_added_today_flashcard ? 'Đã trong Flashcard Hôm Nay (Nhấn để hủy)' : 'Thêm vào Flashcard Hôm Nay'}
+                      >
+                        <span>{word.is_added_today_flashcard ? '★ Flashcard' : '☆ Flashcard'}</span>
+                      </button>
                       {duplicateWordSet.has(word.tu.trim().toLowerCase()) && (
                         <span className="px-1.5 py-0.5 bg-rose-100 text-rose-900 border border-rose-800 text-[9px] font-mono font-bold">
                           ⚠️ TRÙNG
@@ -1140,12 +1208,28 @@ export const VocabularyManager: React.FC = () => {
                 </div>
 
                 {/* Footer Metadata & Actions */}
-                <div className="mt-5 pt-3 border-t border-[#1A1A1A] flex items-center justify-between text-[10px] font-mono">
-                  <div className="flex items-center gap-2">
-                    <span className="text-stone-600 font-bold uppercase">{word.chu_de}</span>
-                    {word.times_reviewed > 0 && (
-                      <span className="text-emerald-700 font-bold">✓ {accuracy}%</span>
-                    )}
+                <div className="mt-5 pt-3 border-t border-[#1A1A1A] flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={word.retention_level || 'chua_thuoc'}
+                      onChange={(e) => updateRetentionLevel(word.word_id, e.target.value as any)}
+                      className={`px-1.5 py-0.5 border text-[10px] font-mono font-bold uppercase cursor-pointer ${
+                        word.retention_level === 'nho'
+                          ? 'bg-emerald-50 text-emerald-900 border-emerald-400'
+                          : word.retention_level === 'hoi_nho'
+                          ? 'bg-indigo-50 text-indigo-900 border-indigo-400'
+                          : word.retention_level === 'quen'
+                          ? 'bg-amber-50 text-amber-900 border-amber-400'
+                          : 'bg-rose-50 text-rose-900 border-rose-400'
+                      }`}
+                    >
+                      <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
+                      <option value="quen">🟠 2. Quên</option>
+                      <option value="hoi_nho">🔵 3. Hơi nhớ</option>
+                      <option value="nho">🟢 4. Nhớ</option>
+                    </select>
+
+                    <span className="text-stone-600 font-bold uppercase truncate max-w-[80px]">{word.chu_de}</span>
                   </div>
 
                   <div className="flex items-center gap-1">

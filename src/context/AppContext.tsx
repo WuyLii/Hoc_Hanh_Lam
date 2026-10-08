@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import {
   UserProfile,
   VocabularyItem,
+  VocabularyRetentionLevel,
   Deck,
   GrammarItem,
   ReviewSession,
@@ -48,6 +49,8 @@ interface AppContextType {
   cleanAllDuplicates: (language?: LanguageCode) => Promise<{ success: boolean; deletedCount: number; message: string }>;
   batchAddVocabulary: (items: Partial<VocabularyItem>[]) => number;
   recordSRSRating: (wordId: string, rating: RecallQuality) => void;
+  toggleTodayFlashcard: (itemOrId: string | Partial<VocabularyItem>) => VocabularyItem | null;
+  updateRetentionLevel: (wordId: string, level: VocabularyRetentionLevel) => void;
 
   decks: Deck[];
   currentLangDecks: Deck[];
@@ -600,10 +603,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetWord = vocabulary.find((w) => w.word_id === wordId);
     if (!targetWord) return;
 
+    let retention: VocabularyRetentionLevel = 'chua_thuoc';
+    if (rating === 'hard') retention = 'quen';
+    else if (rating === 'good') retention = 'hoi_nho';
+    else if (rating === 'easy') retention = 'nho';
+
     const srsUpdate = calculateNextSRS(targetWord, rating);
     const updatedWord: VocabularyItem = {
       ...targetWord,
       ...srsUpdate,
+      retention_level: retention,
       last_reviewed: new Date().toISOString(),
     };
 
@@ -612,6 +621,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Add points for studying
     const pts = rating === 'easy' ? 15 : rating === 'good' ? 10 : rating === 'hard' ? 5 : 2;
     updateUser({ total_points: (currentUser.total_points || 0) + pts });
+  };
+
+  const toggleTodayFlashcard = (itemOrId: string | Partial<VocabularyItem>): VocabularyItem | null => {
+    if (typeof itemOrId === 'string') {
+      const existing = vocabulary.find((w) => w.word_id === itemOrId);
+      if (existing) {
+        const nextVal = !existing.is_added_today_flashcard;
+        const updated: VocabularyItem = {
+          ...existing,
+          is_added_today_flashcard: nextVal,
+          added_to_today_flashcard_at: nextVal ? new Date().toISOString() : undefined,
+        };
+        updateVocabulary(updated);
+        return updated;
+      }
+      return null;
+    } else {
+      const searchWord = (itemOrId.tu || '').trim().toLowerCase();
+      const existing = vocabulary.find(
+        (w) =>
+          (itemOrId.word_id && w.word_id === itemOrId.word_id) ||
+          (searchWord && w.tu.trim().toLowerCase() === searchWord && w.ngon_ngu === (itemOrId.ngon_ngu || currentLanguage))
+      );
+      if (existing) {
+        const nextVal = !existing.is_added_today_flashcard;
+        const updated: VocabularyItem = {
+          ...existing,
+          is_added_today_flashcard: nextVal,
+          added_to_today_flashcard_at: nextVal ? new Date().toISOString() : undefined,
+        };
+        updateVocabulary(updated);
+        return updated;
+      } else {
+        const added = addVocabulary({
+          ...itemOrId,
+          is_added_today_flashcard: true,
+          added_to_today_flashcard_at: new Date().toISOString(),
+          retention_level: itemOrId.retention_level || 'chua_thuoc',
+        });
+        return added;
+      }
+    }
+  };
+
+  const updateRetentionLevel = (wordId: string, level: VocabularyRetentionLevel) => {
+    const targetWord = vocabulary.find((w) => w.word_id === wordId);
+    if (!targetWord) return;
+    const updatedWord: VocabularyItem = {
+      ...targetWord,
+      retention_level: level,
+    };
+    updateVocabulary(updatedWord);
   };
 
   // Deck operations
@@ -1498,6 +1559,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cleanAllDuplicates,
         batchAddVocabulary,
         recordSRSRating,
+        toggleTodayFlashcard,
+        updateRetentionLevel,
 
         decks,
         currentLangDecks,
