@@ -59,6 +59,13 @@ export const VocabularyManager: React.FC = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical' | 'srs'>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
+  // In-UI Toast Notice
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4500);
+  };
+
   // Pagination for 10,000 items
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(60);
@@ -262,7 +269,7 @@ export const VocabularyManager: React.FC = () => {
 
   const handleEnrichBilingual = async () => {
     if (wordsNeedingBilingual.length === 0) {
-      alert(
+      showToast(
         currentLanguage === 'ko'
           ? 'Tất cả các từ tiếng Hàn hiện đã có đầy đủ nghĩa tiếng Anh tương ứng!'
           : 'Tất cả các từ tiếng Anh hiện đã có đầy đủ nghĩa tiếng Hàn tương ứng!'
@@ -312,9 +319,9 @@ export const VocabularyManager: React.FC = () => {
         }
       });
 
-      alert(`🎉 Đã bổ sung thành công nghĩa đối ứng Anh ⇄ Hàn cho ${updatedCount} từ vựng bằng AI!`);
+      showToast(`🎉 Đã bổ sung thành công nghĩa đối ứng Anh ⇄ Hàn cho ${updatedCount} từ vựng bằng AI!`);
     } catch (err: any) {
-      alert(err.message || 'Không thể bổ sung bằng AI');
+      showToast(err.message || 'Không thể bổ sung bằng AI');
     } finally {
       setIsEnrichingBilingual(false);
     }
@@ -352,7 +359,7 @@ export const VocabularyManager: React.FC = () => {
             ngon_ngu: currentLanguage,
           }))
         );
-        alert(`Đã nhập thành công ${count} từ vựng mới vào kho!`);
+        showToast(`Đã nhập thành công ${count} từ vựng mới vào kho!`);
       }
     };
     reader.readAsText(file, 'utf-8');
@@ -537,6 +544,19 @@ export const VocabularyManager: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Toast Notice Banner */}
+      {toastMessage && (
+        <div className="p-3 bg-amber-50 border-2 border-[#1A1A1A] editorial-shadow-sm flex items-center justify-between gap-3 text-xs font-mono font-bold text-[#1A1A1A] animate-in fade-in slide-in-from-top-2">
+          <span>{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-stone-500 hover:text-black font-bold px-2 py-0.5"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Editorial Header & Action Strip */}
       <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b-2 border-[#1A1A1A] pb-6">
         <div>
@@ -869,7 +889,7 @@ export const VocabularyManager: React.FC = () => {
               onClick={() => {
                 if (window.confirm(`Bạn có chắc muốn đặt lại tất cả ${currentLangVocabulary.length} từ vựng của ${currentLangInfo.name} về trạng thái "Chưa đánh giá" để bắt đầu theo dõi tiến độ mới?`)) {
                   resetAllRetentionToUnrated(currentLanguage);
-                  alert(`Đã chuyển toàn bộ từ vựng ${currentLangInfo.name} sang trạng thái "Chưa đánh giá"!`);
+                  showToast(`✅ Đã chuyển toàn bộ từ vựng ${currentLangInfo.name} sang trạng thái "Chưa đánh giá"!`);
                 }
               }}
               className="px-2.5 py-1.5 border border-stone-400 bg-white hover:bg-stone-100 text-stone-800 text-[10px] font-mono font-bold uppercase transition flex items-center gap-1"

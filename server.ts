@@ -19,6 +19,7 @@ import {
 } from './src/server/geminiHandlers.ts';
 import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from './src/utils/deduplicate.ts';
+import { INITIAL_VOCABULARY, INITIAL_GRAMMAR } from './src/data/seedData.ts';
 
 dotenv.config();
 
@@ -45,28 +46,72 @@ interface CloudStore {
   lastUpdated?: string;
 }
 
-let memoryStore: CloudStore & { isCleared?: boolean } = {
-  vocabulary: [],
-  grammar: [],
-  decks: [],
-  reviewSessions: [],
-  mockTests: [],
-  listeningExercises: [],
-  progressLogs: [],
-  journalEntries: [],
-  notifications: [],
-  chatHistory: [],
-  sheetsConfig: {
-    scriptUrl: '',
-    spreadsheetUrlOrId: '',
-    spreadsheetId: '',
-    autoSync: false,
-    syncIntervalHours: 24,
-    lastSyncedAt: '',
-  },
-  lastUpdated: new Date().toISOString(),
-  isCleared: true,
-};
+function loadMemoryStore(): CloudStore & { isCleared?: boolean } {
+  let loaded: any = null;
+  if (fs.existsSync(STORE_FILE)) {
+    try {
+      const content = fs.readFileSync(STORE_FILE, 'utf-8');
+      if (content && content.trim()) {
+        loaded = JSON.parse(content);
+      }
+    } catch (e) {
+      console.error('Failed to parse cloud_store.json:', e);
+    }
+  }
+
+  const initialVocab = Array.isArray(INITIAL_VOCABULARY) ? cleanDeduplicateVocab(INITIAL_VOCABULARY) : [];
+  const initialGrammar = Array.isArray(INITIAL_GRAMMAR) ? cleanDeduplicateGrammar(INITIAL_GRAMMAR) : [];
+
+  const store: CloudStore & { isCleared?: boolean } = {
+    vocabulary: (loaded && Array.isArray(loaded.vocabulary) && loaded.vocabulary.length > 0)
+      ? cleanDeduplicateVocab(loaded.vocabulary).map((w: any) => ({ ...w, retention_level: w.retention_level || 'chua_danh_gia' }))
+      : initialVocab.map((w: any) => ({ ...w, retention_level: 'chua_danh_gia' })),
+    grammar: (loaded && Array.isArray(loaded.grammar) && loaded.grammar.length > 0)
+      ? cleanDeduplicateGrammar(loaded.grammar)
+      : initialGrammar,
+    decks: (loaded && Array.isArray(loaded.decks)) ? loaded.decks : [],
+    reviewSessions: (loaded && Array.isArray(loaded.reviewSessions)) ? loaded.reviewSessions : [],
+    mockTests: (loaded && Array.isArray(loaded.mockTests)) ? loaded.mockTests : [],
+    listeningExercises: (loaded && Array.isArray(loaded.listeningExercises)) ? loaded.listeningExercises : [],
+    progressLogs: (loaded && Array.isArray(loaded.progressLogs)) ? loaded.progressLogs : [],
+    journalEntries: (loaded && Array.isArray(loaded.journalEntries)) ? loaded.journalEntries : [],
+    notifications: (loaded && Array.isArray(loaded.notifications)) ? loaded.notifications : [],
+    chatHistory: (loaded && Array.isArray(loaded.chatHistory)) ? loaded.chatHistory : [],
+    currentUser: loaded?.currentUser || {
+      user_id: 'user_1',
+      ten: 'Lê Quốc Huy',
+      avatar: '🎓',
+      ngon_ngu_hoc: 'en',
+      cap_do: {
+        en: 'A1 - Sơ cấp',
+        ko: 'TOPIK 1 (Sơ cấp 1)',
+        zh: 'HSK 1',
+      },
+      muc_tieu: {
+        en: 'Học từ vựng và kết nối Google Sheets',
+        ko: 'Học tiếng Hàn hiệu quả',
+        zh: 'Học tiếng Trung thực chiến',
+      },
+      pin_hash: '1234',
+      total_points: 894,
+    },
+    currentLanguage: loaded?.currentLanguage || 'ko',
+    sheetsConfig: loaded?.sheetsConfig || {
+      scriptUrl: '',
+      spreadsheetUrlOrId: '',
+      spreadsheetId: '',
+      autoSync: false,
+      syncIntervalHours: 24,
+      lastSyncedAt: '',
+    },
+    lastUpdated: loaded?.lastUpdated || new Date().toISOString(),
+    isCleared: false,
+  };
+
+  return store;
+}
+
+let memoryStore = loadMemoryStore();
 
 function saveMemoryStore() {
   try {
@@ -76,7 +121,7 @@ function saveMemoryStore() {
   }
 }
 
-// Reset cloud_store.json to clean state on startup
+// Persist the loaded/seeded store to ensure cloud_store.json exists with valid data
 saveMemoryStore();
 
 async function startServer() {
@@ -220,6 +265,13 @@ async function startServer() {
   });
 
   // 9. Unified Cross-Device Cloud Store API (Safari, PWA, Chrome, Mobile Sync)
+  app.use(['/api/sync', '/api/vocabulary', '/api/grammar'], (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+  });
+
   app.post('/api/sync/clear-all', (req, res) => {
     try {
       memoryStore = {
@@ -275,18 +327,82 @@ async function startServer() {
     });
   });
 
+  app.post('/api/sync/reset-all-retention', (req, res) => {
+    try {
+      const { lang } = req.body || {};
+      if (Array.isArray(memoryStore.vocabulary)) {
+        memoryStore.vocabulary = memoryStore.vocabulary.map((w: any) => {
+          if (!lang || w.ngon_ngu === lang) {
+            return {
+              ...w,
+              retention_level: 'chua_danh_gia',
+              srs_box: 0,
+              srs_interval: 0,
+              times_reviewed: 0,
+              times_correct: 0,
+              last_reviewed: null,
+            };
+          }
+          return w;
+        });
+        memoryStore.lastUpdated = new Date().toISOString();
+        saveMemoryStore();
+      }
+      res.json({
+        success: true,
+        message: 'Đã gán tất cả từ vựng về trạng thái Chưa đánh giá trên Cloud',
+        total: (memoryStore.vocabulary || []).length,
+        lastUpdated: memoryStore.lastUpdated,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi đặt lại mức độ ghi nhớ' });
+    }
+  });
+
   app.post('/api/sync/store', (req, res) => {
     try {
       const { store } = req.body;
       if (store && typeof store === 'object') {
-        // Smart merge with strict deduplication
-        Object.keys(store).forEach((key) => {
-          if (store[key] !== undefined && store[key] !== null) {
-            (memoryStore as any)[key] = store[key];
+        memoryStore.isCleared = false;
+
+        // Apply updated vocabulary directly with deduplication
+        if (Array.isArray(store.vocabulary)) {
+          const cleaned = cleanDeduplicateVocab(store.vocabulary);
+          memoryStore.vocabulary = cleaned.map((w: any) => ({
+            ...w,
+            retention_level: w.retention_level || 'chua_danh_gia',
+          }));
+        }
+
+        // Apply updated grammar directly
+        if (Array.isArray(store.grammar)) {
+          memoryStore.grammar = cleanDeduplicateGrammar(store.grammar);
+        }
+
+        // Decks
+        if (Array.isArray(store.decks)) {
+          memoryStore.decks = store.decks;
+        }
+
+        // Other metadata and progress
+        const fields = [
+          'reviewSessions',
+          'mockTests',
+          'listeningExercises',
+          'progressLogs',
+          'journalEntries',
+          'notifications',
+          'chatHistory',
+          'currentUser',
+          'currentLanguage',
+          'sheetsConfig',
+        ];
+        fields.forEach((k) => {
+          if (store[k] !== undefined && store[k] !== null) {
+            (memoryStore as any)[k] = store[k];
           }
         });
-        if (memoryStore.vocabulary) memoryStore.vocabulary = cleanDeduplicateVocab(memoryStore.vocabulary);
-        if (memoryStore.grammar) memoryStore.grammar = cleanDeduplicateGrammar(memoryStore.grammar);
+
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
       }
@@ -400,6 +516,7 @@ async function startServer() {
       if (existingIdx >= 0) {
         memoryStore.vocabulary[existingIdx] = { ...memoryStore.vocabulary[existingIdx], ...item };
       } else {
+        item.retention_level = 'chua_danh_gia';
         memoryStore.vocabulary.unshift(item);
       }
 

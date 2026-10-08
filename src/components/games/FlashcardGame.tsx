@@ -129,12 +129,12 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
 
   // Pending selected word IDs for checkbox selection inside drawer
   const [pendingWordIds, setPendingWordIds] = useState<Set<string>>(() => {
-    if (initialWords && initialWords.length > 0) {
+    if (initialWords !== undefined) {
       return new Set(initialWords.map((w) => w.word_id));
     }
     if (initialRetentionFilter === 'today_flashcard') {
       const todayWords = words.filter((w) => Boolean(w.is_added_today_flashcard || (w as any).is_starred));
-      if (todayWords.length > 0) return new Set(todayWords.map((w) => w.word_id));
+      return new Set(todayWords.map((w) => w.word_id));
     }
     return new Set(words.map((w) => w.word_id));
   });
@@ -146,10 +146,10 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
 
   // Applied words array currently rendered in the Flashcard deck
   const [activeWords, setActiveWords] = useState<VocabularyItem[]>(() => {
-    if (initialWords && initialWords.length > 0) return initialWords;
+    if (initialWords !== undefined) return initialWords;
     if (initialRetentionFilter === 'today_flashcard') {
       const todayWords = words.filter((w) => Boolean(w.is_added_today_flashcard || (w as any).is_starred));
-      if (todayWords.length > 0) return todayWords;
+      return todayWords;
     }
     return words.length > 0 ? words : [];
   });

@@ -104,41 +104,50 @@ export function cleanDeduplicateVocab(items: VocabularyItem[]): VocabularyItem[]
         is_starred: Boolean(item.is_starred),
       });
     } else {
-      // Merge properties if duplicate exists, retaining highest SRS and richer fields
+      // Merge properties if duplicate exists, retaining richest fields while respecting incoming item
       const existing = map.get(canonicalKey)!;
-      const existingSrs = existing.srs_box || 0;
-      const incomingSrs = item.srs_box || 0;
-
-      const primary = incomingSrs >= existingSrs ? item : existing;
-      const secondary = incomingSrs >= existingSrs ? existing : item;
 
       // Smart merge meanings without duplicate loops
       const mergedNghia = mergeMeanings(existing.nghia || '', item.nghia || '');
       const mergedNghiaHan = mergeMeanings(existing.nghia_tieng_han || '', item.nghia_tieng_han || '');
       const mergedNghiaAnh = mergeMeanings(existing.nghia_tieng_anh || '', item.nghia_tieng_anh || '');
 
+      // Incoming user-controlled states take precedence if provided
+      const resolvedRetention = item.retention_level || existing.retention_level || 'chua_danh_gia';
+      const resolvedStarred = typeof item.is_starred === 'boolean'
+        ? item.is_starred
+        : typeof existing.is_starred === 'boolean'
+        ? existing.is_starred
+        : false;
+      const resolvedTodayFlashcard = typeof item.is_added_today_flashcard === 'boolean'
+        ? item.is_added_today_flashcard
+        : typeof existing.is_added_today_flashcard === 'boolean'
+        ? existing.is_added_today_flashcard
+        : resolvedStarred;
+
       map.set(canonicalKey, {
-        ...secondary,
-        ...primary,
-        word_id: primary.word_id || existing.word_id || item.word_id,
-        tu: (primary.tu || existing.tu || '').trim(),
+        ...existing,
+        ...item,
+        word_id: item.word_id || existing.word_id,
+        tu: (item.tu || existing.tu || '').trim(),
         nghia: mergedNghia,
-        phien_am: primary.phien_am || secondary.phien_am || '',
-        loai_tu: primary.loai_tu || secondary.loai_tu || 'Từ vựng',
-        vi_du: (primary.vi_du && primary.vi_du.length > 5) ? primary.vi_du : (secondary.vi_du || primary.vi_du || ''),
-        vi_du_dich: (primary.vi_du_dich && primary.vi_du_dich.length > 3) ? primary.vi_du_dich : (secondary.vi_du_dich || primary.vi_du_dich || ''),
+        phien_am: item.phien_am || existing.phien_am || '',
+        loai_tu: item.loai_tu || existing.loai_tu || 'Từ vựng',
+        vi_du: (item.vi_du && item.vi_du.length > 5) ? item.vi_du : (existing.vi_du || item.vi_du || ''),
+        vi_du_dich: (item.vi_du_dich && item.vi_du_dich.length > 3) ? item.vi_du_dich : (existing.vi_du_dich || item.vi_du_dich || ''),
         nghia_tieng_han: mergedNghiaHan,
         nghia_tieng_anh: mergedNghiaAnh,
-        phien_am_tieng_han: primary.phien_am_tieng_han || secondary.phien_am_tieng_han || '',
-        chu_de: primary.chu_de || secondary.chu_de || 'Tổng hợp',
-        cap_do: primary.cap_do || secondary.cap_do || 'Cơ bản',
-        retention_level: primary.retention_level || secondary.retention_level || 'chua_danh_gia',
-        is_added_today_flashcard: Boolean(primary.is_added_today_flashcard || secondary.is_added_today_flashcard),
-        is_starred: Boolean(primary.is_starred || secondary.is_starred),
-        srs_box: Math.max(existingSrs, incomingSrs),
-        times_reviewed: (existing.times_reviewed || 0) + (item.times_reviewed || 0),
-        times_correct: (existing.times_correct || 0) + (item.times_correct || 0),
-        last_reviewed: primary.last_reviewed || secondary.last_reviewed || null,
+        phien_am_tieng_han: item.phien_am_tieng_han || existing.phien_am_tieng_han || '',
+        chu_de: item.chu_de || existing.chu_de || 'Tổng hợp',
+        cap_do: item.cap_do || existing.cap_do || 'Cơ bản',
+        retention_level: resolvedRetention,
+        is_added_today_flashcard: resolvedTodayFlashcard,
+        is_starred: resolvedStarred,
+        added_to_today_flashcard_at: item.added_to_today_flashcard_at || existing.added_to_today_flashcard_at,
+        srs_box: item.srs_box !== undefined ? item.srs_box : (existing.srs_box || 0),
+        times_reviewed: Math.max(existing.times_reviewed || 0, item.times_reviewed || 0),
+        times_correct: Math.max(existing.times_correct || 0, item.times_correct || 0),
+        last_reviewed: item.last_reviewed || existing.last_reviewed || null,
         created_at: existing.created_at || item.created_at || new Date().toISOString(),
       });
     }

@@ -166,23 +166,29 @@ function saveToStorage<T>(key: string, value: T): void {
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // One-time absolute zero state reset
+  const hasInitialServerSyncedRef = useRef<boolean>(false);
+  const isApplyingServerStoreRef = useRef<boolean>(false);
+  const syncChannelRef = useRef<BroadcastChannel | null>(null);
+
+  // Cross-tab real-time synchronization via BroadcastChannel
   useEffect(() => {
-    const hasReset = localStorage.getItem('polyglot_hub_zero_state_v5');
-    if (!hasReset) {
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'vocabulary');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'decks');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'grammar');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'review_sessions');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'mock_tests');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'listening');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'progress_logs');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'journal');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'chat_history');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'notifications');
-      localStorage.removeItem(LOCAL_STORAGE_PREFIX + 'current_user');
-      localStorage.setItem('polyglot_hub_zero_state_v5', 'true');
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        syncChannelRef.current = new BroadcastChannel('polyglot_cloud_sync');
+        syncChannelRef.current.onmessage = (event) => {
+          if (event.data?.type === 'CLOUD_SYNC_UPDATED') {
+            syncWithCloudServer(true);
+          }
+        };
+      }
+    } catch (e) {
+      // Ignore if not supported in environment
     }
+    return () => {
+      try {
+        syncChannelRef.current?.close();
+      } catch (e) {}
+    };
   }, []);
 
   // Initialize large datasets from IndexedDB on startup
@@ -208,11 +214,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const cleaned = cleanDeduplicateVocab(cachedVocab);
             setVocabulary(cleaned.map((v) => ({
               ...v,
-              retention_level: (v.times_reviewed && v.times_reviewed > 0 && v.retention_level && v.retention_level !== 'chua_thuoc')
-                ? v.retention_level
-                : (v.retention_level === 'nho' || v.retention_level === 'hoi_nho' || v.retention_level === 'quen')
-                  ? v.retention_level
-                  : 'chua_danh_gia',
+              retention_level: v.retention_level || 'chua_danh_gia',
             })));
           }
           const mergedGrammar = cleanDeduplicateGrammar([...INITIAL_GRAMMAR, ...(cachedGrammar || [])]);
@@ -271,34 +273,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return cleaned.map((v, idx) => ({
       ...v,
       bai_hoc: v.bai_hoc || `Bài ${Math.floor(idx / 10) + 1}`,
-      retention_level: (v.times_reviewed && v.times_reviewed > 0 && v.retention_level && v.retention_level !== 'chua_thuoc')
-        ? v.retention_level
-        : (v.retention_level === 'nho' || v.retention_level === 'hoi_nho' || v.retention_level === 'quen')
-          ? v.retention_level
-          : 'chua_danh_gia',
+      retention_level: v.retention_level || 'chua_danh_gia',
     }));
   });
 
-  // One-time automatic migration: ensure all existing unreviewed/unrated words are 'chua_danh_gia'
+  // One-time automatic migration: ensure ALL existing vocabulary are set to 'chua_danh_gia' across all browsers
   useEffect(() => {
-    const hasMigratedRetention = localStorage.getItem('polyglot_migrate_retention_unrated_v6');
-    if (!hasMigratedRetention && vocabulary.length > 0) {
+    const hasResetAllToUnrated = localStorage.getItem('polyglot_reset_all_retention_unrated_v8');
+    if (!hasResetAllToUnrated && vocabulary.length > 0) {
       setVocabulary((prev) => {
-        const updated = prev.map((w) => {
-          const hasReviewHistory = w.times_reviewed && w.times_reviewed > 0;
-          return {
-            ...w,
-            retention_level: hasReviewHistory && w.retention_level && w.retention_level !== 'chua_thuoc'
-              ? w.retention_level
-              : (w.retention_level === 'nho' || w.retention_level === 'hoi_nho' || w.retention_level === 'quen')
-                ? w.retention_level
-                : 'chua_danh_gia',
-          };
-        });
+        const updated = prev.map((w) => ({
+          ...w,
+          retention_level: 'chua_danh_gia' as VocabularyRetentionLevel,
+          srs_box: 0,
+          srs_interval: 0,
+          times_reviewed: 0,
+          times_correct: 0,
+          last_reviewed: null,
+        }));
         idbSet('vocabulary', updated).catch(() => {});
         return updated;
       });
-      localStorage.setItem('polyglot_migrate_retention_unrated_v6', 'true');
+      localStorage.setItem('polyglot_reset_all_retention_unrated_v8', 'true');
     }
   }, [vocabulary.length]);
   const [decks, setDecks] = useState<Deck[]>(() =>
@@ -732,13 +728,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateVocabulary(updatedWord);
   };
 
-  const resetAllRetentionToUnrated = (targetLang?: LanguageCode) => {
+  const resetAllRetentionToUnrated = async (targetLang?: LanguageCode) => {
     setVocabulary((prev) => {
       const updated = prev.map((w) => {
         if (!targetLang || w.ngon_ngu === targetLang) {
           return {
             ...w,
             retention_level: 'chua_danh_gia' as VocabularyRetentionLevel,
+            srs_box: 0,
+            srs_interval: 0,
+            times_reviewed: 0,
+            times_correct: 0,
+            last_reviewed: null,
           };
         }
         return w;
@@ -746,6 +747,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       idbSet('vocabulary', updated).catch(() => {});
       return updated;
     });
+
+    try {
+      await safeFetchWithTimeout(
+        '/api/sync/reset-all-retention',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lang: targetLang }),
+        },
+        5000
+      );
+    } catch (e) {
+      console.warn('Lỗi gửi reset-all-retention:', e);
+    }
   };
 
   // Deck operations
@@ -1368,6 +1383,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const serverStore = json.store || {};
       const serverUpdated = json.lastUpdated || '';
 
+      isApplyingServerStoreRef.current = true;
+
       if (serverStore.isCleared) {
         setVocabulary([]);
         setGrammar([]);
@@ -1381,11 +1398,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setChatHistory([]);
         idbClear().catch(() => {});
         localStorage.clear();
+        setTimeout(() => {
+          isApplyingServerStoreRef.current = false;
+        }, 2000);
         return { success: true, message: 'Dữ liệu đã được xóa sạch trên tất cả trình duyệt' };
       }
 
       // Skip if server hasn't been updated since our last sync
       if (silent && serverUpdated && serverUpdated === lastServerTimestampRef.current) {
+        isApplyingServerStoreRef.current = false;
         return { success: true, message: 'Dữ liệu đã mới nhất' };
       }
 
@@ -1424,6 +1445,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
+      // Update Review Sessions
+      if (Array.isArray(serverStore.reviewSessions) && serverStore.reviewSessions.length > 0) {
+        setReviewSessions(serverStore.reviewSessions);
+        idbSet('review_sessions', serverStore.reviewSessions).catch(() => {});
+      }
+
+      // Update Progress Logs
+      if (Array.isArray(serverStore.progressLogs) && serverStore.progressLogs.length > 0) {
+        setProgressLogs(serverStore.progressLogs);
+        idbSet('progress_logs', serverStore.progressLogs).catch(() => {});
+      }
+
+      // Update Journal Entries
+      if (Array.isArray(serverStore.journalEntries) && serverStore.journalEntries.length > 0) {
+        setJournalEntries(serverStore.journalEntries);
+        idbSet('journal', serverStore.journalEntries).catch(() => {});
+      }
+
+      // Update Notifications
+      if (Array.isArray(serverStore.notifications) && serverStore.notifications.length > 0) {
+        setNotifications(serverStore.notifications);
+        idbSet('notifications', serverStore.notifications).catch(() => {});
+      }
+
+      // Update Chat History
+      if (Array.isArray(serverStore.chatHistory) && serverStore.chatHistory.length > 0) {
+        setChatHistory(serverStore.chatHistory);
+        idbSet('chat_history', serverStore.chatHistory).catch(() => {});
+      }
+
       if (serverStore.sheetsConfig) {
         setSheetsConfig((prev) => ({ ...prev, ...serverStore.sheetsConfig }));
       }
@@ -1432,9 +1483,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser((prev) => ({ ...prev, ...serverStore.currentUser }));
       }
 
+      if (serverStore.currentLanguage) {
+        setCurrentLanguage(serverStore.currentLanguage);
+      }
+
+      hasInitialServerSyncedRef.current = true;
+
       const now = new Date().toISOString();
       setLastCloudSyncedAt(now);
       if (serverUpdated) lastServerTimestampRef.current = serverUpdated;
+
+      setTimeout(() => {
+        isApplyingServerStoreRef.current = false;
+      }, 2000);
 
       if (hasLocalItems && (!serverStore.vocabulary || serverStore.vocabulary.length === 0)) {
         pushToCloudServer();
@@ -1451,10 +1512,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const pushToCloudServer = async () => {
+  const pushToCloudServer = async (overrideVocab?: VocabularyItem[]) => {
+    if (!hasInitialServerSyncedRef.current) return;
     if (isPushingRef.current) return;
     try {
       isPushingRef.current = true;
+      const vocabToSend = overrideVocab || vocabulary;
       const res = await safeFetchWithTimeout(
         '/api/sync/store',
         {
@@ -1462,7 +1525,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             store: {
-              vocabulary,
+              vocabulary: vocabToSend,
               grammar,
               decks,
               reviewSessions,
@@ -1486,6 +1549,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           lastServerTimestampRef.current = json.lastUpdated;
         }
         setLastCloudSyncedAt(new Date().toISOString());
+        // Notify other open tabs in the same browser to sync immediately
+        try {
+          syncChannelRef.current?.postMessage({ type: 'CLOUD_SYNC_UPDATED' });
+        } catch (e) {}
       }
     } catch (e) {
       // Soft failure without uncaught error
@@ -1528,6 +1595,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const handleInitialSync = async () => {
       await syncWithCloudServer(false);
+      hasInitialServerSyncedRef.current = true;
       if (SupabaseService.isConfigured()) {
         await importFromSupabase(true);
       }
@@ -1535,7 +1603,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleInitialSync();
   }, []);
 
-  // 2. Real-time background polling for cloud server changes (status checked every 15s) and offline sync queue drainage
+  // 2. Real-time background polling for cloud server changes (status checked every 8s) and offline sync queue drainage
   useEffect(() => {
     const drainQueue = async () => {
       if (navigator.onLine && SupabaseService.isConfigured()) {
@@ -1546,9 +1614,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const interval = setInterval(() => {
       syncWithCloudServer(true);
       drainQueue();
-    }, 15000);
+    }, 8000);
 
-    const handleOnline = () => {
+    const handleOnlineOrFocus = () => {
       drainQueue();
       syncWithCloudServer(true);
       if (SupabaseService.isConfigured()) {
@@ -1556,48 +1624,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
 
-    window.addEventListener('online', handleOnline);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('online', handleOnline);
-    };
-  }, []);
-
-  // 3. On Window Focus & App Re-open (e.g. Opening PWA on iPhone from home screen)
-  useEffect(() => {
-    const handleAppFocus = () => {
-      syncWithCloudServer(true);
-      if (SupabaseService.isConfigured()) {
-        importFromSupabase(true);
-      }
-    };
-    window.addEventListener('focus', handleAppFocus);
+    window.addEventListener('online', handleOnlineOrFocus);
+    window.addEventListener('focus', handleOnlineOrFocus);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        syncWithCloudServer(true);
-        if (SupabaseService.isConfigured()) {
-          importFromSupabase(true);
-        }
+        handleOnlineOrFocus();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
-      window.removeEventListener('focus', handleAppFocus);
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnlineOrFocus);
+      window.removeEventListener('focus', handleOnlineOrFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
 
-  // 4. Fast Auto-Save to Cloud Server & Supabase whenever any state updates (guarded against import loops)
+  // 3. Fast Auto-Save to Cloud Server & Supabase whenever any state updates (guarded against initial boot overwrite & server echo loop)
   useEffect(() => {
+    if (!hasInitialServerSyncedRef.current) return;
     if (isImportingRef.current) return;
+    if (isApplyingServerStoreRef.current) return;
     const timer = setTimeout(() => {
+      if (!hasInitialServerSyncedRef.current) return;
       if (isImportingRef.current) return;
+      if (isApplyingServerStoreRef.current) return;
       pushToCloudServer();
       if (SupabaseService.isConfigured()) {
         exportToSupabase();
       }
-    }, 2500);
+    }, 1200);
     return () => clearTimeout(timer);
   }, [
     vocabulary,
