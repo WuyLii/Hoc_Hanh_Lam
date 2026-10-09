@@ -27,6 +27,7 @@ import {
   ListOrdered,
   Layers,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 
 export const SupabaseSettings: React.FC = () => {
@@ -71,6 +72,7 @@ export const SupabaseSettings: React.FC = () => {
   const [showKey, setShowKey] = useState(false);
   const [hasCopiedSql, setHasCopiedSql] = useState(false);
   const [hasCopiedGrantSql, setHasCopiedGrantSql] = useState(false);
+  const [hasCopiedAlterSql, setHasCopiedAlterSql] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
@@ -139,6 +141,7 @@ CREATE TABLE IF NOT EXISTS public.vocabulary (
     ngon_ngu TEXT NOT NULL DEFAULT 'ko',
     chu_de TEXT DEFAULT 'Chung',
     cap_do TEXT DEFAULT 'Sơ cấp',
+    bai_hoc TEXT DEFAULT 'Bài 1',
     nguon_goc TEXT DEFAULT 'Hệ thống',
     srs_box INTEGER DEFAULT 0,
     srs_next_review TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -147,8 +150,20 @@ CREATE TABLE IF NOT EXISTS public.vocabulary (
     times_reviewed INTEGER DEFAULT 0,
     times_correct INTEGER DEFAULT 0,
     last_reviewed TIMESTAMP WITH TIME ZONE,
+    retention_level TEXT DEFAULT 'chua_danh_gia',
+    is_added_today_flashcard BOOLEAN DEFAULT FALSE,
+    is_starred BOOLEAN DEFAULT FALSE,
+    added_to_today_flashcard_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Tự động thêm cột nâng cấp nếu bảng vocabulary đã tồn tại từ trước (Chạy an toàn)
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS bai_hoc TEXT DEFAULT 'Bài 1';
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS retention_level TEXT DEFAULT 'chua_danh_gia';
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS is_added_today_flashcard BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS added_to_today_flashcard_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.vocabulary ALTER COLUMN retention_level SET DEFAULT 'chua_danh_gia';
 
 -- 3. BẢNG BỘ TỪ VỰNG / DECKS (decks)
 CREATE TABLE IF NOT EXISTS public.decks (
@@ -265,7 +280,11 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 -- CHỈ MỤC (INDEXES) TỐI ƯU
 CREATE INDEX IF NOT EXISTS idx_vocabulary_user_lang ON public.vocabulary(user_id, ngon_ngu);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_bai_hoc ON public.vocabulary(bai_hoc);
 CREATE INDEX IF NOT EXISTS idx_vocabulary_srs_next ON public.vocabulary(srs_next_review);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_starred ON public.vocabulary(is_starred);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_today ON public.vocabulary(is_added_today_flashcard);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_retention ON public.vocabulary(retention_level);
 CREATE INDEX IF NOT EXISTS idx_grammar_user_lang ON public.grammar(user_id, ngon_ngu);
 CREATE INDEX IF NOT EXISTS idx_decks_lang ON public.decks(ngon_ngu);
 CREATE INDEX IF NOT EXISTS idx_review_sessions_user ON public.review_sessions(user_id);
@@ -482,6 +501,28 @@ CREATE POLICY "chat_all_policy" ON public.chat_conversations FOR ALL USING (auth
 ALTER TABLE IF EXISTS public.notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "notifications_all_policy" ON public.notifications;
 CREATE POLICY "notifications_all_policy" ON public.notifications FOR ALL USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);`;
+
+  const alterOnlySqlScript = `-- ====================================================================
+-- MÃ SQL NÂNG CẤP NHANH CHO BẢNG TỪ VỰNG ĐÃ TỒN TẠI (CHẠY TRONG SQL EDITOR)
+-- Bổ sung đầy đủ cột Đánh dấu sao (is_starred) & Trạng thái học (retention_level)
+-- ====================================================================
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS is_added_today_flashcard BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS added_to_today_flashcard_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS retention_level TEXT DEFAULT 'chua_danh_gia';
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS bai_hoc TEXT DEFAULT 'Bài 1';
+ALTER TABLE public.vocabulary ALTER COLUMN retention_level SET DEFAULT 'chua_danh_gia';
+
+CREATE INDEX IF NOT EXISTS idx_vocabulary_starred ON public.vocabulary(is_starred);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_today ON public.vocabulary(is_added_today_flashcard);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_retention ON public.vocabulary(retention_level);
+`;
+
+  const handleCopyAlterSql = () => {
+    navigator.clipboard.writeText(alterOnlySqlScript);
+    setHasCopiedAlterSql(true);
+    setTimeout(() => setHasCopiedAlterSql(false), 2500);
+  };
 
   const handleCopyGrantSql = () => {
     navigator.clipboard.writeText(grantOnlySqlScript);
@@ -900,6 +941,40 @@ CREATE POLICY "notifications_all_policy" ON public.notifications FOR ALL USING (
               </>
             )}
           </button>
+        </div>
+
+        {/* Quick Upgrade Box for Star & Retention Status */}
+        <div className="bg-amber-50/90 border-2 border-amber-400 p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="font-bold text-xs uppercase font-mono text-amber-950 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-700" />
+                <span>Nâng Cấp CSDL Đã Có: Bổ sung Cột Đánh Dấu Sao &amp; Trạng Thái Học Thuộc</span>
+              </div>
+              <p className="text-xs text-stone-700 font-sans mt-1">
+                Nếu bạn đã tạo bảng từ trước trên Supabase, chỉ cần chạy đoạn mã ngắn này để bổ sung các cột <code>is_starred</code>, <code>is_added_today_flashcard</code>, <code>retention_level</code>:
+              </p>
+            </div>
+            <button
+              onClick={handleCopyAlterSql}
+              className="px-3.5 py-2 bg-amber-600 text-white font-mono text-xs font-bold uppercase tracking-wider hover:bg-amber-700 transition flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_0px_#000]"
+            >
+              {hasCopiedAlterSql ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-white" />
+                  <span>Đã Copy Mã Nâng Cấp!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Sao Chép Mã Nâng Cấp</span>
+                </>
+              )}
+            </button>
+          </div>
+          <pre className="p-3 bg-stone-900 text-emerald-300 font-mono text-[11px] overflow-x-auto border border-stone-800 rounded-none leading-relaxed">
+            {alterOnlySqlScript}
+          </pre>
         </div>
 
         {/* Quick Fix Box for Error 42501 */}

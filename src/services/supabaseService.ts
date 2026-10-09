@@ -727,6 +727,10 @@ export class SupabaseService {
       ...word,
       last_reviewed: word.last_reviewed ? word.last_reviewed : null,
       srs_next_review: word.srs_next_review || new Date().toISOString(),
+      retention_level: word.retention_level || 'chua_danh_gia',
+      is_starred: Boolean(word.is_starred || word.is_added_today_flashcard),
+      is_added_today_flashcard: Boolean(word.is_added_today_flashcard || word.is_starred),
+      added_to_today_flashcard_at: word.added_to_today_flashcard_at || (word.is_starred || word.is_added_today_flashcard ? new Date().toISOString() : null),
       created_at: word.created_at || new Date().toISOString(),
     };
 
@@ -744,6 +748,14 @@ export class SupabaseService {
     try {
       const { error } = await client.from('vocabulary').upsert([clean], { onConflict: 'word_id' });
       if (error) {
+        // If is_starred column is not yet migrated in Supabase, retry without is_starred safely
+        if (error.message?.includes('is_starred')) {
+          const fallback = { ...clean };
+          delete (fallback as any).is_starred;
+          const { error: retryErr } = await client.from('vocabulary').upsert([fallback], { onConflict: 'word_id' });
+          if (!retryErr) return { success: true };
+        }
+
         await enqueueSyncTask({
           type: 'upsert',
           table: 'vocabulary',
@@ -775,6 +787,10 @@ export class SupabaseService {
       ...v,
       last_reviewed: v.last_reviewed ? v.last_reviewed : null,
       srs_next_review: v.srs_next_review || new Date().toISOString(),
+      retention_level: v.retention_level || 'chua_danh_gia',
+      is_starred: Boolean(v.is_starred || v.is_added_today_flashcard),
+      is_added_today_flashcard: Boolean(v.is_added_today_flashcard || v.is_starred),
+      added_to_today_flashcard_at: v.added_to_today_flashcard_at || (v.is_starred || v.is_added_today_flashcard ? new Date().toISOString() : null),
       created_at: v.created_at || new Date().toISOString(),
     }));
 

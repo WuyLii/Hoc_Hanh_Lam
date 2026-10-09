@@ -26,6 +26,8 @@ export const GameReviewHub: React.FC = () => {
     selectedGameMode,
     setSelectedGameMode,
     recordSRSRating,
+    toggleTodayFlashcard,
+    updateRetentionLevel,
     addReviewSession,
     addStudyTime,
   } = useApp();
@@ -201,6 +203,8 @@ export const GameReviewHub: React.FC = () => {
             language={currentLanguage}
             onFinish={handleFinishGame}
             onRecordSRS={recordSRSRating}
+            onToggleStar={toggleTodayFlashcard}
+            onUpdateRetention={updateRetentionLevel}
             onExit={handleExitGame}
           />
         );

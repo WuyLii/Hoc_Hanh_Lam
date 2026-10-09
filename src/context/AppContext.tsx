@@ -170,13 +170,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isApplyingServerStoreRef = useRef<boolean>(false);
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
 
-  // Cross-tab real-time synchronization via BroadcastChannel
+  // 1. Cross-tab real-time synchronization via BroadcastChannel
   useEffect(() => {
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         syncChannelRef.current = new BroadcastChannel('polyglot_cloud_sync');
         syncChannelRef.current.onmessage = (event) => {
-          if (event.data?.type === 'CLOUD_SYNC_UPDATED') {
+          if (event.data?.type === 'WORD_STATUS_UPDATED' && event.data.word) {
+            const updatedWord: VocabularyItem = event.data.word;
+            setVocabulary((prev) => {
+              const idx = prev.findIndex(
+                (w) =>
+                  w.word_id === updatedWord.word_id ||
+                  ((w.tu || '').trim().toLowerCase() === (updatedWord.tu || '').trim().toLowerCase() &&
+                    w.ngon_ngu === updatedWord.ngon_ngu)
+              );
+              if (idx >= 0) {
+                const nextList = [...prev];
+                nextList[idx] = { ...nextList[idx], ...updatedWord };
+                idbSet('vocabulary', nextList).catch(() => {});
+                return nextList;
+              }
+              return prev;
+            });
+          } else if (event.data?.type === 'CLOUD_SYNC_UPDATED') {
             syncWithCloudServer(true);
           }
         };
@@ -187,6 +204,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       try {
         syncChannelRef.current?.close();
+      } catch (e) {}
+    };
+  }, []);
+
+  // 2. Real-Time Cross-Browser Database Push via Server-Sent Events (SSE)
+  useEffect(() => {
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/sync/stream');
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'WORD_STATUS_UPDATED' && data.word) {
+            const updatedWord: VocabularyItem = data.word;
+            setVocabulary((prev) => {
+              const idx = prev.findIndex(
+                (w) =>
+                  w.word_id === updatedWord.word_id ||
+                  ((w.tu || '').trim().toLowerCase() === (updatedWord.tu || '').trim().toLowerCase() &&
+                    w.ngon_ngu === updatedWord.ngon_ngu)
+              );
+              if (idx >= 0) {
+                const nextList = [...prev];
+                nextList[idx] = { ...nextList[idx], ...updatedWord };
+                idbSet('vocabulary', nextList).catch(() => {});
+                return nextList;
+              } else {
+                const nextList = [updatedWord, ...prev];
+                idbSet('vocabulary', nextList).catch(() => {});
+                return nextList;
+              }
+            });
+            if (data.lastUpdated) {
+              lastServerTimestampRef.current = data.lastUpdated;
+            }
+          } else if (data.type === 'STORE_UPDATED' || data.type === 'STORE_CLEARED') {
+            syncWithCloudServer(true);
+          }
+        } catch (e) {}
+      };
+    } catch (e) {}
+
+    return () => {
+      try {
+        es?.close();
       } catch (e) {}
     };
   }, []);
@@ -209,7 +271,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           idbGet<ChatConversation[]>('chat_history', []),
         ]);
 
-        if (isMounted) {
+        if (isMounted && !hasInitialServerSyncedRef.current) {
           if (cachedVocab && cachedVocab.length > 0) {
             const cleaned = cleanDeduplicateVocab(cachedVocab);
             setVocabulary(cleaned.map((v) => ({
@@ -277,26 +339,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   });
 
-  // One-time automatic migration: ensure ALL existing vocabulary are set to 'chua_danh_gia' across all browsers
-  useEffect(() => {
-    const hasResetAllToUnrated = localStorage.getItem('polyglot_reset_all_retention_unrated_v8');
-    if (!hasResetAllToUnrated && vocabulary.length > 0) {
-      setVocabulary((prev) => {
-        const updated = prev.map((w) => ({
-          ...w,
-          retention_level: 'chua_danh_gia' as VocabularyRetentionLevel,
-          srs_box: 0,
-          srs_interval: 0,
-          times_reviewed: 0,
-          times_correct: 0,
-          last_reviewed: null,
-        }));
-        idbSet('vocabulary', updated).catch(() => {});
-        return updated;
-      });
-      localStorage.setItem('polyglot_reset_all_retention_unrated_v8', 'true');
-    }
-  }, [vocabulary.length]);
+  // Keep vocabulary synced with CSDL database without wiping user retention ratings
   const [decks, setDecks] = useState<Deck[]>(() =>
     cleanDeduplicateDecks(loadFromStorage('decks', []))
   );
@@ -451,10 +494,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       created_at: new Date().toISOString().split('T')[0],
     };
 
-    setVocabulary((prev) => [newWord, ...prev]);
-    idbSet('vocabulary', [newWord, ...vocabulary]).catch(() => {});
+    setVocabulary((prev) => {
+      const nextList = [newWord, ...prev];
+      idbSet('vocabulary', nextList).catch(() => {});
+      return nextList;
+    });
 
-    // Persist immediately to Supabase Cloud
+    // 1. Immediately persist to CSDL Cloud Server Database
+    safeFetchWithTimeout(
+      '/api/vocabulary',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newWord),
+      },
+      5000
+    )
+      .then(async (res) => {
+        if (res.ok) {
+          const json = await res.json().catch(() => ({}));
+          if (json.lastUpdated) {
+            lastServerTimestampRef.current = json.lastUpdated;
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi ghi từ vựng mới vào CSDL máy chủ:', err);
+      });
+
+    // 2. Broadcast immediately across open tabs
+    try {
+      syncChannelRef.current?.postMessage({ type: 'WORD_STATUS_UPDATED', word: newWord });
+    } catch (e) {}
+
+    // 3. Persist immediately to Supabase Cloud if configured
     if (SupabaseService.isConfigured()) {
       SupabaseService.saveVocabulary(newWord).catch((err) => {
         console.warn('Lỗi lưu từ vựng vào Supabase:', err);
@@ -473,6 +546,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
 
+    // 1. Immediately persist to CSDL Cloud Server Database (toàn bộ hệ thống)
+    safeFetchWithTimeout(
+      `/api/vocabulary/${encodeURIComponent(item.word_id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      },
+      5000
+    )
+      .then(async (res) => {
+        if (res.ok) {
+          const json = await res.json().catch(() => ({}));
+          if (json.lastUpdated) {
+            lastServerTimestampRef.current = json.lastUpdated;
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi ghi cập nhật từ vựng vào CSDL máy chủ:', err);
+      });
+
+    // 2. Broadcast immediately across open tabs in same browser
+    try {
+      syncChannelRef.current?.postMessage({ type: 'WORD_STATUS_UPDATED', word: item });
+    } catch (e) {}
+
+    // 3. Immediately persist to Supabase Cloud if configured
     if (SupabaseService.isConfigured()) {
       SupabaseService.saveVocabulary(item).catch((err) => {
         console.warn('Lỗi cập nhật từ vựng vào Supabase:', err);
@@ -724,6 +825,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedWord: VocabularyItem = {
       ...targetWord,
       retention_level: level,
+      last_reviewed: new Date().toISOString(),
     };
     updateVocabulary(updatedWord);
   };

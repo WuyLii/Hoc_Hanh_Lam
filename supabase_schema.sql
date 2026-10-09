@@ -55,17 +55,20 @@ CREATE TABLE IF NOT EXISTS public.vocabulary (
     times_reviewed INTEGER DEFAULT 0,
     times_correct INTEGER DEFAULT 0,
     last_reviewed TIMESTAMP WITH TIME ZONE,
-    retention_level TEXT DEFAULT 'chua_thuoc',
+    retention_level TEXT DEFAULT 'chua_danh_gia',
     is_added_today_flashcard BOOLEAN DEFAULT FALSE,
+    is_starred BOOLEAN DEFAULT FALSE,
     added_to_today_flashcard_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Tự động thêm cột nâng cấp nếu bảng vocabulary đã tồn tại từ trước
+-- Tự động thêm cột nâng cấp nếu bảng vocabulary đã tồn tại từ trước (Chạy an toàn)
 ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS bai_hoc TEXT DEFAULT 'Bài 1';
-ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS retention_level TEXT DEFAULT 'chua_thuoc';
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS retention_level TEXT DEFAULT 'chua_danh_gia';
 ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS is_added_today_flashcard BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.vocabulary ADD COLUMN IF NOT EXISTS added_to_today_flashcard_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.vocabulary ALTER COLUMN retention_level SET DEFAULT 'chua_danh_gia';
 
 -- 3. BẢNG BỘ TỪ VỰNG / DECKS (decks)
 CREATE TABLE IF NOT EXISTS public.decks (
@@ -203,6 +206,9 @@ CREATE TABLE IF NOT EXISTS public.dictionary_history (
 CREATE INDEX IF NOT EXISTS idx_vocabulary_user_lang ON public.vocabulary(user_id, ngon_ngu);
 CREATE INDEX IF NOT EXISTS idx_vocabulary_bai_hoc ON public.vocabulary(bai_hoc);
 CREATE INDEX IF NOT EXISTS idx_vocabulary_srs_next ON public.vocabulary(srs_next_review);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_starred ON public.vocabulary(is_starred);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_today ON public.vocabulary(is_added_today_flashcard);
+CREATE INDEX IF NOT EXISTS idx_vocabulary_retention ON public.vocabulary(retention_level);
 CREATE INDEX IF NOT EXISTS idx_grammar_user_lang ON public.grammar(user_id, ngon_ngu);
 CREATE INDEX IF NOT EXISTS idx_grammar_bai_hoc ON public.grammar(bai_hoc);
 CREATE INDEX IF NOT EXISTS idx_decks_lang ON public.decks(ngon_ngu);

@@ -272,6 +272,38 @@ async function startServer() {
     next();
   });
 
+  // Server-Sent Events (SSE) for Real-Time Cross-Browser Database Push
+  const sseClients = new Set<express.Response>();
+
+  const broadcastSync = (event: { type: string; data?: any; word?: any; lastUpdated?: string }) => {
+    const payload = `data: ${JSON.stringify(event)}\n\n`;
+    sseClients.forEach((client) => {
+      try {
+        client.write(payload);
+      } catch {
+        sseClients.delete(client);
+      }
+    });
+  };
+
+  app.get('/api/sync/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof (res as any).flushHeaders === 'function') {
+      (res as any).flushHeaders();
+    }
+
+    sseClients.add(res);
+
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', lastUpdated: memoryStore.lastUpdated })}\n\n`);
+
+    req.on('close', () => {
+      sseClients.delete(res);
+    });
+  });
+
   app.post('/api/sync/clear-all', (req, res) => {
     try {
       memoryStore = {
@@ -297,6 +329,7 @@ async function startServer() {
         isCleared: true,
       };
       saveMemoryStore();
+      broadcastSync({ type: 'STORE_CLEARED', lastUpdated: memoryStore.lastUpdated });
       res.json({
         success: true,
         message: 'Đã xóa sạch toàn bộ dữ liệu trên hệ thống máy chủ Cloud',
@@ -347,6 +380,7 @@ async function startServer() {
         });
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
+        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated });
       }
       res.json({
         success: true,
@@ -405,6 +439,7 @@ async function startServer() {
 
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
+        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated });
       }
       res.json({
         success: true,
@@ -427,6 +462,7 @@ async function startServer() {
         }
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
+        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated });
       }
       res.json({ success: true, count: wordIds?.length || 0, store: memoryStore });
     } catch (err: any) {
@@ -516,13 +552,14 @@ async function startServer() {
       if (existingIdx >= 0) {
         memoryStore.vocabulary[existingIdx] = { ...memoryStore.vocabulary[existingIdx], ...item };
       } else {
-        item.retention_level = 'chua_danh_gia';
+        item.retention_level = item.retention_level || 'chua_danh_gia';
         memoryStore.vocabulary.unshift(item);
       }
 
       memoryStore.vocabulary = cleanDeduplicateVocab(memoryStore.vocabulary);
       memoryStore.lastUpdated = new Date().toISOString();
       saveMemoryStore();
+      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: item, lastUpdated: memoryStore.lastUpdated });
 
       res.json({ success: true, item, total: memoryStore.vocabulary.length });
     } catch (e: any) {
@@ -530,23 +567,74 @@ async function startServer() {
     }
   });
 
+  const updateWordInMemory = (wordId: string, updates: any) => {
+    if (!memoryStore.vocabulary) memoryStore.vocabulary = [];
+    const searchId = String(wordId || '').trim();
+    const searchTu = String(updates?.tu || '').trim().toLowerCase();
+    const searchLang = String(updates?.ngon_ngu || '').trim().toLowerCase();
+
+    let idx = -1;
+    if (searchId) {
+      idx = memoryStore.vocabulary.findIndex((w) => w.word_id === searchId);
+    }
+    if (idx < 0 && searchTu) {
+      idx = memoryStore.vocabulary.findIndex(
+        (w) =>
+          (w.tu || '').trim().toLowerCase() === searchTu &&
+          (!searchLang || (w.ngon_ngu || '').trim().toLowerCase() === searchLang)
+      );
+    }
+
+    if (idx >= 0) {
+      memoryStore.vocabulary[idx] = {
+        ...memoryStore.vocabulary[idx],
+        ...updates,
+      };
+      memoryStore.lastUpdated = new Date().toISOString();
+      saveMemoryStore();
+      const updatedItem = memoryStore.vocabulary[idx];
+      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: updatedItem, lastUpdated: memoryStore.lastUpdated });
+      return updatedItem;
+    } else {
+      // If word not yet registered, add it to CSDL
+      const newItem = {
+        word_id: searchId || `w_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        tu: updates.tu || '',
+        nghia: updates.nghia || '',
+        ngon_ngu: updates.ngon_ngu || 'en',
+        retention_level: updates.retention_level || 'chua_danh_gia',
+        is_starred: Boolean(updates.is_starred),
+        is_added_today_flashcard: Boolean(updates.is_added_today_flashcard || updates.is_starred),
+        added_to_today_flashcard_at: updates.added_to_today_flashcard_at || (updates.is_starred ? new Date().toISOString() : undefined),
+        ...updates,
+      };
+      memoryStore.vocabulary.unshift(newItem);
+      memoryStore.lastUpdated = new Date().toISOString();
+      saveMemoryStore();
+      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: newItem, lastUpdated: memoryStore.lastUpdated });
+      return newItem;
+    }
+  };
+
   app.put('/api/vocabulary/:id', (req, res) => {
     try {
       const { id } = req.params;
-      const updates = req.body;
-      if (!memoryStore.vocabulary) memoryStore.vocabulary = [];
-
-      const idx = memoryStore.vocabulary.findIndex((w) => w.word_id === id);
-      if (idx >= 0) {
-        memoryStore.vocabulary[idx] = { ...memoryStore.vocabulary[idx], ...updates };
-        memoryStore.lastUpdated = new Date().toISOString();
-        saveMemoryStore();
-        res.json({ success: true, item: memoryStore.vocabulary[idx] });
-      } else {
-        res.status(404).json({ error: 'Không tìm thấy từ vựng' });
-      }
+      const updates = req.body || {};
+      const updatedItem = updateWordInMemory(id, updates);
+      res.json({ success: true, item: updatedItem, lastUpdated: memoryStore.lastUpdated });
     } catch (e: any) {
       res.status(500).json({ error: e?.message || 'Lỗi cập nhật từ vựng' });
+    }
+  });
+
+  app.post('/api/vocabulary/status-update', (req, res) => {
+    try {
+      const updates = req.body || {};
+      const wordId = updates.word_id || req.query.id;
+      const updatedItem = updateWordInMemory(wordId, updates);
+      res.json({ success: true, item: updatedItem, lastUpdated: memoryStore.lastUpdated });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi cập nhật trạng thái từ vựng' });
     }
   });
 
@@ -560,6 +648,7 @@ async function startServer() {
       if (deleted) {
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
+        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated });
       }
       res.json({ success: true, deleted, total: memoryStore.vocabulary.length });
     } catch (e: any) {

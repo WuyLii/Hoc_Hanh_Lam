@@ -33,6 +33,8 @@ interface FlashcardGameProps {
   initialWords?: VocabularyItem[];
   onFinish: (correctCount: number, totalCount: number, score: number) => void;
   onRecordSRS: (wordId: string, rating: RecallQuality) => void;
+  onToggleStar?: (wordId: string) => void;
+  onUpdateRetention?: (wordId: string, level: any) => void;
   onExit: () => void;
 }
 
@@ -43,6 +45,8 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   initialWords,
   onFinish,
   onRecordSRS,
+  onToggleStar,
+  onUpdateRetention,
   onExit,
 }) => {
   // Mode: Alternating random 2-way (Default), Term-first, or Meaning-first
@@ -998,8 +1002,23 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               </span>
 
               {/* Retention Level Badge */}
-              <span
-                className={`px-2 py-0.5 border text-[9px] font-mono font-bold uppercase ${
+              {/* Interactive Retention Level Select on Card Face */}
+              <select
+                value={currentWord.retention_level || 'chua_danh_gia'}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  const newLevel = e.target.value as any;
+                  if (onUpdateRetention) {
+                    onUpdateRetention(currentWord.word_id, newLevel);
+                  }
+                  setActiveWords((prev) =>
+                    prev.map((w) =>
+                      w.word_id === currentWord.word_id ? { ...w, retention_level: newLevel } : w
+                    )
+                  );
+                }}
+                className={`px-2 py-0.5 border text-[10px] font-mono font-bold uppercase cursor-pointer rounded-none ${
                   currentWord.retention_level === 'nho'
                     ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
                     : currentWord.retention_level === 'hoi_nho'
@@ -1010,23 +1029,41 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                     ? 'bg-rose-100 text-rose-900 border-rose-400'
                     : 'bg-stone-100 text-stone-700 border-stone-300'
                 }`}
+                title="Thay đổi trạng thái học thuộc và lưu trực tiếp vào CSDL toàn hệ thống"
               >
-                {currentWord.retention_level === 'nho'
-                  ? '🟢 Nhớ'
-                  : currentWord.retention_level === 'hoi_nho'
-                  ? '🔵 Hơi nhớ'
-                  : currentWord.retention_level === 'quen'
-                  ? '🟠 Quên'
-                  : currentWord.retention_level === 'chua_thuoc'
-                  ? '🔴 Chưa thuộc'
-                  : '⚪ Chưa đánh giá'}
-              </span>
+                <option value="chua_danh_gia">⚪ Chưa đánh giá</option>
+                <option value="chua_thuoc">🔴 Chưa thuộc</option>
+                <option value="quen">🟠 Quên</option>
+                <option value="hoi_nho">🔵 Hơi nhớ</option>
+                <option value="nho">🟢 Nhớ</option>
+              </select>
 
-              {(currentWord.is_added_today_flashcard || (currentWord as any).is_starred) && (
-                <span className="px-1.5 py-0.5 bg-amber-300 text-amber-950 border border-amber-600 text-[9px] font-mono font-bold">
-                  ★ Đã đánh sao
-                </span>
-              )}
+              {/* Interactive Star Button on Card Face */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const nextVal = !(currentWord.is_added_today_flashcard || (currentWord as any).is_starred);
+                  if (onToggleStar) {
+                    onToggleStar(currentWord.word_id);
+                  }
+                  setActiveWords((prev) =>
+                    prev.map((w) =>
+                      w.word_id === currentWord.word_id
+                        ? { ...w, is_starred: nextVal, is_added_today_flashcard: nextVal }
+                        : w
+                    )
+                  );
+                }}
+                className={`px-2 py-0.5 border text-[10px] font-mono font-bold uppercase transition flex items-center gap-1 cursor-pointer rounded-none ${
+                  (currentWord.is_added_today_flashcard || (currentWord as any).is_starred)
+                    ? 'bg-amber-400 text-amber-950 border-amber-600 shadow-sm'
+                    : 'bg-stone-100 text-stone-600 border-stone-300 hover:border-[#1A1A1A] hover:bg-white'
+                }`}
+                title={(currentWord.is_added_today_flashcard || (currentWord as any).is_starred) ? 'Bỏ đánh sao từ này' : 'Đánh sao từ học hôm nay & Lưu vào CSDL'}
+              >
+                <span>{(currentWord.is_added_today_flashcard || (currentWord as any).is_starred) ? '★ Đã đánh sao' : '☆ Đánh sao'}</span>
+              </button>
 
               <span className="px-2 py-0.5 bg-[#F9F7F2] border border-stone-300 text-[9px] font-mono uppercase text-stone-700">
                 {currentWord.loai_tu || 'Từ vựng'} • {currentWord.cap_do || 'Cơ bản'}

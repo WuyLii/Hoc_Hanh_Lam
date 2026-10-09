@@ -112,18 +112,36 @@ export function cleanDeduplicateVocab(items: VocabularyItem[]): VocabularyItem[]
       const mergedNghiaHan = mergeMeanings(existing.nghia_tieng_han || '', item.nghia_tieng_han || '');
       const mergedNghiaAnh = mergeMeanings(existing.nghia_tieng_anh || '', item.nghia_tieng_anh || '');
 
-      // Incoming user-controlled states take precedence if provided
-      const resolvedRetention = item.retention_level || existing.retention_level || 'chua_danh_gia';
+      // Smart retention resolution: concrete ratings take precedence over unassessed default
+      let resolvedRetention = existing.retention_level || 'chua_danh_gia';
+      const itemRated = item.retention_level && item.retention_level !== 'chua_danh_gia';
+      const existingRated = existing.retention_level && existing.retention_level !== 'chua_danh_gia';
+
+      if (itemRated && !existingRated) {
+        resolvedRetention = item.retention_level!;
+      } else if (!itemRated && existingRated) {
+        resolvedRetention = existing.retention_level!;
+      } else if (item.retention_level) {
+        resolvedRetention = item.retention_level;
+      }
+
+      // Explicit starred resolution: latest explicit boolean wins
       const resolvedStarred = typeof item.is_starred === 'boolean'
         ? item.is_starred
         : typeof existing.is_starred === 'boolean'
         ? existing.is_starred
         : false;
+
       const resolvedTodayFlashcard = typeof item.is_added_today_flashcard === 'boolean'
         ? item.is_added_today_flashcard
         : typeof existing.is_added_today_flashcard === 'boolean'
         ? existing.is_added_today_flashcard
         : resolvedStarred;
+
+      const resolvedLastReviewed =
+        (item.last_reviewed && (!existing.last_reviewed || new Date(item.last_reviewed) >= new Date(existing.last_reviewed)))
+          ? item.last_reviewed
+          : (existing.last_reviewed || item.last_reviewed || null);
 
       map.set(canonicalKey, {
         ...existing,
@@ -147,7 +165,7 @@ export function cleanDeduplicateVocab(items: VocabularyItem[]): VocabularyItem[]
         srs_box: item.srs_box !== undefined ? item.srs_box : (existing.srs_box || 0),
         times_reviewed: Math.max(existing.times_reviewed || 0, item.times_reviewed || 0),
         times_correct: Math.max(existing.times_correct || 0, item.times_correct || 0),
-        last_reviewed: item.last_reviewed || existing.last_reviewed || null,
+        last_reviewed: resolvedLastReviewed,
         created_at: existing.created_at || item.created_at || new Date().toISOString(),
       });
     }
