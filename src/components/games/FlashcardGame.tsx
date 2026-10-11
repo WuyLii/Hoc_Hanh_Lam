@@ -57,9 +57,13 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const [selectedPos, setSelectedPos] = useState<string>('ALL');
   const [selectedContext, setSelectedContext] = useState<string>('ALL');
   const [selectedLevel, setSelectedLevel] = useState<string>('ALL');
-  const [selectedSrsStatus, setSelectedSrsStatus] = useState<string>('ALL');
-  const [selectedRetentionLevel, setSelectedRetentionLevel] = useState<string>(
-    initialRetentionFilter || 'ALL'
+  const [selectedTodayOnly, setSelectedTodayOnly] = useState<'ALL' | 'today_only'>(
+    initialRetentionFilter === 'today_flashcard' ? 'today_only' : 'ALL'
+  );
+  const [selectedWordStatus, setSelectedWordStatus] = useState<string>(
+    initialRetentionFilter && initialRetentionFilter !== 'today_flashcard'
+      ? initialRetentionFilter
+      : 'ALL'
   );
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   
@@ -75,33 +79,37 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   // Candidate words matching current filter criteria
   const candidateWords = useMemo(() => {
     let list = words.filter((w) => {
-      if (selectedRetentionLevel === 'today_flashcard') {
+      // 1. Lọc theo Ôn bài hôm nay hay không
+      if (selectedTodayOnly === 'today_only') {
         const isToday = Boolean(w.is_added_today_flashcard || (w as any).is_starred);
         if (!isToday) return false;
-      } else {
-        if (selectedPos !== 'ALL' && w.loai_tu !== selectedPos) return false;
-        if (selectedContext !== 'ALL' && w.chu_de !== selectedContext) return false;
-        if (selectedLevel !== 'ALL' && w.cap_do !== selectedLevel) return false;
+      }
 
-        if (selectedRetentionLevel !== 'ALL') {
-          const retLevel = w.retention_level || 'chua_danh_gia';
-          if (retLevel !== selectedRetentionLevel) return false;
-        }
-
-        if (selectedSrsStatus === 'due') {
+      // 2. Lọc theo Trạng thái của từ
+      if (selectedWordStatus !== 'ALL') {
+        const retLevel = w.retention_level || 'chua_danh_gia';
+        if (selectedWordStatus === 'due') {
           const now = new Date();
           const isDue = !w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0;
           if (!isDue) return false;
-        } else if (selectedSrsStatus === 'new') {
+        } else if (selectedWordStatus === 'new') {
           if (w.srs_box !== 0 && w.times_reviewed) return false;
-        } else if (selectedSrsStatus === 'difficult') {
+        } else if (selectedWordStatus === 'difficult') {
           const isDifficult = (w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1;
           if (!isDifficult) return false;
-        } else if (selectedSrsStatus === 'mastered') {
+        } else if (selectedWordStatus === 'mastered') {
           if ((w.srs_box || 0) < 4) return false;
+        } else {
+          if (retLevel !== selectedWordStatus) return false;
         }
       }
 
+      // 3. Các bộ lọc từ loại, ngữ cảnh, cấp độ
+      if (selectedPos !== 'ALL' && w.loai_tu !== selectedPos) return false;
+      if (selectedContext !== 'ALL' && w.chu_de !== selectedContext) return false;
+      if (selectedLevel !== 'ALL' && w.cap_do !== selectedLevel) return false;
+
+      // 4. Tìm kiếm từ khóa
       if (searchKeyword.trim()) {
         const q = searchKeyword.toLowerCase().trim();
         const searchFields = [
@@ -129,7 +137,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
       list = list.slice(0, lim);
     }
     return list;
-  }, [words, selectedPos, selectedContext, selectedLevel, selectedRetentionLevel, selectedSrsStatus, searchKeyword, selectedLimit]);
+  }, [words, selectedPos, selectedContext, selectedLevel, selectedTodayOnly, selectedWordStatus, searchKeyword, selectedLimit]);
 
   // Pending selected word IDs for checkbox selection inside drawer
   const [pendingWordIds, setPendingWordIds] = useState<Set<string>>(() => {
@@ -310,7 +318,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
         finalChosen = candidateWords;
         setPendingWordIds(new Set(candidateWords.map((w) => w.word_id)));
       } else {
-        if (selectedRetentionLevel === 'today_flashcard') {
+        if (selectedTodayOnly === 'today_only') {
           setReloadNotice('⚠️ Chưa có từ nào được đánh dấu sao hoặc thêm vào Flashcard Hôm Nay! Hãy bấm [★ Đánh sao] ở Sổ Từ Vựng hoặc Tra Từ Điển.');
         } else {
           setReloadNotice('⚠️ Không tìm thấy từ nào phù hợp với bộ lọc đã chọn! Vui lòng chọn lại.');
@@ -349,7 +357,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   };
 
   if (!activeWords || activeWords.length === 0) {
-    const isTodayFilter = selectedRetentionLevel === 'today_flashcard';
+    const isTodayFilter = selectedTodayOnly === 'today_only';
     return (
       <div className="p-8 text-center bg-white border-2 border-[#1A1A1A] editorial-shadow space-y-4 max-w-md mx-auto my-8">
         <div className={`w-14 h-14 border-2 border-[#1A1A1A] flex items-center justify-center mx-auto text-2xl ${
@@ -372,8 +380,8 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               setSelectedPos('ALL');
               setSelectedContext('ALL');
               setSelectedLevel('ALL');
-              setSelectedSrsStatus('ALL');
-              setSelectedRetentionLevel('ALL');
+              setSelectedTodayOnly('ALL');
+              setSelectedWordStatus('ALL');
               setSearchKeyword('');
               const allIds = new Set(words.map((w) => w.word_id));
               setPendingWordIds(allIds);
@@ -512,7 +520,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                 setTimeout(() => setReloadNotice(null), 5000);
                 return;
               }
-              setSelectedRetentionLevel('today_flashcard');
+              setSelectedTodayOnly('today_only');
               setActiveWords(todayWords);
               setPendingWordIds(new Set(todayWords.map((w) => w.word_id)));
               setCurrentIndex(0);
@@ -523,7 +531,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               setTimeout(() => setReloadNotice(null), 4000);
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 border-2 text-xs font-mono uppercase font-bold transition editorial-shadow-sm ${
-              selectedRetentionLevel === 'today_flashcard'
+              selectedTodayOnly === 'today_only'
                 ? 'bg-amber-400 text-amber-950 border-amber-800'
                 : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-[#1A1A1A]'
             }`}
@@ -531,7 +539,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
           >
             <Star
               className={`w-3.5 h-3.5 ${
-                selectedRetentionLevel === 'today_flashcard'
+                selectedTodayOnly === 'today_only'
                   ? 'fill-amber-950 text-amber-950'
                   : 'fill-amber-500 text-amber-600'
               }`}
@@ -655,41 +663,40 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               </div>
             </div>
 
-            {/* Retention Level Filter */}
+            {/* 1. Lựa chọn Ôn Bài hôm nay hay không */}
             <div>
               <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
-                Mức độ ghi nhớ:
+                Ôn bài hôm nay:
               </label>
               <select
-                value={selectedRetentionLevel}
-                onChange={(e) => setSelectedRetentionLevel(e.target.value)}
-                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white font-bold"
+                value={selectedTodayOnly}
+                onChange={(e) => setSelectedTodayOnly(e.target.value as 'ALL' | 'today_only')}
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white font-bold cursor-pointer"
               >
-                <option value="ALL">Tất cả cấp độ</option>
-                <option value="today_flashcard">⭐ Thẻ Flashcard Hôm Nay (Đã đánh sao)</option>
-                <option value="chua_danh_gia">⚪ Chưa đánh giá (Chưa chơi)</option>
-                <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
-                <option value="quen">🟠 2. Quên</option>
-                <option value="hoi_nho">🔵 3. Hơi nhớ</option>
-                <option value="nho">🟢 4. Nhớ</option>
+                <option value="ALL">Toàn bộ kho từ ({words.length})</option>
+                <option value="today_only">⭐ Chỉ ôn bài hôm nay ({starredTodayCount})</option>
               </select>
             </div>
 
-            {/* SRS Status Filter */}
+            {/* 2. Cho phép chọn trạng thái của từ */}
             <div>
               <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
-                Trạng thái SRS:
+                Trạng thái của từ:
               </label>
               <select
-                value={selectedSrsStatus}
-                onChange={(e) => setSelectedSrsStatus(e.target.value)}
-                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white"
+                value={selectedWordStatus}
+                onChange={(e) => setSelectedWordStatus(e.target.value)}
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white font-bold cursor-pointer"
               >
-                <option value="ALL">Tất cả từ</option>
-                <option value="due">🔴 Cần ôn ngay</option>
-                <option value="new">🆕 Từ mới chưa học</option>
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="chua_danh_gia">⚪ Chưa đánh giá (Chưa chơi)</option>
+                <option value="chua_thuoc">🔴 Chưa thuộc (Hộp 0)</option>
+                <option value="quen">🟠 Quên</option>
+                <option value="hoi_nho">🔵 Hơi nhớ</option>
+                <option value="nho">🟢 Đã nhớ</option>
+                <option value="due">⏰ Cần ôn ngay (SRS)</option>
                 <option value="difficult">⚠️ Từ cần củng cố</option>
-                <option value="mastered">✅ Từ đã thuộc</option>
+                <option value="mastered">✅ Đã thành thạo</option>
               </select>
             </div>
 
@@ -821,7 +828,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
           <div className="max-h-56 overflow-y-auto border border-[#1A1A1A] bg-[#F9F7F2] p-2 space-y-1 divide-y divide-stone-200 text-xs font-mono">
             {candidateWords.length === 0 ? (
               <div className="p-6 text-center text-stone-600 font-mono text-xs space-y-1">
-                {selectedRetentionLevel === 'today_flashcard' ? (
+                {selectedTodayOnly === 'today_only' ? (
                   <>
                     <p className="font-bold text-amber-900 text-sm">⭐ Chưa có từ nào được đánh dấu sao hoặc thêm vào Flashcard Hôm Nay!</p>
                     <p className="text-stone-500 text-[11px]">

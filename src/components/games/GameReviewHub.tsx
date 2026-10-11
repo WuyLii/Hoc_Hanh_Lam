@@ -39,7 +39,9 @@ export const GameReviewHub: React.FC = () => {
   const [activeTopicFilter, setActiveTopicFilter] = useState<string>('ALL');
   const [activePosFilter, setActivePosFilter] = useState<string>('ALL');
   const [activeLimitFilter, setActiveLimitFilter] = useState<string>('ALL');
-  const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'due' | 'difficult' | 'today_flashcard'>('all');
+  const [activeStatusFilter, setActiveStatusFilter] = useState<
+    'all' | 'due' | 'difficult' | 'today_flashcard' | 'chua_thuoc' | 'quen' | 'hoi_nho' | 'nho' | 'chua_danh_gia'
+  >('all');
 
   const [shuffleKey, setShuffleKey] = useState<number>(0);
 
@@ -68,6 +70,16 @@ export const GameReviewHub: React.FC = () => {
       return !w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0;
     } else if (activeStatusFilter === 'difficult') {
       return (w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1;
+    } else if (activeStatusFilter === 'chua_thuoc') {
+      return w.retention_level === 'chua_thuoc';
+    } else if (activeStatusFilter === 'quen') {
+      return w.retention_level === 'quen';
+    } else if (activeStatusFilter === 'hoi_nho') {
+      return w.retention_level === 'hoi_nho';
+    } else if (activeStatusFilter === 'nho') {
+      return w.retention_level === 'nho';
+    } else if (activeStatusFilter === 'chua_danh_gia') {
+      return !w.retention_level || w.retention_level === 'chua_danh_gia';
     }
 
     return true;
@@ -334,17 +346,22 @@ export const GameReviewHub: React.FC = () => {
           {/* Status filter */}
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
-              Trạng thái SRS:
+              Nguồn từ & Trạng thái:
             </label>
             <select
               value={activeStatusFilter}
               onChange={(e: any) => setActiveStatusFilter(e.target.value)}
-              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none"
+              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none font-bold cursor-pointer"
             >
               <option value="today_flashcard">⭐ Thẻ Hôm Nay (Đã đánh sao)</option>
               <option value="all">Toàn bộ kho từ</option>
-              <option value="due">Cần ôn hôm nay (SRS)</option>
-              <option value="difficult">Từ khó nhớ</option>
+              <option value="chua_thuoc">🔴 Chưa thuộc (Hộp 0)</option>
+              <option value="quen">🟠 Quên</option>
+              <option value="hoi_nho">🔵 Hơi nhớ</option>
+              <option value="nho">🟢 Đã nhớ</option>
+              <option value="chua_danh_gia">⚪ Chưa đánh giá</option>
+              <option value="due">⏰ Cần ôn hôm nay (SRS)</option>
+              <option value="difficult">⚠️ Từ khó cần củng cố</option>
             </select>
           </div>
 
