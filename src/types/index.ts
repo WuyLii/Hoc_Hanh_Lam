@@ -84,6 +84,7 @@ export interface VocabularyItem {
   cap_do: string;
   bai_hoc?: string; // Phân loại theo Bài (vd: "Bài 1", "Bài 2: Gia đình", v.v.)
   nguon_goc?: string; // Sách, Phim, Hội thoại, Nhạc, Báo chí...
+  ghi_chu?: string; // Ghi chú từ vựng bổ sung
   // Cấp độ đánh giá ghi nhớ: 'chua_danh_gia' | 'chua_thuoc' | 'quen' | 'hoi_nho' | 'nho'
   retention_level?: VocabularyRetentionLevel;
   // Ôn tập Flashcard Hôm Nay & Đánh dấu sao

@@ -53,7 +53,7 @@ export async function lookupDictionaryApi(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s resilient timeout
 
     try {
       const response = await fetch('/api/gemini/dictionary-lookup', {
@@ -88,7 +88,7 @@ export async function lookupDictionaryApi(
 
       // If aborted by timeout
       if (err?.name === 'AbortError') {
-        lastError = new Error('Quá trình tra cứu mất quá nhiều thời gian. Vui lòng bấm thử lại!');
+        lastError = new Error('Quá trình tra cứu mất nhiều thời gian do máy chủ AI đang tải cao. Vui lòng bấm "Thử lại ngay" để kết nối lại!');
       }
 
       // If network fetch failed (e.g. TypeError: Failed to fetch)

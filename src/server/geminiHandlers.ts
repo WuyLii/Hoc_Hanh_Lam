@@ -364,23 +364,23 @@ export async function callGeminiTutorAlternating(
 export const DEDICATED_DICTIONARY_MODELS: DedicatedModelConfig[] = [
   {
     id: 'dict-ai-1',
-    name: 'Từ điển AI 1 (Gemini 3.8 Flash Flagship)',
-    model: 'gemini-3.8-flash',
-    fallbackModel: 'gemini-flash-latest',
-    description: 'Chuyên gia Đại từ điển Học thuật, Ngữ nghĩa sâu sắc, IPA & Hán Việt',
+    name: 'Từ điển AI 1 (Gemini 3.1 Flash Lite Tốc độ cao)',
+    model: 'gemini-3.1-flash-lite',
+    fallbackModel: 'gemini-3.8-flash',
+    description: 'Chuyên gia Đại từ điển Học thuật, Tốc độ cao, IPA & Hán Việt',
   },
   {
     id: 'dict-ai-2',
-    name: 'Từ điển AI 2 (Gemini Flash Latest)',
-    model: 'gemini-flash-latest',
+    name: 'Từ điển AI 2 (Gemini 3.8 Flash Flagship)',
+    model: 'gemini-3.8-flash',
     fallbackModel: 'gemini-3.1-flash-lite',
-    description: 'Chuyên gia Song ngữ Tốc độ cao, Đối chiếu Hán Việt & Dự phòng thông minh',
+    description: 'Chuyên gia Ngữ nghĩa sâu sắc, Đối chiếu Hán Việt & Dự phòng thông minh',
   },
   {
     id: 'dict-ai-lite',
-    name: 'Từ điển AI 3 (Gemini 3.1 Flash Lite)',
-    model: 'gemini-3.1-flash-lite',
-    fallbackModel: 'gemini-flash-latest',
+    name: 'Từ điển AI 3 (Gemini Flash Latest)',
+    model: 'gemini-flash-latest',
+    fallbackModel: 'gemini-3.1-flash-lite',
     description: 'Dự phòng siêu tốc độ cao và ổn định',
   },
 ];
@@ -409,10 +409,14 @@ export async function callGeminiDictionaryAlternating(
 
       for (const dictAI of dictSequence) {
         try {
+          const modelConfig = { ...config };
+          if (!dictAI.model.startsWith('gemini-3') && modelConfig.thinkingConfig) {
+            delete modelConfig.thinkingConfig;
+          }
           const res = await ai.models.generateContent({
             model: dictAI.model,
             contents,
-            config,
+            config: modelConfig,
           });
           if (res && res.text) {
             return {
@@ -429,13 +433,18 @@ export async function callGeminiDictionaryAlternating(
           }
         } catch (err: any) {
           lastError = err;
+          console.warn(`[DICTIONARY AI] Model ${dictAI.model} (${dictAI.name}) gặp lỗi, thử tiếp:`, err?.message || err);
           // Thử fallback model của riêng từ điển AI
           if (dictAI.fallbackModel && dictAI.fallbackModel !== dictAI.model) {
             try {
+              const fallbackConfig = { ...config };
+              if (!dictAI.fallbackModel.startsWith('gemini-3') && fallbackConfig.thinkingConfig) {
+                delete fallbackConfig.thinkingConfig;
+              }
               const resFallback = await ai.models.generateContent({
                 model: dictAI.fallbackModel,
                 contents,
-                config,
+                config: fallbackConfig,
               });
               if (resFallback && resFallback.text) {
                 return {
@@ -450,11 +459,12 @@ export async function callGeminiDictionaryAlternating(
                   },
                 };
               }
-            } catch (err2) {
+            } catch (err2: any) {
               lastError = err2;
+              console.warn(`[DICTIONARY AI] Fallback model ${dictAI.fallbackModel} gặp lỗi:`, err2?.message || err2);
             }
           }
-          await new Promise((resolve) => setTimeout(resolve, 150));
+          await new Promise((resolve) => setTimeout(resolve, 80));
         }
       }
 
@@ -694,7 +704,7 @@ Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markd
 const serverDictionaryCache = new Map<string, any>();
 const MAX_SERVER_CACHE_SIZE = 500;
 
-export async function handleDictionaryLookup(body: any, headers?: any) {
+export async function handleDictionaryLookup(body: any, headers?: any, localVocabs?: any[]) {
   const { query, language, mode, forceRefresh, customApiKey, customApiKey2 } = body;
   if (!query || typeof query !== 'string' || !query.trim()) {
     throw new Error('Từ khóa tra cứu không được để trống');
@@ -710,6 +720,69 @@ export async function handleDictionaryLookup(body: any, headers?: any) {
       ...cached,
       fromCache: true,
     };
+  }
+
+  // Khi tìm những từ đã có sẵn trong kho từ vựng và không phải làm mới:
+  // "kh cần AI phải biên soạn lại quá chi tiết, có thể bê nguyên cái đã có trong kho và đưa ra. Chỉ cần cho thêm 1 ví dụ kèm."
+  if (!forceRefresh && localVocabs && localVocabs.length > 0) {
+    const qLower = qClean.toLowerCase();
+    const matched = localVocabs.find(
+      (v: any) =>
+        (v.tu && v.tu.trim().toLowerCase() === qLower && (!v.ngon_ngu || v.ngon_ngu === language)) ||
+        (v.nghia && v.nghia.trim().toLowerCase() === qLower && (!v.ngon_ngu || v.ngon_ngu === language))
+    ) || localVocabs.find(
+      (v: any) =>
+        (v.tu && v.tu.trim().toLowerCase() === qLower) ||
+        (v.nghia && v.nghia.trim().toLowerCase() === qLower)
+    );
+
+    if (matched) {
+      const example = matched.vi_du
+        ? [{ sentence: matched.vi_du, phonetic: '', translation: matched.vi_du_dich || '' }]
+        : [{
+            sentence: language === 'en'
+              ? `Please practice using the word "${matched.tu}" in everyday conversations.`
+              : language === 'ko'
+              ? `우리는 매일 "${matched.tu}"(을/를) 연습합니다.`
+              : `我们每天都练习使用"${matched.tu}"。`,
+            phonetic: '',
+            translation: `Ví dụ minh họa cho từ "${matched.tu}": ${matched.nghia}`,
+          }];
+
+      const localRes = {
+        found: true,
+        word: matched.tu,
+        originalScript: matched.tu,
+        phonetic: matched.phien_am || '',
+        partOfSpeech: matched.loai_tu || 'Từ vựng',
+        level: matched.cap_do || 'Cơ bản',
+        bai_hoc: matched.bai_hoc || matched.chu_de || 'Kho từ cá nhân',
+        primaryMeaning: matched.nghia,
+        additionalMeanings: [],
+        hanVietOrRoot: matched.nghia_tieng_han || matched.phien_am_tieng_han || '',
+        englishMeaning: matched.nghia_tieng_anh || (language === 'en' ? matched.nghia : ''),
+        koreanMeaning: matched.nghia_tieng_han || (language === 'ko' ? matched.nghia : ''),
+        chineseMeaning: '',
+        definition: `Mục từ sẵn có từ Kho Từ Vựng nội bộ (Hộp SRS ${matched.srs_box ?? 0}${matched.retention_level ? `, ${matched.retention_level}` : ''}). Trích xuất tức thì không cần AI biên soạn.`,
+        examples: example,
+        synonyms: [],
+        antonyms: [],
+        collocations: [],
+        conjugationsOrForms: [],
+        grammarNotes: matched.ghi_chu || '',
+        mnemonic: matched.retention_level ? `Trạng thái: ${matched.retention_level}` : '',
+        query: qClean,
+        language,
+        aiModel: 'Kho Từ Vựng Nội Bộ (Lấy trực tiếp từ kho & 1 ví dụ)',
+        aiModelId: 'local-store-direct',
+        turn: 1,
+        fromCache: true,
+        fromLocalDatabase: true,
+      };
+
+      serverDictionaryCache.set(cacheKey, localRes);
+      return localRes;
+    }
   }
 
   const langName = language === 'en' ? 'Tiếng Anh' : language === 'ko' ? 'Tiếng Hàn' : 'Tiếng Trung';
@@ -777,17 +850,64 @@ Trả về duy nhất định dạng JSON chuẩn:
 }`;
 
   // Gọi độc quyền 2 con AI chỉ dành riêng cho Tra Từ Điển với 2 Mã Nguồn Gemini API
-  const resultObj = await callGeminiDictionaryAlternating(
-    { customApiKey, customApiKey2, headers },
-    prompt,
-    {
-      responseMimeType: 'application/json',
-      temperature: 0.2,
-      thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
-      },
+  let resultObj: any = null;
+  try {
+    resultObj = await callGeminiDictionaryAlternating(
+      { customApiKey, customApiKey2, headers },
+      prompt,
+      {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      }
+    );
+  } catch (aiErr: any) {
+    console.warn('[DICTIONARY LOOKUP] Tất cả AI models đều bận hoặc gặp sự cố, kiểm tra kho dữ liệu nội bộ:', aiErr?.message || aiErr);
+    
+    // Nếu AI gặp sự cố (ví dụ 503 spike từ Google), thử đối chiếu trong kho từ vựng nội bộ của app
+    if (localVocabs && localVocabs.length > 0) {
+      const qLower = qClean.toLowerCase();
+      const matched = localVocabs.find(
+        (v: any) =>
+          (v.tu && v.tu.trim().toLowerCase() === qLower) ||
+          (v.nghia && v.nghia.trim().toLowerCase() === qLower) ||
+          (v.tu && v.tu.toLowerCase().includes(qLower) && v.ngon_ngu === language) ||
+          (v.nghia && v.nghia.toLowerCase().includes(qLower) && v.ngon_ngu === language)
+      );
+
+      if (matched) {
+        return {
+          found: true,
+          word: matched.tu,
+          originalScript: matched.tu,
+          phonetic: matched.phien_am || '',
+          partOfSpeech: matched.loai_tu || 'Từ vựng',
+          level: matched.cap_do || 'Cơ bản',
+          bai_hoc: matched.bai_hoc || 'Bài 1',
+          primaryMeaning: matched.nghia,
+          additionalMeanings: [],
+          hanVietOrRoot: matched.nghia_tieng_han || '',
+          englishMeaning: matched.nghia_tieng_anh || '',
+          koreanMeaning: matched.nghia_tieng_han || '',
+          chineseMeaning: '',
+          definition: `Định nghĩa tra cứu từ Sổ Từ Vựng: ${matched.nghia}`,
+          examples: matched.vi_du ? [{ sentence: matched.vi_du, phonetic: '', translation: matched.vi_du_dich || '' }] : [],
+          synonyms: [],
+          antonyms: [],
+          collocations: [],
+          conjugationsOrForms: [],
+          query: qClean,
+          language,
+          aiModel: 'Kho Từ Vựng Nội Bộ (Dự Phòng Ngoại Tuyến)',
+          aiModelId: 'local-store',
+          turn: 1,
+          fromCache: false,
+          fromLocalDatabase: true,
+        };
+      }
     }
-  );
+
+    throw aiErr;
+  }
 
   const parsed = safeParseJSON(resultObj.res.text || '{}');
   const finalResult = {

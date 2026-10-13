@@ -39,9 +39,12 @@ export const GameReviewHub: React.FC = () => {
   const [activeTopicFilter, setActiveTopicFilter] = useState<string>('ALL');
   const [activePosFilter, setActivePosFilter] = useState<string>('ALL');
   const [activeLimitFilter, setActiveLimitFilter] = useState<string>('ALL');
-  const [activeStatusFilter, setActiveStatusFilter] = useState<
-    'all' | 'due' | 'difficult' | 'today_flashcard' | 'chua_thuoc' | 'quen' | 'hoi_nho' | 'nho' | 'chua_danh_gia'
-  >('all');
+  // 1. Lựa chọn Ôn Bài hôm nay hay không
+  const [activeTodayFilter, setActiveTodayFilter] = useState<'ALL' | 'today_only'>('ALL');
+  // 2. Cho phép chọn trạng thái của từ
+  const [activeRetentionFilter, setActiveRetentionFilter] = useState<
+    'ALL' | 'due' | 'difficult' | 'chua_thuoc' | 'quen' | 'hoi_nho' | 'nho' | 'chua_danh_gia'
+  >('ALL');
 
   const [shuffleKey, setShuffleKey] = useState<number>(0);
 
@@ -63,29 +66,34 @@ export const GameReviewHub: React.FC = () => {
       return false;
     }
 
-    if (activeStatusFilter === 'today_flashcard') {
-      return Boolean(w.is_added_today_flashcard || (w as any).is_starred);
-    } else if (activeStatusFilter === 'due') {
+    // 1. Lựa chọn Ôn Bài hôm nay hay không
+    if (activeTodayFilter === 'today_only') {
+      if (!w.is_added_today_flashcard && !(w as any).is_starred) return false;
+    }
+
+    // 2. Cho phép chọn trạng thái của từ
+    if (activeRetentionFilter === 'due') {
       const now = new Date();
-      return !w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0;
-    } else if (activeStatusFilter === 'difficult') {
-      return (w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1;
-    } else if (activeStatusFilter === 'chua_thuoc') {
-      return w.retention_level === 'chua_thuoc';
-    } else if (activeStatusFilter === 'quen') {
-      return w.retention_level === 'quen';
-    } else if (activeStatusFilter === 'hoi_nho') {
-      return w.retention_level === 'hoi_nho';
-    } else if (activeStatusFilter === 'nho') {
-      return w.retention_level === 'nho';
-    } else if (activeStatusFilter === 'chua_danh_gia') {
-      return !w.retention_level || w.retention_level === 'chua_danh_gia';
+      if (!(!w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0)) return false;
+    } else if (activeRetentionFilter === 'difficult') {
+      if (!((w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1)) return false;
+    } else if (activeRetentionFilter === 'chua_thuoc') {
+      if (w.retention_level !== 'chua_thuoc') return false;
+    } else if (activeRetentionFilter === 'quen') {
+      if (w.retention_level !== 'quen') return false;
+    } else if (activeRetentionFilter === 'hoi_nho') {
+      if (w.retention_level !== 'hoi_nho') return false;
+    } else if (activeRetentionFilter === 'nho') {
+      if (w.retention_level !== 'nho') return false;
+    } else if (activeRetentionFilter === 'chua_danh_gia') {
+      if (w.retention_level && w.retention_level !== 'chua_danh_gia') return false;
     }
 
     return true;
   });
 
-  const filteredPool = activeStatusFilter === 'today_flashcard'
+  const isFilteringActive = activeTodayFilter === 'today_only' || activeRetentionFilter !== 'ALL';
+  const filteredPool = isFilteringActive
     ? reviewWords
     : (reviewWords.length > 0 ? reviewWords : currentLangVocabulary);
   
@@ -104,7 +112,7 @@ export const GameReviewHub: React.FC = () => {
   React.useEffect(() => {
     if (selectedGameMode) {
       if (!sessionWords || sessionWords.length === 0) {
-        setSessionWords(finalWordsToPlay.length > 0 ? finalWordsToPlay : (activeStatusFilter === 'today_flashcard' ? [] : currentLangVocabulary));
+        setSessionWords(finalWordsToPlay.length > 0 ? finalWordsToPlay : (isFilteringActive ? [] : currentLangVocabulary));
       }
     } else {
       if (sessionWords) {
@@ -210,8 +218,8 @@ export const GameReviewHub: React.FC = () => {
         return (
           <FlashcardGame
             words={currentLangVocabulary}
-            initialWords={activeStatusFilter === 'today_flashcard' ? reviewWords : undefined}
-            initialRetentionFilter={activeStatusFilter === 'today_flashcard' ? 'today_flashcard' : undefined}
+            initialWords={isFilteringActive ? reviewWords : undefined}
+            initialRetentionFilter={activeTodayFilter === 'today_only' ? 'today_only' : undefined}
             language={currentLanguage}
             onFinish={handleFinishGame}
             onRecordSRS={recordSRSRating}
@@ -342,25 +350,39 @@ export const GameReviewHub: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {/* Status filter */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {/* 1. Lựa chọn Ôn Bài hôm nay hay không */}
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
-              Nguồn từ & Trạng thái:
+              Ôn bài hôm nay:
             </label>
             <select
-              value={activeStatusFilter}
-              onChange={(e: any) => setActiveStatusFilter(e.target.value)}
+              value={activeTodayFilter}
+              onChange={(e: any) => setActiveTodayFilter(e.target.value)}
               className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none font-bold cursor-pointer"
             >
-              <option value="today_flashcard">⭐ Thẻ Hôm Nay (Đã đánh sao)</option>
-              <option value="all">Toàn bộ kho từ</option>
-              <option value="chua_thuoc">🔴 Chưa thuộc (Hộp 0)</option>
-              <option value="quen">🟠 Quên</option>
-              <option value="hoi_nho">🔵 Hơi nhớ</option>
-              <option value="nho">🟢 Đã nhớ</option>
-              <option value="chua_danh_gia">⚪ Chưa đánh giá</option>
-              <option value="due">⏰ Cần ôn hôm nay (SRS)</option>
+              <option value="ALL">Toàn bộ kho từ</option>
+              <option value="today_only">⭐ Chỉ ôn bài hôm nay (Đã đánh sao)</option>
+            </select>
+          </div>
+
+          {/* 2. Cho phép chọn trạng thái của từ */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
+              Trạng thái của từ:
+            </label>
+            <select
+              value={activeRetentionFilter}
+              onChange={(e: any) => setActiveRetentionFilter(e.target.value)}
+              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none font-bold cursor-pointer"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="chua_danh_gia">⚪ Chưa đánh giá (Chưa chơi)</option>
+              <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
+              <option value="quen">🟠 2. Quên</option>
+              <option value="hoi_nho">🔵 3. Hơi nhớ</option>
+              <option value="nho">🟢 4. Đã nhớ</option>
+              <option value="due">⏰ Cần ôn ngay (SRS)</option>
               <option value="difficult">⚠️ Từ khó cần củng cố</option>
             </select>
           </div>
@@ -443,7 +465,7 @@ export const GameReviewHub: React.FC = () => {
           </div>
         </div>
 
-        {activeStatusFilter === 'today_flashcard' && (
+        {activeTodayFilter === 'today_only' && (
           <div className={`mt-3 p-3 border text-xs font-mono flex items-center justify-between ${
             reviewWords.length === 0
               ? 'bg-amber-50 border-amber-300 text-amber-900'

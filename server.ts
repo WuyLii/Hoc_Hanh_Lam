@@ -239,7 +239,7 @@ async function startServer() {
   // 7.5. Deep Academic Bilingual Dictionary Lookup (Anh-Việt, Hàn-Việt, Trung-Việt)
   app.post('/api/gemini/dictionary-lookup', async (req, res) => {
     try {
-      const result = await handleDictionaryLookup(req.body, req.headers);
+      const result = await handleDictionaryLookup(req.body, req.headers, memoryStore.vocabulary);
       res.json(result);
     } catch (error: any) {
       console.error('Error in /api/gemini/dictionary-lookup:', error);

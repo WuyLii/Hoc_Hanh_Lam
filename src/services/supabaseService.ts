@@ -725,6 +725,7 @@ export class SupabaseService {
   public static async saveVocabulary(word: VocabularyItem): Promise<{ success: boolean; error?: string }> {
     const clean = {
       ...word,
+      user_id: word.user_id || 'shared',
       last_reviewed: word.last_reviewed ? word.last_reviewed : null,
       srs_next_review: word.srs_next_review || new Date().toISOString(),
       retention_level: word.retention_level || 'chua_danh_gia',
@@ -785,6 +786,7 @@ export class SupabaseService {
     if (words.length === 0) return { success: true, count: 0 };
     const cleanVocab = words.map((v) => ({
       ...v,
+      user_id: v.user_id || 'shared',
       last_reviewed: v.last_reviewed ? v.last_reviewed : null,
       srs_next_review: v.srs_next_review || new Date().toISOString(),
       retention_level: v.retention_level || 'chua_danh_gia',

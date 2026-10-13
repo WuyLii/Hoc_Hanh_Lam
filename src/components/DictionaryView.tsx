@@ -75,6 +75,7 @@ export const DictionaryView: React.FC = () => {
   const currentLangInfo = LANGUAGES[currentLanguage];
 
   const [query, setQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchMode, setSearchMode] = useState<'auto' | 'target_to_vi' | 'vi_to_target'>('auto');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,8 +113,45 @@ export const DictionaryView: React.FC = () => {
       .filter(({ match }) => match.matches)
       .sort((a, b) => b.match.score - a.match.score)
       .map(({ item }) => item)
-      .slice(0, 5);
+      .slice(0, 6);
   }, [query, currentLangVocabulary]);
+
+  // Gợi ý những từ tìm thấy trong kho từ vựng của người dùng
+  // CHỈ HIỂN THỊ KHI ĐÃ TÌM KIẾM (khi nào tìm từ thì mới hiện lên, chưa tìm từ thì ẩn đi)
+  const suggestedStoreVocabs = useMemo(() => {
+    // Khi chưa tìm từ (chưa có result) -> Ẩn hoàn toàn để hiển thị giống ban đầu
+    if (!result || !currentLangVocabulary || currentLangVocabulary.length === 0) {
+      return [];
+    }
+
+    const activeTerm = (result.word || query || '').trim().toLowerCase();
+    if (!activeTerm) return [];
+
+    // Tìm các từ trong kho có liên quan đến từ vừa tra cứu
+    const matched = currentLangVocabulary
+      .map((item) => ({ item, match: matchVocabulary(item, activeTerm, 'both') }))
+      .filter(({ match }) => match.matches)
+      .sort((a, b) => b.match.score - a.match.score)
+      .map(({ item }) => item);
+
+    // Bổ sung các từ cùng chủ đề hoặc bài học nếu có
+    const matchedIds = new Set(matched.map((m) => m.word_id));
+    const currentTopic = matched[0]?.chu_de;
+    const topicComplements = currentLangVocabulary.filter(
+      (v) => !matchedIds.has(v.word_id) && currentTopic && v.chu_de === currentTopic
+    );
+
+    // Các từ nổi bật khác trong kho (được đánh dấu sao hoặc flashcard)
+    const otherComplements = [...currentLangVocabulary]
+      .filter((v) => !matchedIds.has(v.word_id) && !topicComplements.some((t) => t.word_id === v.word_id))
+      .sort((a, b) => {
+        const aPri = (a.is_starred ? 5 : 0) + (a.is_added_today_flashcard ? 4 : 0);
+        const bPri = (b.is_starred ? 5 : 0) + (b.is_added_today_flashcard ? 4 : 0);
+        return bPri - aPri;
+      });
+
+    return [...matched, ...topicComplements, ...otherComplements].slice(0, 6);
+  }, [result, query, currentLangVocabulary]);
 
   // Check if the current result word is already in vocabulary bank
   const isAlreadyInVocab = useMemo(() => {
@@ -141,10 +179,93 @@ export const DictionaryView: React.FC = () => {
     const term = (searchTerm !== undefined ? searchTerm : query).trim();
     if (!term) return;
 
+    // Ẩn gợi ý ngay khi người dùng tìm kiếm (hoặc bấm chọn từ gợi ý)
+    setShowSuggestions(false);
     setQuery(term);
-    setLoading(true);
     setError(null);
 
+    // Khi tìm những từ đã có sẵn trong kho từ vựng:
+    // "kh cần AI phải biên soạn lại quá chi tiết, có thể bê nguyên cái đã có trong kho và đưa ra. Chỉ cần cho thêm 1 ví dụ kèm."
+    if (!forceRefresh) {
+      const termLower = term.toLowerCase();
+      // Khớp chính xác từ hoặc nghĩa
+      const exactMatch = currentLangVocabulary.find(
+        (v) =>
+          (v.tu && v.tu.trim().toLowerCase() === termLower) ||
+          (v.nghia && v.nghia.trim().toLowerCase() === termLower)
+      );
+
+      // Nếu không khớp chính xác, tìm khớp bắt đầu bằng
+      const matchedVocab = exactMatch || currentLangVocabulary.find(
+        (v) =>
+          (v.tu && v.tu.trim().toLowerCase().startsWith(termLower)) ||
+          (v.nghia && v.nghia.trim().toLowerCase().includes(termLower))
+      );
+
+      if (matchedVocab) {
+        setLoading(false);
+
+        // Bê nguyên cái đã có trong kho và đưa ra, kèm đúng 1 câu ví dụ
+        const hasExample = matchedVocab.vi_du && matchedVocab.vi_du.trim().length > 0;
+        const examplesList = hasExample
+          ? [{ sentence: matchedVocab.vi_du, phonetic: '', translation: matchedVocab.vi_du_dich || '' }]
+          : [{
+              sentence: currentLanguage === 'en'
+                ? `Please practice using the word "${matchedVocab.tu}" in everyday conversations.`
+                : currentLanguage === 'ko'
+                ? `우리는 매일 "${matchedVocab.tu}"(을/를) 연습합니다.`
+                : `我们每天都练习使用"${matchedVocab.tu}"。`,
+              phonetic: '',
+              translation: `Ví dụ minh họa cho từ "${matchedVocab.tu}": ${matchedVocab.nghia}`,
+            }];
+
+        const localResult: DictionaryResult = {
+          query: term,
+          language: currentLanguage,
+          found: true,
+          word: matchedVocab.tu,
+          originalScript: matchedVocab.tu,
+          phonetic: matchedVocab.phien_am || '',
+          partOfSpeech: matchedVocab.loai_tu || 'Từ vựng',
+          level: matchedVocab.cap_do || 'Cơ bản',
+          bai_hoc: matchedVocab.bai_hoc || matchedVocab.chu_de || 'Kho từ cá nhân',
+          primaryMeaning: matchedVocab.nghia,
+          additionalMeanings: [],
+          hanVietOrRoot: matchedVocab.nghia_tieng_han || matchedVocab.phien_am_tieng_han || '',
+          englishMeaning: matchedVocab.nghia_tieng_anh || (currentLanguage === 'en' ? matchedVocab.nghia : ''),
+          koreanMeaning: matchedVocab.nghia_tieng_han || (currentLanguage === 'ko' ? matchedVocab.nghia : ''),
+          chineseMeaning: '',
+          definition: `Mục từ sẵn có từ Kho Từ Vựng cá nhân (Hộp SRS ${matchedVocab.srs_box ?? 0}${
+            matchedVocab.retention_level ? ` • ${matchedVocab.retention_level === 'nho' ? 'Đã nhớ' : matchedVocab.retention_level === 'hoi_nho' ? 'Hơi nhớ' : matchedVocab.retention_level === 'quen' ? 'Quên' : 'Chưa thuộc'}` : ''
+          }). Trích xuất tức thì 0ms không cần AI biên soạn lại, kèm 1 ví dụ thực tế.`,
+          examples: examplesList,
+          synonyms: [],
+          antonyms: [],
+          collocations: [],
+          conjugationsOrForms: [],
+          grammarNotes: matchedVocab.ghi_chu || '',
+          mnemonic: matchedVocab.retention_level ? `Trạng thái: Hộp SRS ${matchedVocab.srs_box} (${matchedVocab.retention_level})` : '',
+          aiModel: 'Kho Từ Vựng Cá Nhân (Lấy trực tiếp từ kho & 1 ví dụ)',
+          aiModelId: 'local-store-direct',
+          fromCache: true,
+        };
+
+        setResult(localResult);
+
+        // Lưu vào lịch sử tra cứu
+        const updated = saveDictionaryHistory({
+          query: term,
+          word: localResult.word,
+          meaning: localResult.primaryMeaning || '',
+          language: currentLanguage,
+        });
+        setHistory(updated);
+        return;
+      }
+    }
+
+    // Nếu từ chưa có trong kho từ vựng hoặc người dùng yêu cầu forceRefresh
+    setLoading(true);
     try {
       const res = await lookupDictionaryApi(term, currentLanguage, searchMode, forceRefresh);
       setResult(res);
@@ -392,7 +513,25 @@ export const DictionaryView: React.FC = () => {
                 ref={inputRef}
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setQuery(val);
+                  if (val.trim()) {
+                    setShowSuggestions(true);
+                  } else {
+                    setShowSuggestions(false);
+                  }
+                }}
+                onFocus={() => {
+                  if (query.trim()) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setShowSuggestions(false);
+                  }
+                }}
                 placeholder={`Nhập từ vựng (${currentLangInfo.name}) hoặc nghĩa tiếng Việt cần tra...`}
                 className="w-full pl-11 pr-10 py-3 bg-[#F9F7F2] border-2 border-[#1A1A1A] text-sm font-mono text-[#1A1A1A] placeholder-stone-400 focus:outline-none focus:bg-white transition"
               />
@@ -401,6 +540,9 @@ export const DictionaryView: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setQuery('');
+                    setResult(null);
+                    setError(null);
+                    setShowSuggestions(false);
                     inputRef.current?.focus();
                   }}
                   className="absolute right-3 top-3 text-stone-400 hover:text-[#1A1A1A] p-0.5"
@@ -441,7 +583,7 @@ export const DictionaryView: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Word Suggestions */}
+          {/* Quick Word Suggestions - Giữ nguyên như ban đầu */}
           <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono pt-1">
             <span className="text-stone-500 text-[11px] uppercase font-bold mr-1">Từ gợi ý nhanh:</span>
             {SUGGESTED_WORDS[currentLanguage]?.map((item) => (
@@ -463,38 +605,82 @@ export const DictionaryView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Result View (8 Cols) */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Matched Local Vocabulary Notice */}
-          {matchedLocalVocabs.length > 0 && !result && (
-            <div className="border-2 border-[#1A1A1A] bg-amber-50 p-4 editorial-shadow-sm space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-mono text-xs font-bold text-amber-900">
-                  <Bookmark className="w-4 h-4 text-amber-600" />
-                  <span>TÌM THẤY {matchedLocalVocabs.length} TỪ TRONG KHO TỪ VỰNG CỦA BẠN:</span>
+          {/* Gợi ý những từ tìm thấy trong kho từ vựng - Hiện khi đang gõ phím tìm kiếm, ẩn đi sau khi tìm kiếm xong */}
+          {showSuggestions && matchedLocalVocabs.length > 0 && (
+            <div className="border-2 border-[#1A1A1A] bg-amber-50/95 p-4 editorial-shadow-sm space-y-3 animate-in fade-in duration-150">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-300/80 pb-2.5">
+                <div className="flex items-center gap-2 font-mono text-xs font-bold text-amber-950">
+                  <Bookmark className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span className="uppercase tracking-wide">
+                    GỢI Ý {matchedLocalVocabs.length} TỪ TRONG KHO TỪ VỰNG KHỚP VỚI &quot;{query.trim()}&quot;:
+                  </span>
                 </div>
-                <button
-                  onClick={() => setActiveNav('vocabulary')}
-                  className="text-[11px] font-mono font-bold text-amber-800 underline hover:text-black"
-                >
-                  Mở Sổ Từ Vựng ➔
-                </button>
+                <div className="flex items-center gap-3 text-[11px] font-mono font-bold text-amber-900">
+                  <span className="text-amber-800 text-[10px] bg-amber-200/80 px-2 py-0.5 border border-amber-300">
+                    ⚡ Bấm để tra cứu tức thì (0ms & kèm 1 ví dụ)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowSuggestions(false)}
+                    className="text-stone-500 hover:text-black font-bold transition text-xs"
+                    title="Đóng gợi ý"
+                  >
+                    ✕ Đóng
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+
+              {/* Grid các từ gợi ý trong kho */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-0.5">
                 {matchedLocalVocabs.map((vocab) => (
                   <div
                     key={vocab.word_id}
                     onClick={() => handleSearch(vocab.tu)}
-                    className="p-2.5 bg-white border border-[#1A1A1A] hover:bg-amber-100/50 cursor-pointer transition flex items-start justify-between gap-2"
+                    className="p-2.5 border border-[#1A1A1A] bg-white hover:bg-amber-100/70 hover:shadow-xs transition cursor-pointer flex flex-col justify-between gap-1.5"
+                    title={`Bấm để tra cứu tức thì từ "${vocab.tu}"`}
                   >
-                    <div>
-                      <div className="font-bold text-sm text-[#1A1A1A]">{vocab.tu}</div>
-                      <div className="text-xs text-stone-600 line-clamp-1">{vocab.nghia}</div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-baseline justify-between gap-1">
+                        <span className="font-bold text-sm text-[#1A1A1A] truncate">{vocab.tu}</span>
+                        <span className="text-[9px] font-mono font-bold bg-amber-600 text-white px-1 py-0.2 shrink-0">
+                          Trong kho
+                        </span>
+                      </div>
+                      <div className="text-xs text-stone-700 line-clamp-1">{vocab.nghia}</div>
                       {vocab.phien_am && (
-                        <div className="text-[10px] font-mono text-stone-400">[{vocab.phien_am}]</div>
+                        <div className="text-[10px] font-mono text-stone-500 truncate">[{vocab.phien_am}]</div>
                       )}
                     </div>
-                    <span className="text-[9px] font-mono font-bold bg-[#1A1A1A] text-white px-1.5 py-0.5 uppercase">
-                      Hộp SRS {vocab.srs_box}
-                    </span>
+
+                    <div className="flex items-center justify-between text-[9px] font-mono font-bold pt-1 border-t border-stone-200/80">
+                      <span className="bg-[#1A1A1A] text-white px-1.5 py-0.5 uppercase">
+                        Hộp {vocab.srs_box}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {vocab.retention_level && (
+                          <span className={`px-1.5 py-0.5 uppercase ${
+                            vocab.retention_level === 'nho'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : vocab.retention_level === 'hoi_nho'
+                              ? 'bg-blue-100 text-blue-800'
+                              : vocab.retention_level === 'quen'
+                              ? 'bg-amber-200 text-amber-900'
+                              : 'bg-stone-200 text-stone-700'
+                          }`}>
+                            {vocab.retention_level === 'nho'
+                              ? 'Đã nhớ'
+                              : vocab.retention_level === 'hoi_nho'
+                              ? 'Hơi nhớ'
+                              : vocab.retention_level === 'quen'
+                              ? 'Quên'
+                              : 'Chưa thuộc'}
+                          </span>
+                        )}
+                        {(vocab.is_starred || vocab.is_added_today_flashcard) && (
+                          <Star className="w-3 h-3 fill-amber-500 text-amber-600" />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -525,7 +711,7 @@ export const DictionaryView: React.FC = () => {
               </div>
               <p>{error}</p>
               <button
-                onClick={() => handleSearch()}
+                onClick={() => handleSearch(query, true)}
                 className="px-4 py-2 bg-red-600 text-white font-bold uppercase hover:bg-red-700 transition"
               >
                 Thử lại ngay
@@ -536,6 +722,22 @@ export const DictionaryView: React.FC = () => {
           {/* Detailed Dictionary Result */}
           {result && !loading && (
             <div className="border-2 border-[#1A1A1A] bg-white p-4 sm:p-6 md:p-8 editorial-shadow space-y-5 sm:space-y-6">
+              {/* Thông báo nếu từ vừa tìm đã có sẵn trong kho */}
+              {isAlreadyInVocab && (
+                <div className="p-3 bg-emerald-50 border border-emerald-400 text-emerald-950 text-xs font-mono flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>
+                      Từ <strong className="font-bold underline">{isAlreadyInVocab.tu}</strong> đã có sẵn trong kho từ vựng của bạn (Hộp SRS {isAlreadyInVocab.srs_box}
+                      {isAlreadyInVocab.retention_level ? ` • ${isAlreadyInVocab.retention_level === 'nho' ? 'Đã nhớ' : isAlreadyInVocab.retention_level === 'hoi_nho' ? 'Hơi nhớ' : isAlreadyInVocab.retention_level === 'quen' ? 'Quên' : 'Chưa thuộc'}` : ''}).
+                      {result.aiModelId === 'local-store-direct' && ' Đã lấy trực tiếp từ kho kèm 1 ví dụ.'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 font-bold uppercase shrink-0">
+                    Có sẵn trong kho
+                  </span>
+                </div>
+              )}
               {/* Header Info */}
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-[#1A1A1A] pb-5">
                 <div className="space-y-2">
@@ -842,7 +1044,9 @@ export const DictionaryView: React.FC = () => {
                   <span className="flex items-center gap-1.5 font-bold text-[#1A1A1A]">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                     <span>
-                      {result.fromCache
+                      {result.aiModelId === 'local-store-direct'
+                        ? '📦 Trích xuất trực tiếp từ Kho Từ Vựng của bạn (0ms - Kèm 1 ví dụ)'
+                        : result.fromCache
                         ? '⚡ Tải tức thì từ Bộ nhớ đệm (0ms - Tiết kiệm quota)'
                         : `Xử lý bởi: ${result.aiModel || 'Từ điển AI Độc Quyền'}`}
                     </span>
@@ -852,9 +1056,15 @@ export const DictionaryView: React.FC = () => {
                       Lượt #{result.turn}
                     </span>
                   )}
-                  <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 border border-emerald-300 font-semibold text-[10px]">
-                    ● Độc quyền 2 AI luân phiên (Không lo hết lượt)
-                  </span>
+                  {result.aiModelId === 'local-store-direct' ? (
+                    <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 border border-emerald-300 font-semibold text-[10px]">
+                      ✓ Đã có sẵn trong kho từ vựng
+                    </span>
+                  ) : (
+                    <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 border border-emerald-300 font-semibold text-[10px]">
+                      ● Độc quyền 2 AI luân phiên (Không lo hết lượt)
+                    </span>
+                  )}
                 </div>
 
                 <button
@@ -863,7 +1073,9 @@ export const DictionaryView: React.FC = () => {
                   disabled={loading}
                   className="text-stone-700 hover:text-black font-bold underline transition self-start sm:self-auto"
                 >
-                  Tra cứu lại (Làm mới AI) ➔
+                  {result.aiModelId === 'local-store-direct'
+                    ? 'Biên soạn lại bằng AI chuyên sâu ➔'
+                    : 'Tra cứu lại (Làm mới AI) ➔'}
                 </button>
               </div>
             </div>

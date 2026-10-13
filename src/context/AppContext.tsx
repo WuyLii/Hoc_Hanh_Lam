@@ -820,7 +820,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateRetentionLevel = (wordId: string, level: VocabularyRetentionLevel) => {
-    const targetWord = vocabulary.find((w) => w.word_id === wordId);
+    let targetWord = vocabulary.find((w) => w.word_id === wordId);
+    if (!targetWord) {
+      targetWord = vocabulary.find((w) => w.word_id?.toLowerCase() === wordId?.toLowerCase());
+    }
     if (!targetWord) return;
     const updatedWord: VocabularyItem = {
       ...targetWord,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { VocabularyItem, LanguageCode } from '../../types';
+import { VocabularyItem, LanguageCode, VocabularyRetentionLevel } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { RecallQuality } from '../../services/srsEngine';
 import { SpeakButton } from '../SpeakButton';
@@ -201,6 +201,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionResults, setSessionResults] = useState<{ wordId: string; rating: RecallQuality }[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
   // When words prop changes initially, sync activeWords
   useEffect(() => {
@@ -228,9 +229,26 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     if (!currentWord || isAdvancingRef.current) return;
     isAdvancingRef.current = true;
 
+    // Map rating to retention level: again->chua_thuoc, hard->quen, good->hoi_nho, easy->nho
+    let retention: VocabularyRetentionLevel = 'chua_thuoc';
+    if (rating === 'hard') retention = 'quen';
+    else if (rating === 'good') retention = 'hoi_nho';
+    else if (rating === 'easy') retention = 'nho';
+
+    // Update activeWords local state so the current word immediately reflects its new retention level
+    setActiveWords((prev) =>
+      prev.map((w) =>
+        w.word_id === currentWord.word_id ? { ...w, retention_level: retention } : w
+      )
+    );
+
+    // Save directly to CSDL and SRS SM-2
     onRecordSRS(currentWord.word_id, rating);
     const newResults = [...sessionResults, { wordId: currentWord.word_id, rating }];
     setSessionResults(newResults);
+
+    setSavedNotice(retention);
+    setTimeout(() => setSavedNotice(null), 2500);
 
     if (currentIndex + 1 < activeWords.length) {
       setCurrentIndex((prev) => prev + 1);
@@ -1010,40 +1028,51 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
 
               {/* Retention Level Badge */}
               {/* Interactive Retention Level Select on Card Face */}
-              <select
-                value={currentWord.retention_level || 'chua_danh_gia'}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  const newLevel = e.target.value as any;
-                  if (onUpdateRetention) {
-                    onUpdateRetention(currentWord.word_id, newLevel);
-                  }
-                  setActiveWords((prev) =>
-                    prev.map((w) =>
-                      w.word_id === currentWord.word_id ? { ...w, retention_level: newLevel } : w
-                    )
-                  );
-                }}
-                className={`px-2 py-0.5 border text-[10px] font-mono font-bold uppercase cursor-pointer rounded-none ${
-                  currentWord.retention_level === 'nho'
-                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
-                    : currentWord.retention_level === 'hoi_nho'
-                    ? 'bg-indigo-100 text-indigo-900 border-indigo-400'
-                    : currentWord.retention_level === 'quen'
-                    ? 'bg-amber-100 text-amber-900 border-amber-400'
-                    : currentWord.retention_level === 'chua_thuoc'
-                    ? 'bg-rose-100 text-rose-900 border-rose-400'
-                    : 'bg-stone-100 text-stone-700 border-stone-300'
-                }`}
-                title="Thay đổi trạng thái học thuộc và lưu trực tiếp vào CSDL toàn hệ thống"
-              >
-                <option value="chua_danh_gia">⚪ Chưa đánh giá</option>
-                <option value="chua_thuoc">🔴 Chưa thuộc</option>
-                <option value="quen">🟠 Quên</option>
-                <option value="hoi_nho">🔵 Hơi nhớ</option>
-                <option value="nho">🟢 Nhớ</option>
-              </select>
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={currentWord.retention_level || 'chua_danh_gia'}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    const newLevel = e.target.value as any;
+                    if (onUpdateRetention) {
+                      onUpdateRetention(currentWord.word_id, newLevel);
+                    }
+                    setActiveWords((prev) =>
+                      prev.map((w) =>
+                        w.word_id === currentWord.word_id ? { ...w, retention_level: newLevel } : w
+                      )
+                    );
+                    setSavedNotice(newLevel);
+                    setTimeout(() => setSavedNotice(null), 2500);
+                  }}
+                  className={`px-2 py-0.5 border text-[10px] font-mono font-bold uppercase cursor-pointer rounded-none transition shadow-sm ${
+                    currentWord.retention_level === 'nho'
+                      ? 'bg-emerald-100 text-emerald-900 border-emerald-500 font-black'
+                      : currentWord.retention_level === 'hoi_nho'
+                      ? 'bg-indigo-100 text-indigo-900 border-indigo-500 font-black'
+                      : currentWord.retention_level === 'quen'
+                      ? 'bg-amber-100 text-amber-900 border-amber-500 font-black'
+                      : currentWord.retention_level === 'chua_thuoc'
+                      ? 'bg-rose-100 text-rose-900 border-rose-500 font-black'
+                      : 'bg-stone-100 text-stone-700 border-stone-400'
+                  }`}
+                  title="Thay đổi trạng thái học thuộc và lưu trực tiếp vào CSDL toàn hệ thống ngay lập tức"
+                >
+                  <option value="chua_danh_gia">⚪ Chưa đánh giá</option>
+                  <option value="chua_thuoc">🔴 1. Chưa thuộc</option>
+                  <option value="quen">🟠 2. Quên</option>
+                  <option value="hoi_nho">🔵 3. Hơi nhớ</option>
+                  <option value="nho">🟢 4. Nhớ (Đã thuộc)</option>
+                </select>
+
+                {savedNotice && (
+                  <span className="px-1.5 py-0.5 bg-emerald-700 text-white text-[9px] font-mono font-bold tracking-tight animate-in fade-in zoom-in-95 border border-emerald-900 flex items-center gap-1 shadow-sm">
+                    <span>✓</span>
+                    <span>ĐÃ LƯU CSDL</span>
+                  </span>
+                )}
+              </div>
 
               {/* Interactive Star Button on Card Face */}
               <button
