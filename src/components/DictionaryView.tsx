@@ -540,13 +540,12 @@ export const DictionaryView: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setQuery('');
-                    setResult(null);
                     setError(null);
                     setShowSuggestions(false);
                     inputRef.current?.focus();
                   }}
                   className="absolute right-3 top-3 text-stone-400 hover:text-[#1A1A1A] p-0.5"
-                  title="Xóa tìm kiếm"
+                  title="Xóa ô nhập để tìm từ mới"
                 >
                   <X className="w-4 h-4" />
                 </button>
