@@ -111,7 +111,7 @@ const AppContent: React.FC = () => {
             </span>
           </div>
           <div className="text-xs font-serif italic text-stone-700 text-center sm:text-right">
-            Thuật toán lặp lại ngắt quãng SRS SM-2 • Trí tuệ nhân tạo Gemini 3.7 • Tự động đồng bộ Google Sheets (24h)
+            Hệ thống học tập thông minh với thuật toán ngắt quãng SRS SM-2 • Phát âm chuẩn quốc tế
           </div>
         </div>
       </footer>

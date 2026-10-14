@@ -420,19 +420,11 @@ export const DictionaryView: React.FC = () => {
       <div className="border-2 border-[#1A1A1A] bg-white p-4 sm:p-6 md:p-8 editorial-shadow space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 border-b border-[#1A1A1A]/20 pb-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="bg-[#1A1A1A] text-white text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5">
-                PHIÊN BẢN v3.0 MỚI
-              </span>
-              <span className="text-[11px] sm:text-xs font-mono uppercase text-stone-500 font-bold">
-                Song ngữ & Học thuật đối chiếu
-              </span>
-            </div>
             <h1 className="font-serif font-black text-2xl sm:text-4xl text-[#1A1A1A] tracking-tight">
               ĐẠI TỪ ĐIỂN ĐA NGÔN NGỮ
             </h1>
             <p className="font-mono text-xs text-stone-600 max-w-2xl leading-relaxed">
-              Tra cứu sâu mọi từ vựng ngoại ngữ với phiên âm quốc tế (IPA / Romaja / Pinyin), âm Hán Việt, bảng chia động từ, câu ví dụ thực tế và tự động đồng bộ kho từ SRS.
+              Tra cứu sâu mọi từ vựng ngoại ngữ với phiên âm quốc tế (IPA / Romaja / Pinyin), âm Hán Việt, bảng chia động từ và câu ví dụ thực tế.
             </p>
           </div>
 
@@ -463,43 +455,8 @@ export const DictionaryView: React.FC = () => {
           </div>
         </div>
 
-        {/* Dedicated 2 AI Architecture Banner */}
-        <div className="border border-[#1A1A1A] bg-[#F9F7F2] p-3 text-xs font-mono space-y-1.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-bold text-[#1A1A1A] uppercase tracking-wider text-[11px] sm:text-xs">
-                CẤP ĐỘC QUYỀN 2 CON AI RIÊNG CHO TRA TỪ ĐIỂN
-              </span>
-              <span className="text-[9px] bg-[#1A1A1A] text-white px-1.5 py-0.5 font-bold uppercase tracking-wider">
-                ĐỘC LẬP 100%
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-emerald-900 font-bold bg-emerald-100/90 px-2 py-0.5 border border-emerald-400">
-              <Check className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Đảm bảo &ge; 100 từ/ngày không lo hết lượt</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-            <div className="flex items-center gap-2 text-stone-700 bg-white p-2 border border-stone-300">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#1A1A1A] shrink-0" />
-              <div>
-                <span className="font-bold text-[#1A1A1A]">AI 1: Gemini Flash (Primary)</span>
-                <span className="text-stone-500 block text-[10px]">Học thuật, ngữ nghĩa chuyên sâu & phiên âm IPA/Pinyin chuẩn</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-stone-700 bg-white p-2 border border-stone-300">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-600 shrink-0" />
-              <div>
-                <span className="font-bold text-[#1A1A1A]">AI 2: Gemini 3.7 Flash</span>
-                <span className="text-stone-500 block text-[10px]">Tốc độ cao, đối chiếu song ngữ & Tự động dự phòng thông minh</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Search Bar Container */}
-        <div className="space-y-3 pt-2">
+        <div className="space-y-3 pt-1">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -581,22 +538,6 @@ export const DictionaryView: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Quick Word Suggestions - Giữ nguyên như ban đầu */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono pt-1">
-            <span className="text-stone-500 text-[11px] uppercase font-bold mr-1">Từ gợi ý nhanh:</span>
-            {SUGGESTED_WORDS[currentLanguage]?.map((item) => (
-              <button
-                key={item.word}
-                type="button"
-                onClick={() => handleSearch(item.word)}
-                className="px-2.5 py-1 bg-[#F9F7F2] border border-stone-300 hover:border-[#1A1A1A] hover:bg-white text-stone-700 text-[11px] transition flex items-center gap-1"
-              >
-                <span className="font-bold text-[#1A1A1A]">{item.word}</span>
-                <span className="text-stone-400 text-[10px]">({item.meaning})</span>
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -1037,44 +978,21 @@ export const DictionaryView: React.FC = () => {
                 </div>
               )}
 
-              {/* AI Processing Attribution & Quota Shield Footer */}
-              <div className="pt-4 border-t-2 border-[#1A1A1A]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="flex items-center gap-1.5 font-bold text-[#1A1A1A]">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>
-                      {result.aiModelId === 'local-store-direct'
-                        ? '📦 Trích xuất trực tiếp từ Kho Từ Vựng của bạn (0ms - Kèm 1 ví dụ)'
-                        : result.fromCache
-                        ? '⚡ Tải tức thì từ Bộ nhớ đệm (0ms - Tiết kiệm quota)'
-                        : `Xử lý bởi: ${result.aiModel || 'Từ điển AI Độc Quyền'}`}
-                    </span>
-                  </span>
-                  {result.turn && !result.fromCache && (
-                    <span className="bg-stone-200 text-stone-800 text-[10px] px-1.5 py-0.5 font-bold">
-                      Lượt #{result.turn}
-                    </span>
-                  )}
-                  {result.aiModelId === 'local-store-direct' ? (
-                    <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 border border-emerald-300 font-semibold text-[10px]">
-                      ✓ Đã có sẵn trong kho từ vựng
-                    </span>
-                  ) : (
-                    <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 border border-emerald-300 font-semibold text-[10px]">
-                      ● Độc quyền 2 AI luân phiên (Không lo hết lượt)
-                    </span>
-                  )}
-                </div>
+              {/* Clean Result Action Footer */}
+              <div className="pt-4 border-t border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono text-stone-500">
+                <span className="text-[11px]">
+                  {result.aiModelId === 'local-store-direct'
+                    ? '✓ Lấy trực tiếp từ kho từ vựng của bạn'
+                    : '✓ Mục từ được giải nghĩa chi tiết'}
+                </span>
 
                 <button
                   type="button"
                   onClick={() => handleSearch(result.word || query, true)}
                   disabled={loading}
-                  className="text-stone-700 hover:text-black font-bold underline transition self-start sm:self-auto"
+                  className="text-stone-700 hover:text-black font-bold underline transition self-start sm:self-auto text-[11px]"
                 >
-                  {result.aiModelId === 'local-store-direct'
-                    ? 'Biên soạn lại bằng AI chuyên sâu ➔'
-                    : 'Tra cứu lại (Làm mới AI) ➔'}
+                  Làm mới tra cứu ➔
                 </button>
               </div>
             </div>
@@ -1266,20 +1184,6 @@ export const DictionaryView: React.FC = () => {
                 </>
               )}
             </div>
-          </div>
-
-          {/* Quick Study Card */}
-          <div className="border-2 border-[#1A1A1A] bg-[#F3EFE6] p-4 font-mono text-xs space-y-2">
-            <div className="font-bold uppercase text-[11px] flex items-center gap-1 text-[#1A1A1A]">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>Lợi ích của Tra Từ Điển v3.0</span>
-            </div>
-            <ul className="text-stone-600 text-[11px] space-y-1.5 list-disc list-inside">
-              <li>Tra cứu 2 chiều tự động (Ngoại ngữ ⇄ Tiếng Việt).</li>
-              <li>Tự động bóc tách âm Hán Việt hỗ trợ nhớ siêu nhanh.</li>
-              <li>1 click lưu trực tiếp vào sổ từ vựng SRS để ôn tập.</li>
-              <li>Phát âm giọng đọc chuẩn bản ngữ cho từng từ & ví dụ.</li>
-            </ul>
           </div>
         </div>
       </div>

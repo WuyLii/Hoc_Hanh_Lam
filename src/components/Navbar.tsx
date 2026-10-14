@@ -82,7 +82,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
     { id: 'aichat', label: 'Gia sư AI', num: '08', icon: Sparkles },
     { id: 'stroke', label: 'Tập viết nét chữ', num: '09', icon: PenTool },
     { id: 'numbers', label: 'Số & Lượng từ', num: '10', icon: Calculator },
-    { id: 'sheets', label: 'CSDL Supabase / Sheets', num: '11', icon: Database },
   ];
 
   const handleMobileNavClick = (id: string) => {
@@ -113,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
                   </span>
                 </div>
                 <p className="text-[10px] font-mono tracking-[0.15em] uppercase text-[#1A1A1A]/70 mt-0.5">
-                  Nền tảng học đa ngôn ngữ & CSDL Google Sheets
+                  Nền tảng học ngoại ngữ thông minh (Anh • Hàn • Trung)
                 </p>
               </div>
             </div>
@@ -179,19 +178,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
                   </div>
                 )}
               </div>
-
-              {/* Unified Cloud & Sheets Sync Indicator */}
-              <button
-                onClick={handleManualSync}
-                disabled={isSyncing || isCloudSyncing}
-                title="Bấm để đồng bộ dữ liệu giữa Safari iPhone PWA, Chrome PC & Google Sheets"
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-[#1A1A1A] bg-white text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F9F7F2] font-mono text-[11px] transition"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing || isCloudSyncing ? 'animate-spin text-amber-500' : 'text-emerald-600'}`} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">
-                  {isSyncing || isCloudSyncing ? 'ĐANG ĐỒNG BỘ...' : 'ĐỒNG BỘ CLOUD'}
-                </span>
-              </button>
             </div>
           </div>
         </div>
