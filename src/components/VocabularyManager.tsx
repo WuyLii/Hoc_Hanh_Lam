@@ -25,6 +25,7 @@ import {
   RotateCw,
   Languages,
 } from 'lucide-react';
+import { isLessonMatch } from './games/GameReviewHub';
 
 export const VocabularyManager: React.FC = () => {
   const {
@@ -389,7 +390,7 @@ export const VocabularyManager: React.FC = () => {
         if (showOnlyDuplicates && !isDuplicate) return null;
 
         const matchTopic = selectedTopic === 'ALL' || w.chu_de === selectedTopic;
-        const matchLesson = selectedLesson === 'ALL' || w.bai_hoc === selectedLesson || (!w.bai_hoc && selectedLesson === 'Bài 1');
+        const matchLesson = isLessonMatch(w.bai_hoc, selectedLesson);
         const matchLevel =
           selectedLevel === 'ALL' ||
           w.cap_do === selectedLevel ||
@@ -697,12 +698,15 @@ export const VocabularyManager: React.FC = () => {
               onChange={(e) => setSelectedLesson(e.target.value)}
               className="w-full py-2 px-3 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono font-bold text-[#1A1A1A] focus:outline-none focus:bg-white"
             >
-              <option value="ALL">📖 TẤT CẢ BÀI HỌC ({lessons.length})</option>
-              {lessons.map((les) => (
-                <option key={les} value={les}>
-                  {les}
-                </option>
-              ))}
+              <option value="ALL">📖 TẤT CẢ BÀI HỌC ({currentLangVocabulary.length})</option>
+              {lessons.map((les) => {
+                const count = currentLangVocabulary.filter((w) => isLessonMatch(w.bai_hoc, les)).length;
+                return (
+                  <option key={les} value={les}>
+                    {les} ({count} từ)
+                  </option>
+                );
+              })}
             </select>
           </div>
 

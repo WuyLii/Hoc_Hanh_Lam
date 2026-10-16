@@ -27,7 +27,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Persistent Server Cloud Store for Cross-Device & Cross-Browser Sync
-const STORE_FILE = path.join(__dirname, 'cloud_store.json');
+const STORE_FILE = fs.existsSync(path.join(__dirname, 'cloud_store.json'))
+  ? path.join(__dirname, 'cloud_store.json')
+  : path.join(__dirname, '../cloud_store.json');
 
 interface CloudStore {
   vocabulary?: any[];

@@ -22,6 +22,7 @@ import {
   Eye,
   Star,
 } from 'lucide-react';
+import { isLessonMatch } from './GameReviewHub';
 
 export type FlashcardDirectionMode = 'random_alternate' | 'term_to_meaning' | 'meaning_to_term';
 export type CardDirection = 'term_to_meaning' | 'meaning_to_term';
@@ -30,6 +31,7 @@ interface FlashcardGameProps {
   words: VocabularyItem[];
   language: LanguageCode;
   initialRetentionFilter?: string;
+  initialLessonFilter?: string;
   initialWords?: VocabularyItem[];
   onFinish: (correctCount: number, totalCount: number, score: number) => void;
   onRecordSRS: (wordId: string, rating: RecallQuality) => void;
@@ -42,6 +44,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   words,
   language,
   initialRetentionFilter,
+  initialLessonFilter,
   initialWords,
   onFinish,
   onRecordSRS,
@@ -57,6 +60,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const [selectedPos, setSelectedPos] = useState<string>('ALL');
   const [selectedContext, setSelectedContext] = useState<string>('ALL');
   const [selectedLevel, setSelectedLevel] = useState<string>('ALL');
+  const [selectedLesson, setSelectedLesson] = useState<string>(initialLessonFilter || 'ALL');
   const [selectedTodayOnly, setSelectedTodayOnly] = useState<'ALL' | 'today_only'>(
     initialRetentionFilter === 'today_flashcard' ? 'today_only' : 'ALL'
   );
@@ -74,6 +78,16 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const availablePos = useMemo(() => Array.from(new Set(words.map((w) => w.loai_tu || 'Khác'))).filter(Boolean), [words]);
   const availableContexts = useMemo(() => Array.from(new Set(words.map((w) => w.chu_de || 'Tổng hợp'))).filter(Boolean), [words]);
   const availableLevels = useMemo(() => Array.from(new Set(words.map((w) => w.cap_do || 'Cơ bản'))).filter(Boolean), [words]);
+  const availableLessons = useMemo(() => {
+    const set = new Set<string>();
+    words.forEach((w) => {
+      if (w.bai_hoc) set.add(w.bai_hoc.trim());
+    });
+    if (set.size === 0) {
+      return ['Bài 1', 'Bài 2', 'Bài 3', 'Bài 4', 'Bài 5', 'Bài 6', 'Bài 7', 'Bài 8', 'Bài 9', 'Bài 10'];
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [words]);
   const starredTodayCount = useMemo(() => words.filter((w) => Boolean(w.is_added_today_flashcard || (w as any).is_starred)).length, [words]);
 
   // Candidate words matching current filter criteria
@@ -104,10 +118,13 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
         }
       }
 
-      // 3. Các bộ lọc từ loại, ngữ cảnh, cấp độ
+      // 3. Các bộ lọc từ loại, ngữ cảnh, cấp độ, bài học
       if (selectedPos !== 'ALL' && w.loai_tu !== selectedPos) return false;
       if (selectedContext !== 'ALL' && w.chu_de !== selectedContext) return false;
       if (selectedLevel !== 'ALL' && w.cap_do !== selectedLevel) return false;
+      if (selectedLesson !== 'ALL') {
+        if (!isLessonMatch(w.bai_hoc, selectedLesson)) return false;
+      }
 
       // 4. Tìm kiếm từ khóa
       if (searchKeyword.trim()) {
@@ -755,6 +772,28 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
                     {lvl}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Lesson */}
+            <div>
+              <label className="block text-[10px] font-mono font-bold uppercase text-stone-600 mb-0.5">
+                📚 Bài Học:
+              </label>
+              <select
+                value={selectedLesson}
+                onChange={(e) => setSelectedLesson(e.target.value)}
+                className="w-full py-1.5 px-2 bg-[#F9F7F2] border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:bg-white font-bold"
+              >
+                <option value="ALL">Tất cả bài học ({words.length})</option>
+                {availableLessons.map((les) => {
+                  const count = words.filter((w) => isLessonMatch(w.bai_hoc, les)).length;
+                  return (
+                    <option key={les} value={les}>
+                      {les} ({count} từ)
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

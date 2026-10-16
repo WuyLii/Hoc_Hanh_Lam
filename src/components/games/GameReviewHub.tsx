@@ -14,7 +14,16 @@ import {
   Filter,
   Play,
   ArrowRight,
+  RotateCcw,
 } from 'lucide-react';
+import {
+  filterWords,
+  buildLessonIndex,
+  isLessonMatch,
+  LessonIndexItem,
+} from '../../utils/lessonFilter';
+
+export { isLessonMatch };
 
 export const GameReviewHub: React.FC = () => {
   const {
@@ -37,6 +46,7 @@ export const GameReviewHub: React.FC = () => {
   // Filter state inside Game Hub
   const [activeDeckFilter, setActiveDeckFilter] = useState<string>('ALL');
   const [activeTopicFilter, setActiveTopicFilter] = useState<string>('ALL');
+  const [activeLessonFilter, setActiveLessonFilter] = useState<string>('ALL');
   const [activePosFilter, setActivePosFilter] = useState<string>('ALL');
   const [activeLimitFilter, setActiveLimitFilter] = useState<string>('ALL');
   // 1. Lựa chọn Ôn Bài hôm nay hay không
@@ -51,48 +61,55 @@ export const GameReviewHub: React.FC = () => {
   const topics = Array.from(new Set(currentLangVocabulary.map((w) => w.chu_de || 'Tổng hợp'))).filter(Boolean);
   const posTypes = Array.from(new Set(currentLangVocabulary.map((w) => w.loai_tu || 'Khác'))).filter(Boolean);
 
-  // Filter words based on selected source
-  const reviewWords = currentLangVocabulary.filter((w) => {
-    if (activeDeckFilter !== 'ALL') {
-      const targetDeck = currentLangDecks.find((d) => d.deck_id === activeDeckFilter);
-      if (targetDeck && !targetDeck.danh_sach_word_id.includes(w.word_id)) return false;
-    }
+  const lessonIndex = React.useMemo(() => buildLessonIndex(currentLangVocabulary), [currentLangVocabulary]);
 
-    if (activeTopicFilter !== 'ALL' && w.chu_de !== activeTopicFilter) {
-      return false;
-    }
+  const targetDeck = React.useMemo(
+    () => (activeDeckFilter !== 'ALL' ? currentLangDecks.find((d) => d.deck_id === activeDeckFilter) : null),
+    [activeDeckFilter, currentLangDecks]
+  );
 
-    if (activePosFilter !== 'ALL' && w.loai_tu !== activePosFilter) {
-      return false;
-    }
+  // Contextual word count for each lesson in the dropdown considering other active filters
+  const contextualLessonCounts = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    lessonIndex.forEach((item) => {
+      const matched = filterWords(currentLangVocabulary, {
+        lessons: [item.key],
+        todayOnly: activeTodayFilter === 'today_only',
+        wordStatus: activeRetentionFilter,
+        pos: activePosFilter,
+        topic: activeTopicFilter,
+        deckId: activeDeckFilter,
+        deckWordIds: targetDeck?.danh_sach_word_id,
+      });
+      counts.set(item.key, matched.length);
+    });
+    return counts;
+  }, [currentLangVocabulary, lessonIndex, activeTodayFilter, activeRetentionFilter, activePosFilter, activeTopicFilter, activeDeckFilter, targetDeck]);
 
-    // 1. Lựa chọn Ôn Bài hôm nay hay không
-    if (activeTodayFilter === 'today_only') {
-      if (!w.is_added_today_flashcard && !(w as any).is_starred) return false;
-    }
+  // Single-pass source filter using unified filterWords
+  const reviewWords = React.useMemo(() => {
+    return filterWords(currentLangVocabulary, {
+      selectedLesson: activeLessonFilter,
+      todayOnly: activeTodayFilter === 'today_only',
+      wordStatus: activeRetentionFilter,
+      pos: activePosFilter,
+      topic: activeTopicFilter,
+      deckId: activeDeckFilter,
+      deckWordIds: targetDeck?.danh_sach_word_id,
+    });
+  }, [currentLangVocabulary, activeLessonFilter, activeTodayFilter, activeRetentionFilter, activePosFilter, activeTopicFilter, activeDeckFilter, targetDeck]);
 
-    // 2. Cho phép chọn trạng thái của từ
-    if (activeRetentionFilter === 'due') {
-      const now = new Date();
-      if (!(!w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0)) return false;
-    } else if (activeRetentionFilter === 'difficult') {
-      if (!((w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1)) return false;
-    } else if (activeRetentionFilter === 'chua_thuoc') {
-      if (w.retention_level !== 'chua_thuoc') return false;
-    } else if (activeRetentionFilter === 'quen') {
-      if (w.retention_level !== 'quen') return false;
-    } else if (activeRetentionFilter === 'hoi_nho') {
-      if (w.retention_level !== 'hoi_nho') return false;
-    } else if (activeRetentionFilter === 'nho') {
-      if (w.retention_level !== 'nho') return false;
-    } else if (activeRetentionFilter === 'chua_danh_gia') {
-      if (w.retention_level && w.retention_level !== 'chua_danh_gia') return false;
-    }
+  const handleResetAllFilters = () => {
+    setActiveDeckFilter('ALL');
+    setActiveTopicFilter('ALL');
+    setActiveLessonFilter('ALL');
+    setActivePosFilter('ALL');
+    setActiveLimitFilter('ALL');
+    setActiveTodayFilter('ALL');
+    setActiveRetentionFilter('ALL');
+  };
 
-    return true;
-  });
-
-  const isFilteringActive = activeTodayFilter === 'today_only' || activeRetentionFilter !== 'ALL';
+  const isFilteringActive = activeTodayFilter === 'today_only' || activeRetentionFilter !== 'ALL' || activeLessonFilter !== 'ALL' || activeTopicFilter !== 'ALL' || activePosFilter !== 'ALL' || activeDeckFilter !== 'ALL';
   const filteredPool = isFilteringActive
     ? reviewWords
     : (reviewWords.length > 0 ? reviewWords : currentLangVocabulary);
@@ -220,6 +237,7 @@ export const GameReviewHub: React.FC = () => {
             words={currentLangVocabulary}
             initialWords={isFilteringActive ? reviewWords : undefined}
             initialRetentionFilter={activeTodayFilter === 'today_only' ? 'today_only' : undefined}
+            initialLessonFilter={activeLessonFilter !== 'ALL' ? activeLessonFilter : undefined}
             language={currentLanguage}
             onFinish={handleFinishGame}
             onRecordSRS={recordSRSRating}
@@ -350,7 +368,7 @@ export const GameReviewHub: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3">
           {/* 1. Lựa chọn Ôn Bài hôm nay hay không */}
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
@@ -445,6 +463,34 @@ export const GameReviewHub: React.FC = () => {
             </select>
           </div>
 
+          {/* Lesson filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
+              📚 Chọn Bài Học:
+            </label>
+            <select
+              value={activeLessonFilter}
+              onChange={(e) => setActiveLessonFilter(e.target.value)}
+              className="w-full py-2 px-2 bg-white border border-[#1A1A1A] text-xs font-mono text-[#1A1A1A] focus:outline-none font-bold cursor-pointer"
+            >
+              <option value="ALL">Tất cả bài học ({currentLangVocabulary.length})</option>
+              {lessonIndex.map((item) => {
+                const count = contextualLessonCounts.get(item.key) ?? item.count;
+                const isZero = count === 0;
+                return (
+                  <option
+                    key={item.key}
+                    value={item.key}
+                    disabled={isZero}
+                    className={isZero ? 'text-stone-400' : ''}
+                  >
+                    {item.label} ({count} từ){isZero ? ' — Không có từ' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
           {/* Topic/Context filter */}
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-stone-600 mb-1">
@@ -463,6 +509,51 @@ export const GameReviewHub: React.FC = () => {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Filter Action & Status Banners */}
+        <div className="space-y-2">
+          {activeLessonFilter !== 'ALL' && (
+            <div className="p-3 bg-amber-50 border-2 border-[#1A1A1A] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+              <div className="flex items-center gap-2">
+                <span>📚 Đang lọc theo: <strong className="font-bold underline">{lessonIndex.find((i) => i.key === activeLessonFilter)?.label || activeLessonFilter}</strong></span>
+                <span className="bg-[#1A1A1A] text-white px-2 py-0.5 text-[11px] font-bold">
+                  {filteredPool.length} TỪ KHỚP
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveLessonFilter('ALL')}
+                  className="px-2.5 py-1 bg-white border border-[#1A1A1A] hover:bg-stone-100 text-[#1A1A1A] font-bold text-[10px] uppercase transition"
+                >
+                  ✕ Gỡ lọc bài này
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedGameMode('flashcard')}
+                  disabled={filteredPool.length === 0}
+                  className="px-3 py-1 bg-[#1A1A1A] text-white font-bold uppercase text-[10px] hover:bg-stone-800 disabled:opacity-50 transition flex items-center gap-1.5"
+                >
+                  <span>🎴 TẠO THẺ & ÔN FLASHCARD BÀI NÀY</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isFilteringActive && (
+            <div className="flex items-center justify-between text-xs font-mono pt-1 text-stone-600">
+              <span>Đang bật các điều kiện lọc tùy chỉnh</span>
+              <button
+                type="button"
+                onClick={handleResetAllFilters}
+                className="text-[#1A1A1A] underline font-bold hover:text-red-700 flex items-center gap-1 text-[11px]"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Xóa tất cả bộ lọc</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {activeTodayFilter === 'today_only' && (
