@@ -22,7 +22,7 @@ import {
   Eye,
   Star,
 } from 'lucide-react';
-import { isLessonMatch } from './GameReviewHub';
+import { filterWords, isLessonMatch } from '../../utils/lessonFilter';
 
 export type FlashcardDirectionMode = 'random_alternate' | 'term_to_meaning' | 'meaning_to_term';
 export type CardDirection = 'term_to_meaning' | 'meaning_to_term';
@@ -90,71 +90,19 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   }, [words]);
   const starredTodayCount = useMemo(() => words.filter((w) => Boolean(w.is_added_today_flashcard || (w as any).is_starred)).length, [words]);
 
-  // Candidate words matching current filter criteria
+  // Candidate words matching current filter criteria using single-pass filterWords
   const candidateWords = useMemo(() => {
-    let list = words.filter((w) => {
-      // 1. Lọc theo Ôn bài hôm nay hay không
-      if (selectedTodayOnly === 'today_only') {
-        const isToday = Boolean(w.is_added_today_flashcard || (w as any).is_starred);
-        if (!isToday) return false;
-      }
-
-      // 2. Lọc theo Trạng thái của từ
-      if (selectedWordStatus !== 'ALL') {
-        const retLevel = w.retention_level || 'chua_danh_gia';
-        if (selectedWordStatus === 'due') {
-          const now = new Date();
-          const isDue = !w.srs_next_review || new Date(w.srs_next_review) <= now || w.srs_box === 0;
-          if (!isDue) return false;
-        } else if (selectedWordStatus === 'new') {
-          if (w.srs_box !== 0 && w.times_reviewed) return false;
-        } else if (selectedWordStatus === 'difficult') {
-          const isDifficult = (w.times_reviewed > 0 && w.times_correct / w.times_reviewed < 0.6) || w.srs_box <= 1;
-          if (!isDifficult) return false;
-        } else if (selectedWordStatus === 'mastered') {
-          if ((w.srs_box || 0) < 4) return false;
-        } else {
-          if (retLevel !== selectedWordStatus) return false;
-        }
-      }
-
-      // 3. Các bộ lọc từ loại, ngữ cảnh, cấp độ, bài học
-      if (selectedPos !== 'ALL' && w.loai_tu !== selectedPos) return false;
-      if (selectedContext !== 'ALL' && w.chu_de !== selectedContext) return false;
-      if (selectedLevel !== 'ALL' && w.cap_do !== selectedLevel) return false;
-      if (selectedLesson !== 'ALL') {
-        if (!isLessonMatch(w.bai_hoc, selectedLesson)) return false;
-      }
-
-      // 4. Tìm kiếm từ khóa
-      if (searchKeyword.trim()) {
-        const q = searchKeyword.toLowerCase().trim();
-        const searchFields = [
-          w.tu,
-          w.nghia,
-          w.phien_am,
-          w.nghia_tieng_han,
-          w.nghia_tieng_anh,
-          w.vi_du,
-          w.vi_du_dich,
-          w.loai_tu,
-          w.chu_de,
-          w.cap_do,
-        ].map((f) => (f || '').toLowerCase());
-
-        const match = searchFields.some((f) => f.includes(q));
-        if (!match) return false;
-      }
-
-      return true;
+    return filterWords(words, {
+      selectedLesson,
+      todayOnly: selectedTodayOnly === 'today_only',
+      wordStatus: selectedWordStatus,
+      pos: selectedPos,
+      topic: selectedContext,
+      level: selectedLevel,
+      searchKeyword,
+      limit: selectedLimit,
     });
-
-    if (selectedLimit !== 'ALL') {
-      const lim = parseInt(selectedLimit, 10);
-      list = list.slice(0, lim);
-    }
-    return list;
-  }, [words, selectedPos, selectedContext, selectedLevel, selectedTodayOnly, selectedWordStatus, searchKeyword, selectedLimit]);
+  }, [words, selectedPos, selectedContext, selectedLevel, selectedLesson, selectedTodayOnly, selectedWordStatus, searchKeyword, selectedLimit]);
 
   // Pending selected word IDs for checkbox selection inside drawer
   const [pendingWordIds, setPendingWordIds] = useState<Set<string>>(() => {
@@ -415,6 +363,7 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               setSelectedPos('ALL');
               setSelectedContext('ALL');
               setSelectedLevel('ALL');
+              setSelectedLesson('ALL');
               setSelectedTodayOnly('ALL');
               setSelectedWordStatus('ALL');
               setSearchKeyword('');

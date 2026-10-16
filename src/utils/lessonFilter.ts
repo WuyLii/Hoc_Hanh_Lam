@@ -79,6 +79,19 @@ export function normalizeLesson(raw?: string | null): NormalizedLesson {
     };
   }
 
+  // Handle canonical keys like "lesson_1", "lesson_12"
+  if (cleanRaw.toLowerCase().startsWith('lesson_')) {
+    const num = parseInt(cleanRaw.replace('lesson_', ''), 10);
+    if (!isNaN(num)) {
+      return {
+        key: cleanRaw.toLowerCase(),
+        number: num,
+        label: `Bài ${num}`,
+        raw: cleanRaw,
+      };
+    }
+  }
+
   // Convert full-width punctuation and brackets to standard ASCII equivalents
   const standardized = cleanRaw
     .replace(/[\uFF1A\uFF1B]/g, ':') // Full-width colons
