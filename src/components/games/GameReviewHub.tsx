@@ -39,7 +39,29 @@ export const GameReviewHub: React.FC = () => {
     updateRetentionLevel,
     addReviewSession,
     addStudyTime,
+    pendingGameFilters,
+    setPendingGameFilters,
   } = useApp();
+
+  React.useEffect(() => {
+    if (pendingGameFilters) {
+      if (pendingGameFilters.deckId) setActiveDeckFilter(pendingGameFilters.deckId);
+      if (pendingGameFilters.topic) {
+        const target = pendingGameFilters.topic.toLowerCase().trim();
+        const found = topics.find((t: string) => t.toLowerCase().includes(target) || target.includes(t.toLowerCase()));
+        setActiveTopicFilter(found || pendingGameFilters.topic);
+      }
+      if (pendingGameFilters.lesson) setActiveLessonFilter(pendingGameFilters.lesson);
+      if (pendingGameFilters.limit) setActiveLimitFilter(String(pendingGameFilters.limit));
+      if (pendingGameFilters.status) {
+        const st = pendingGameFilters.status as any;
+        if (['ALL', 'due', 'difficult', 'chua_thuoc', 'quen', 'hoi_nho', 'nho', 'chua_danh_gia'].includes(st)) {
+          setActiveRetentionFilter(st);
+        }
+      }
+      setPendingGameFilters(null);
+    }
+  }, [pendingGameFilters]);
 
   const currentLangInfo = LANGUAGES[currentLanguage];
 

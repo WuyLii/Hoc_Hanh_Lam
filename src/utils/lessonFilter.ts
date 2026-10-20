@@ -330,8 +330,12 @@ export function filterWords(words: VocabularyItem[], criteria: FilterCriteria = 
     }
 
     // Topic / Context
-    if (topic && topic !== 'ALL' && w.chu_de !== topic) {
-      return false;
+    if (topic && topic !== 'ALL') {
+      const wordTopic = removeDiacritics(w.chu_de || '').toLowerCase();
+      const targetTopic = removeDiacritics(topic).toLowerCase();
+      if (!wordTopic.includes(targetTopic) && !targetTopic.includes(wordTopic)) {
+        return false;
+      }
     }
 
     // Level

@@ -20,6 +20,7 @@ import {
 import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from './src/utils/deduplicate.ts';
 import { INITIAL_VOCABULARY, INITIAL_GRAMMAR } from './src/data/seedData.ts';
+import { handleTutorAgent } from './src/server/tutorAgent.ts';
 
 dotenv.config();
 
@@ -179,6 +180,18 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error in /api/gemini/chat:', error);
       res.status(500).json({ error: error?.message || 'Lỗi khi kết nối với máy chủ Gia sư AI' });
+    }
+  });
+
+  // 1b. Enhanced Multi-task Tutor Agent with Safe Action System
+  app.post('/api/tutor/agent', async (req, res) => {
+    try {
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      const result = await handleTutorAgent(req.body, req.headers, clientIp);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error in /api/tutor/agent:', error);
+      res.status(500).json({ error: error?.message || 'Lỗi xử lý tác vụ Gia sư AI' });
     }
   });
 

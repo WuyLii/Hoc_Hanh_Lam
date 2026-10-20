@@ -13,6 +13,7 @@ import {
 } from '../src/server/geminiHandlers.js';
 import { fetchPublicSpreadsheet } from '../src/server/sheetsHelper.js';
 import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from '../src/utils/deduplicate.js';
+import { handleTutorAgent } from '../src/server/tutorAgent.js';
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
@@ -180,6 +181,16 @@ app.post('/api/gemini/chat', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Lỗi chat AI' });
+  }
+});
+
+app.post('/api/tutor/agent', async (req, res) => {
+  try {
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    const result = await handleTutorAgent(req.body, req.headers, clientIp);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Lỗi xử lý tác vụ Gia sư AI' });
   }
 });
 

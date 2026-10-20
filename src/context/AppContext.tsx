@@ -120,6 +120,34 @@ interface AppContextType {
   setSelectedGameMode: (mode: string | null) => void;
   selectedLevelFilter: string | null;
   setSelectedLevelFilter: (lvl: string | null) => void;
+  pendingGameFilters: {
+    mode?: string;
+    deckId?: string;
+    limit?: string;
+    topic?: string;
+    lesson?: string;
+    status?: string;
+  } | null;
+  setPendingGameFilters: (filters: {
+    mode?: string;
+    deckId?: string;
+    limit?: string;
+    topic?: string;
+    lesson?: string;
+    status?: string;
+  } | null) => void;
+  pendingVocabFilters: {
+    level?: string;
+    search?: string;
+    topic?: string;
+    limit?: string;
+  } | null;
+  setPendingVocabFilters: (filters: {
+    level?: string;
+    search?: string;
+    topic?: string;
+    limit?: string;
+  } | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -590,6 +618,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [selectedGameMode, setSelectedGameMode] = useState<string | null>(null);
   const [selectedLevelFilter, setSelectedLevelFilter] = useState<string | null>(null);
+  const [pendingGameFilters, setPendingGameFilters] = useState<any | null>(null);
+  const [pendingVocabFilters, setPendingVocabFilters] = useState<any | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Cross-tab synchronization via storage event listener
@@ -2119,6 +2149,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedGameMode,
         selectedLevelFilter,
         setSelectedLevelFilter,
+        pendingGameFilters,
+        setPendingGameFilters,
+        pendingVocabFilters,
+        setPendingVocabFilters,
       }}
     >
       {children}
