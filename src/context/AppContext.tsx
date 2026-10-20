@@ -108,6 +108,9 @@ interface AppContextType {
   clearAllData: () => Promise<{ success: boolean; message: string }>;
   isCloudSyncing: boolean;
   lastCloudSyncedAt: string;
+  isRealtimeConnected: boolean;
+  realtimeLastSyncTime: string;
+  realtimeSyncNotice: string | null;
 
   activeNav: string;
   setActiveNav: (nav: string) => void;
@@ -170,54 +173,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isApplyingServerStoreRef = useRef<boolean>(false);
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
 
-  // 1. Cross-tab real-time synchronization via BroadcastChannel
+  // Stable unique Client ID for this browser tab/session (prevents ping-pong echo loops)
+  const tabClientIdRef = useRef<string>(
+    typeof window !== 'undefined'
+      ? (() => {
+          let cid = '';
+          try {
+            cid = sessionStorage.getItem('polyglot_tab_client_id') || '';
+          } catch {}
+          if (!cid) {
+            cid = 'client_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+            try {
+              sessionStorage.setItem('polyglot_tab_client_id', cid);
+            } catch {}
+          }
+          return cid;
+        })()
+      : 'server_client'
+  );
+
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState<boolean>(false);
+  const [realtimeLastSyncTime, setRealtimeLastSyncTime] = useState<string>('');
+  const [realtimeSyncNotice, setRealtimeSyncNotice] = useState<string | null>(null);
+  const syncNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const flashSyncNotice = (msg: string) => {
+    setRealtimeSyncNotice(msg);
+    if (syncNoticeTimeoutRef.current) clearTimeout(syncNoticeTimeoutRef.current);
+    syncNoticeTimeoutRef.current = setTimeout(() => {
+      setRealtimeSyncNotice(null);
+    }, 3500);
+  };
+
+  // Helper with AbortController timeout & automatic X-Client-Id header to prevent echo loops
+  const safeFetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 15000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const headers = new Headers(options.headers || {});
+      if (!headers.has('X-Client-Id')) {
+        headers.set('X-Client-Id', tabClientIdRef.current);
+      }
+      const res = await fetch(url, { ...options, headers, signal: controller.signal });
+      return res;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  // 1. Cross-tab real-time synchronization via BroadcastChannel (Same Browser)
   useEffect(() => {
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         syncChannelRef.current = new BroadcastChannel('polyglot_cloud_sync');
         syncChannelRef.current.onmessage = (event) => {
+          if (!event.data) return;
+          if (event.data.senderId && event.data.senderId === tabClientIdRef.current) return;
+
           if (event.data?.type === 'WORD_STATUS_UPDATED' && event.data.word) {
             const updatedWord: VocabularyItem = event.data.word;
-            setVocabulary((prev) => {
-              const idx = prev.findIndex(
-                (w) =>
-                  w.word_id === updatedWord.word_id ||
-                  ((w.tu || '').trim().toLowerCase() === (updatedWord.tu || '').trim().toLowerCase() &&
-                    w.ngon_ngu === updatedWord.ngon_ngu)
-              );
-              if (idx >= 0) {
-                const nextList = [...prev];
-                nextList[idx] = { ...nextList[idx], ...updatedWord };
-                idbSet('vocabulary', nextList).catch(() => {});
-                return nextList;
-              }
-              return prev;
-            });
-          } else if (event.data?.type === 'CLOUD_SYNC_UPDATED') {
-            syncWithCloudServer(true);
-          }
-        };
-      }
-    } catch (e) {
-      // Ignore if not supported in environment
-    }
-    return () => {
-      try {
-        syncChannelRef.current?.close();
-      } catch (e) {}
-    };
-  }, []);
-
-  // 2. Real-Time Cross-Browser Database Push via Server-Sent Events (SSE)
-  useEffect(() => {
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource('/api/sync/stream');
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'WORD_STATUS_UPDATED' && data.word) {
-            const updatedWord: VocabularyItem = data.word;
             setVocabulary((prev) => {
               const idx = prev.findIndex(
                 (w) =>
@@ -236,17 +250,198 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 return nextList;
               }
             });
-            if (data.lastUpdated) {
-              lastServerTimestampRef.current = data.lastUpdated;
-            }
-          } else if (data.type === 'STORE_UPDATED' || data.type === 'STORE_CLEARED') {
+            flashSyncNotice(`⚡ Đồng bộ từ vựng: "${updatedWord.tu}"`);
+          } else if (event.data?.type === 'CLOUD_SYNC_UPDATED') {
             syncWithCloudServer(true);
           }
-        } catch (e) {}
-      };
-    } catch (e) {}
+        };
+      }
+    } catch (e) {
+      // Ignore if not supported in environment
+    }
+    return () => {
+      try {
+        syncChannelRef.current?.close();
+      } catch (e) {}
+    };
+  }, []);
+
+  // 2. Real-Time Cross-Browser Database Push via Server-Sent Events (SSE) with Auto-Reconnect & Granular Merging
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let reconnectTimer: NodeJS.Timeout | null = null;
+    let isDisposed = false;
+
+    const connectSSE = () => {
+      if (isDisposed) return;
+      try {
+        es = new EventSource('/api/sync/stream');
+
+        es.onopen = () => {
+          setIsRealtimeConnected(true);
+        };
+
+        es.onmessage = (event) => {
+          try {
+            if (!event.data || event.data.startsWith(':')) return; // keepalive comment
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'CONNECTED') {
+              setIsRealtimeConnected(true);
+              return;
+            }
+
+            // If message came from this exact tab, ignore echo so UI never stutters
+            if (data.senderId && data.senderId === tabClientIdRef.current) {
+              return;
+            }
+
+            const nowStr = new Date().toLocaleTimeString('vi-VN');
+            setRealtimeLastSyncTime(nowStr);
+
+            if (data.type === 'WORD_STATUS_UPDATED' && data.word) {
+              const updatedWord: VocabularyItem = data.word;
+              setVocabulary((prev) => {
+                const idx = prev.findIndex(
+                  (w) =>
+                    w.word_id === updatedWord.word_id ||
+                    ((w.tu || '').trim().toLowerCase() === (updatedWord.tu || '').trim().toLowerCase() &&
+                      w.ngon_ngu === updatedWord.ngon_ngu)
+                );
+                if (idx >= 0) {
+                  const nextList = [...prev];
+                  nextList[idx] = { ...nextList[idx], ...updatedWord };
+                  idbSet('vocabulary', nextList).catch(() => {});
+                  return nextList;
+                } else {
+                  const nextList = [updatedWord, ...prev];
+                  idbSet('vocabulary', nextList).catch(() => {});
+                  return nextList;
+                }
+              });
+              flashSyncNotice(`⚡ Đã đồng bộ từ vựng: "${updatedWord.tu}"`);
+            } else if (data.type === 'WORDS_ADDED' && Array.isArray(data.words) && data.words.length > 0) {
+              const newWords: VocabularyItem[] = data.words;
+              setVocabulary((prev) => {
+                const merged = cleanDeduplicateVocab([...newWords, ...prev]);
+                idbSet('vocabulary', merged).catch(() => {});
+                return merged;
+              });
+              flashSyncNotice(`⚡ Đã đồng bộ thêm ${newWords.length} từ vựng mới`);
+            } else if (data.type === 'WORDS_DELETED' && Array.isArray(data.wordIds) && data.wordIds.length > 0) {
+              const idSet = new Set(data.wordIds);
+              setVocabulary((prev) => {
+                const filtered = prev.filter((w) => !idSet.has(w.word_id));
+                idbSet('vocabulary', filtered).catch(() => {});
+                return filtered;
+              });
+              flashSyncNotice(`⚡ Đã đồng bộ xóa ${data.wordIds.length} từ vựng`);
+            } else if (data.type === 'GRAMMAR_UPDATED' && data.item) {
+              const updatedItem: GrammarItem = data.item;
+              setGrammar((prev) => {
+                const idx = prev.findIndex((g) => g.grammar_id === updatedItem.grammar_id);
+                if (idx >= 0) {
+                  const nextList = [...prev];
+                  nextList[idx] = { ...nextList[idx], ...updatedItem };
+                  idbSet('grammar', nextList).catch(() => {});
+                  return nextList;
+                } else {
+                  const nextList = [updatedItem, ...prev];
+                  idbSet('grammar', nextList).catch(() => {});
+                  return nextList;
+                }
+              });
+              flashSyncNotice(`⚡ Đã đồng bộ ngữ pháp: "${updatedItem.cau_truc}"`);
+            } else if (data.type === 'GRAMMAR_ADDED' && Array.isArray(data.items) && data.items.length > 0) {
+              const newItems: GrammarItem[] = data.items;
+              setGrammar((prev) => {
+                const merged = cleanDeduplicateGrammar([...newItems, ...prev]);
+                idbSet('grammar', merged).catch(() => {});
+                return merged;
+              });
+              flashSyncNotice(`⚡ Đã đồng bộ thêm ${newItems.length} cấu trúc ngữ pháp`);
+            } else if (data.type === 'GRAMMAR_DELETED' && Array.isArray(data.grammarIds) && data.grammarIds.length > 0) {
+              const idSet = new Set(data.grammarIds);
+              setGrammar((prev) => {
+                const filtered = prev.filter((g) => !idSet.has(g.grammar_id));
+                idbSet('grammar', filtered).catch(() => {});
+                return filtered;
+              });
+              flashSyncNotice(`⚡ Đã đồng bộ xóa ${data.grammarIds.length} mục ngữ pháp`);
+            } else if (data.type === 'DECK_UPDATED' && data.deck) {
+              const updatedDeck: Deck = data.deck;
+              setDecks((prev) => {
+                const idx = prev.findIndex((d) => d.deck_id === updatedDeck.deck_id);
+                if (idx >= 0) {
+                  const nextList = [...prev];
+                  nextList[idx] = { ...nextList[idx], ...updatedDeck };
+                  idbSet('decks', nextList).catch(() => {});
+                  return nextList;
+                } else {
+                  const nextList = [updatedDeck, ...prev];
+                  idbSet('decks', nextList).catch(() => {});
+                  return nextList;
+                }
+              });
+              flashSyncNotice(`⚡ Đã đồng bộ bộ thẻ: "${updatedDeck.ten_bo}"`);
+            } else if (data.type === 'DECK_DELETED' && data.deckId) {
+              setDecks((prev) => {
+                const filtered = prev.filter((d) => d.deck_id !== data.deckId);
+                idbSet('decks', filtered).catch(() => {});
+                return filtered;
+              });
+            } else if (data.type === 'USER_UPDATED' && data.user) {
+              setCurrentUser((prev) => ({ ...prev, ...data.user }));
+            } else if (data.type === 'RETENTION_RESET') {
+              setVocabulary((prev) => {
+                const updated = prev.map((w) => {
+                  if (!data.lang || w.ngon_ngu === data.lang) {
+                    return {
+                      ...w,
+                      retention_level: 'chua_danh_gia' as VocabularyRetentionLevel,
+                      srs_box: 0,
+                      srs_interval: 0,
+                      times_reviewed: 0,
+                      times_correct: 0,
+                      last_reviewed: null,
+                    };
+                  }
+                  return w;
+                });
+                idbSet('vocabulary', updated).catch(() => {});
+                return updated;
+              });
+              flashSyncNotice('⚡ Đã đặt lại trạng thái ghi nhớ từ thiết bị khác');
+            } else if (data.type === 'STORE_UPDATED') {
+              syncWithCloudServer(true);
+            } else if (data.type === 'STORE_CLEARED') {
+              syncWithCloudServer(true);
+            }
+          } catch (e) {}
+        };
+
+        es.onerror = () => {
+          setIsRealtimeConnected(false);
+          try {
+            es?.close();
+          } catch (e) {}
+          if (!isDisposed && !reconnectTimer) {
+            reconnectTimer = setTimeout(() => {
+              reconnectTimer = null;
+              connectSSE();
+            }, 3000);
+          }
+        };
+      } catch (e) {
+        setIsRealtimeConnected(false);
+      }
+    };
+
+    connectSSE();
 
     return () => {
+      isDisposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       try {
         es?.close();
       } catch (e) {}
@@ -450,6 +645,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUser = (updatedProps: Partial<UserProfile>) => {
     setCurrentUser((prev) => ({ ...prev, ...updatedProps }));
+    safeFetchWithTimeout(
+      '/api/user',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedProps),
+      },
+      5000
+    ).catch(() => {});
   };
 
   // Vocabulary Operations
@@ -733,6 +937,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         idbSet('vocabulary', merged).catch(() => {});
         return merged;
       });
+      safeFetchWithTimeout(
+        '/api/vocabulary/batch-add',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: newItems }),
+        },
+        10000
+      ).catch((err) => {
+        console.warn('Lỗi ghi danh sách từ vựng lên máy chủ Cloud:', err);
+      });
       if (SupabaseService.isConfigured()) {
         SupabaseService.saveVocabularyBatch(newItems).catch((err) => {
           console.warn('Lỗi lưu danh sách từ vựng vào Supabase:', err);
@@ -884,6 +1099,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setDecks((prev) => [newDeck, ...prev]);
     idbSet('decks', [newDeck, ...decks]).catch(() => {});
+    safeFetchWithTimeout(
+      '/api/decks',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newDeck),
+      },
+      5000
+    ).catch(() => {});
     if (SupabaseService.isConfigured()) {
       SupabaseService.saveDeck(newDeck).catch(() => {});
     }
@@ -896,6 +1120,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       idbSet('decks', updated).catch(() => {});
       return updated;
     });
+    safeFetchWithTimeout(
+      '/api/decks',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(deck),
+      },
+      5000
+    ).catch(() => {});
     if (SupabaseService.isConfigured()) {
       SupabaseService.saveDeck(deck).catch(() => {});
     }
@@ -907,6 +1140,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       idbSet('decks', filtered).catch(() => {});
       return filtered;
     });
+    safeFetchWithTimeout(
+      `/api/decks/${encodeURIComponent(deckId)}`,
+      { method: 'DELETE' },
+      5000
+    ).catch(() => {});
     if (SupabaseService.isConfigured()) {
       SupabaseService.deleteDecks([deckId]).catch(() => {});
     }
@@ -930,6 +1168,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setGrammar((prev) => [newGr, ...prev]);
     idbSet('grammar', [newGr, ...grammar]).catch(() => {});
+    safeFetchWithTimeout(
+      '/api/grammar',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newGr),
+      },
+      5000
+    ).catch(() => {});
     if (SupabaseService.isConfigured()) {
       SupabaseService.saveGrammar(newGr).catch(() => {});
     }
@@ -942,6 +1189,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       idbSet('grammar', updated).catch(() => {});
       return updated;
     });
+    safeFetchWithTimeout(
+      `/api/grammar/${encodeURIComponent(item.grammar_id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      },
+      5000
+    ).catch(() => {});
     if (SupabaseService.isConfigured()) {
       SupabaseService.saveGrammar(item).catch(() => {});
     }
@@ -1074,6 +1330,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const merged = [...newItems, ...prev];
         idbSet('grammar', merged).catch(() => {});
         return merged;
+      });
+      safeFetchWithTimeout(
+        '/api/grammar/batch-add',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: newItems }),
+        },
+        10000
+      ).catch((err) => {
+        console.warn('Lỗi ghi danh sách ngữ pháp lên máy chủ Cloud:', err);
       });
       if (SupabaseService.isConfigured()) {
         SupabaseService.saveGrammarBatch(newItems).catch(() => {});
@@ -1443,17 +1710,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const lastServerTimestampRef = useRef<string>('');
   const isPushingRef = useRef<boolean>(false);
 
-  // Helper with AbortController timeout to prevent hung requests
-  const safeFetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 15000) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      return res;
-    } finally {
-      clearTimeout(timer);
-    }
-  };
 
   const syncWithCloudServer = async (silent = false): Promise<{ success: boolean; message: string }> => {
     try {
@@ -1851,6 +2107,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearAllData,
         isCloudSyncing,
         lastCloudSyncedAt,
+        isRealtimeConnected,
+        realtimeLastSyncTime,
+        realtimeSyncNotice,
 
         activeNav,
         setActiveNav,

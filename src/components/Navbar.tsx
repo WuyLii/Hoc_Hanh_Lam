@@ -44,6 +44,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
     isCloudSyncing,
     sheetsConfig,
     selectedGameMode,
+    isRealtimeConnected,
+    realtimeLastSyncTime,
+    realtimeSyncNotice,
   } = useApp();
 
   const [showLangMenu, setShowLangMenu] = useState(false);
@@ -119,6 +122,38 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
 
             {/* Right Controls */}
             <div className="flex items-center gap-3 text-xs">
+              {/* Multi-Device Real-Time Sync Indicator */}
+              <button
+                onClick={handleManualSync}
+                title={
+                  isRealtimeConnected
+                    ? `Đang kết nối trực tiếp đa thiết bị (SSE Real-time)${realtimeLastSyncTime ? ' • Đồng bộ lúc: ' + realtimeLastSyncTime : ''}. Nhấn để đồng bộ dữ liệu ngay.`
+                    : 'Đang kết nối lại máy chủ Cloud... Nhấn để thử lại ngay.'
+                }
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 border border-[#1A1A1A] font-mono text-[11px] uppercase tracking-wider font-semibold transition ${
+                  isCloudSyncing
+                    ? 'bg-amber-100 text-amber-900 border-amber-600'
+                    : isRealtimeConnected
+                    ? 'bg-emerald-50 text-emerald-950 hover:bg-emerald-100'
+                    : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
+                }`}
+              >
+                <span className="relative flex h-2 w-2">
+                  {isRealtimeConnected && (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  )}
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      isRealtimeConnected ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`}
+                  ></span>
+                </span>
+                <span className="hidden lg:inline">
+                  {isCloudSyncing ? 'Đang đồng bộ...' : isRealtimeConnected ? 'Đa thiết bị trực tiếp' : 'Đang kết nối lại'}
+                </span>
+                <RefreshCw className={`w-3 h-3 ml-0.5 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+              </button>
+
               {/* Quick OCR */}
               <button
                 onClick={onOpenOcrModal}
@@ -238,9 +273,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
             {/* Quick Language Toggle */}
             <button
               onClick={() => setShowLangMenu(!showLangMenu)}
-              className="flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] bg-white border border-[#1A1A1A] text-xs font-mono font-bold active:bg-stone-100 transition"
-              title="Đổi ngôn ngữ học"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] bg-white border border-[#1A1A1A] text-xs font-mono font-bold active:bg-stone-100 transition"
+              title={isRealtimeConnected ? 'Đã kết nối trực tiếp đa thiết bị' : 'Đang kết nối lại máy chủ'}
             >
+              <span className="relative flex h-1.5 w-1.5">
+                {isRealtimeConnected && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span
+                  className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                    isRealtimeConnected ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                ></span>
+              </span>
               <span>{currentLangInfo.flag}</span>
               <span className="text-[11px] uppercase font-bold">{currentLanguage.toUpperCase()}</span>
             </button>
@@ -264,6 +309,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOcrModal }) => {
             </button>
           </div>
         </div>
+
+        {/* Realtime Instant Flash Notice */}
+        {realtimeSyncNotice && (
+          <div className="bg-[#1A1A1A] text-amber-300 text-[11px] font-mono py-1.5 px-3 text-center tracking-wider border-b border-amber-400/40 flex items-center justify-center gap-2 animate-in slide-in-from-top-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+            <span className="font-semibold">{realtimeSyncNotice}</span>
+          </div>
+        )}
 
         {/* Sync Status Banner */}
         {syncStatusMsg && (

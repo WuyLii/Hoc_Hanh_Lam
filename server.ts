@@ -115,16 +115,44 @@ function loadMemoryStore(): CloudStore & { isCleared?: boolean } {
 
 let memoryStore = loadMemoryStore();
 
-function saveMemoryStore() {
+let saveStoreTimeout: NodeJS.Timeout | null = null;
+let isSavingStore = false;
+let pendingSave = false;
+
+async function doSaveMemoryStore() {
+  if (isSavingStore) {
+    pendingSave = true;
+    return;
+  }
+  isSavingStore = true;
+  pendingSave = false;
   try {
-    fs.writeFileSync(STORE_FILE, JSON.stringify(memoryStore, null, 2), 'utf-8');
+    const data = JSON.stringify(memoryStore);
+    await fs.promises.writeFile(STORE_FILE, data, 'utf-8');
   } catch (e) {
     console.error('Failed to save cloud_store.json:', e);
+  } finally {
+    isSavingStore = false;
+    if (pendingSave) {
+      setTimeout(doSaveMemoryStore, 100);
+    }
+  }
+}
+
+function saveMemoryStore(immediate = false) {
+  if (saveStoreTimeout) {
+    clearTimeout(saveStoreTimeout);
+    saveStoreTimeout = null;
+  }
+  if (immediate) {
+    doSaveMemoryStore();
+  } else {
+    saveStoreTimeout = setTimeout(doSaveMemoryStore, 200);
   }
 }
 
 // Persist the loaded/seeded store to ensure cloud_store.json exists with valid data
-saveMemoryStore();
+saveMemoryStore(true);
 
 async function startServer() {
   const app = express();
@@ -267,7 +295,7 @@ async function startServer() {
   });
 
   // 9. Unified Cross-Device Cloud Store API (Safari, PWA, Chrome, Mobile Sync)
-  app.use(['/api/sync', '/api/vocabulary', '/api/grammar'], (req, res, next) => {
+  app.use(['/api/sync', '/api/vocabulary', '/api/grammar', '/api/decks', '/api/user'], (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -277,7 +305,25 @@ async function startServer() {
   // Server-Sent Events (SSE) for Real-Time Cross-Browser Database Push
   const sseClients = new Set<express.Response>();
 
-  const broadcastSync = (event: { type: string; data?: any; word?: any; lastUpdated?: string }) => {
+  interface SyncEventPayload {
+    type: string;
+    data?: any;
+    word?: any;
+    words?: any[];
+    item?: any;
+    items?: any[];
+    deck?: any;
+    user?: any;
+    wordIds?: string[];
+    grammarIds?: string[];
+    deckId?: string;
+    lang?: string;
+    lastUpdated?: string;
+    senderId?: string;
+  }
+
+  const broadcastSync = (event: SyncEventPayload) => {
+    event.lastUpdated = event.lastUpdated || memoryStore.lastUpdated || new Date().toISOString();
     const payload = `data: ${JSON.stringify(event)}\n\n`;
     sseClients.forEach((client) => {
       try {
@@ -287,6 +333,17 @@ async function startServer() {
       }
     });
   };
+
+  // Heartbeat keep-alive every 15s to keep connections alive across mobile & reverse proxies
+  setInterval(() => {
+    sseClients.forEach((client) => {
+      try {
+        client.write(': keepalive\n\n');
+      } catch {
+        sseClients.delete(client);
+      }
+    });
+  }, 15000);
 
   app.get('/api/sync/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -308,6 +365,7 @@ async function startServer() {
 
   app.post('/api/sync/clear-all', (req, res) => {
     try {
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
       memoryStore = {
         vocabulary: [],
         grammar: [],
@@ -331,7 +389,7 @@ async function startServer() {
         isCleared: true,
       };
       saveMemoryStore();
-      broadcastSync({ type: 'STORE_CLEARED', lastUpdated: memoryStore.lastUpdated });
+      broadcastSync({ type: 'STORE_CLEARED', lastUpdated: memoryStore.lastUpdated, senderId });
       res.json({
         success: true,
         message: 'Đã xóa sạch toàn bộ dữ liệu trên hệ thống máy chủ Cloud',
@@ -364,6 +422,7 @@ async function startServer() {
 
   app.post('/api/sync/reset-all-retention', (req, res) => {
     try {
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
       const { lang } = req.body || {};
       if (Array.isArray(memoryStore.vocabulary)) {
         memoryStore.vocabulary = memoryStore.vocabulary.map((w: any) => {
@@ -382,7 +441,7 @@ async function startServer() {
         });
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
-        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated });
+        broadcastSync({ type: 'RETENTION_RESET', lang, lastUpdated: memoryStore.lastUpdated, senderId });
       }
       res.json({
         success: true,
@@ -397,6 +456,7 @@ async function startServer() {
 
   app.post('/api/sync/store', (req, res) => {
     try {
+      const senderId = (req.headers['x-client-id'] || req.body?.store?.senderId || req.body?.senderId) as string | undefined;
       const { store } = req.body;
       if (store && typeof store === 'object') {
         memoryStore.isCleared = false;
@@ -441,7 +501,7 @@ async function startServer() {
 
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
-        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated });
+        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated, senderId });
       }
       res.json({
         success: true,
@@ -456,6 +516,7 @@ async function startServer() {
 
   app.post('/api/sync/delete-words', (req, res) => {
     try {
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
       const { wordIds } = req.body;
       if (Array.isArray(wordIds) && wordIds.length > 0) {
         const idSet = new Set(wordIds);
@@ -464,7 +525,7 @@ async function startServer() {
         }
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
-        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated });
+        broadcastSync({ type: 'WORDS_DELETED', wordIds, lastUpdated: memoryStore.lastUpdated, senderId });
       }
       res.json({ success: true, count: wordIds?.length || 0, store: memoryStore });
     } catch (err: any) {
@@ -475,6 +536,7 @@ async function startServer() {
 
   app.post('/api/sync/delete-grammar', (req, res) => {
     try {
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
       const { grammarIds } = req.body;
       if (Array.isArray(grammarIds) && grammarIds.length > 0) {
         const idSet = new Set(grammarIds);
@@ -483,6 +545,7 @@ async function startServer() {
         }
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
+        broadcastSync({ type: 'GRAMMAR_DELETED', grammarIds, lastUpdated: memoryStore.lastUpdated, senderId });
       }
       res.json({ success: true, count: grammarIds?.length || 0, store: memoryStore });
     } catch (err: any) {
@@ -538,6 +601,7 @@ async function startServer() {
   app.post('/api/vocabulary', (req, res) => {
     try {
       const item = req.body;
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
       if (!item || !item.tu) {
         return res.status(400).json({ error: 'Thiếu thông tin từ vựng' });
       }
@@ -561,7 +625,7 @@ async function startServer() {
       memoryStore.vocabulary = cleanDeduplicateVocab(memoryStore.vocabulary);
       memoryStore.lastUpdated = new Date().toISOString();
       saveMemoryStore();
-      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: item, lastUpdated: memoryStore.lastUpdated });
+      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: item, lastUpdated: memoryStore.lastUpdated, senderId });
 
       res.json({ success: true, item, total: memoryStore.vocabulary.length });
     } catch (e: any) {
@@ -569,7 +633,26 @@ async function startServer() {
     }
   });
 
-  const updateWordInMemory = (wordId: string, updates: any) => {
+  app.post('/api/vocabulary/batch-add', (req, res) => {
+    try {
+      const { items } = req.body;
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.json({ success: true, count: 0 });
+      }
+      if (!memoryStore.vocabulary) memoryStore.vocabulary = [];
+      const cleaned = cleanDeduplicateVocab([...items, ...memoryStore.vocabulary]);
+      memoryStore.vocabulary = cleaned;
+      memoryStore.lastUpdated = new Date().toISOString();
+      saveMemoryStore();
+      broadcastSync({ type: 'WORDS_ADDED', words: items, lastUpdated: memoryStore.lastUpdated, senderId });
+      res.json({ success: true, count: items.length, total: memoryStore.vocabulary.length, lastUpdated: memoryStore.lastUpdated });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi thêm hàng loạt từ vựng' });
+    }
+  });
+
+  const updateWordInMemory = (wordId: string, updates: any, senderId?: string) => {
     if (!memoryStore.vocabulary) memoryStore.vocabulary = [];
     const searchId = String(wordId || '').trim();
     const searchTu = String(updates?.tu || '').trim().toLowerCase();
@@ -595,7 +678,7 @@ async function startServer() {
       memoryStore.lastUpdated = new Date().toISOString();
       saveMemoryStore();
       const updatedItem = memoryStore.vocabulary[idx];
-      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: updatedItem, lastUpdated: memoryStore.lastUpdated });
+      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: updatedItem, lastUpdated: memoryStore.lastUpdated, senderId });
       return updatedItem;
     } else {
       // If word not yet registered, add it to CSDL
@@ -613,7 +696,7 @@ async function startServer() {
       memoryStore.vocabulary.unshift(newItem);
       memoryStore.lastUpdated = new Date().toISOString();
       saveMemoryStore();
-      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: newItem, lastUpdated: memoryStore.lastUpdated });
+      broadcastSync({ type: 'WORD_STATUS_UPDATED', word: newItem, lastUpdated: memoryStore.lastUpdated, senderId });
       return newItem;
     }
   };
@@ -622,7 +705,8 @@ async function startServer() {
     try {
       const { id } = req.params;
       const updates = req.body || {};
-      const updatedItem = updateWordInMemory(id, updates);
+      const senderId = (req.headers['x-client-id'] || updates?.senderId) as string | undefined;
+      const updatedItem = updateWordInMemory(id, updates, senderId);
       res.json({ success: true, item: updatedItem, lastUpdated: memoryStore.lastUpdated });
     } catch (e: any) {
       res.status(500).json({ error: e?.message || 'Lỗi cập nhật từ vựng' });
@@ -633,7 +717,8 @@ async function startServer() {
     try {
       const updates = req.body || {};
       const wordId = updates.word_id || req.query.id;
-      const updatedItem = updateWordInMemory(wordId, updates);
+      const senderId = (req.headers['x-client-id'] || updates?.senderId) as string | undefined;
+      const updatedItem = updateWordInMemory(wordId, updates, senderId);
       res.json({ success: true, item: updatedItem, lastUpdated: memoryStore.lastUpdated });
     } catch (e: any) {
       res.status(500).json({ error: e?.message || 'Lỗi cập nhật trạng thái từ vựng' });
@@ -643,6 +728,7 @@ async function startServer() {
   app.delete('/api/vocabulary/:id', (req, res) => {
     try {
       const { id } = req.params;
+      const senderId = (req.headers['x-client-id'] || req.query?.senderId) as string | undefined;
       if (!memoryStore.vocabulary) memoryStore.vocabulary = [];
       const before = memoryStore.vocabulary.length;
       memoryStore.vocabulary = memoryStore.vocabulary.filter((w) => w.word_id !== id);
@@ -650,7 +736,7 @@ async function startServer() {
       if (deleted) {
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
-        broadcastSync({ type: 'STORE_UPDATED', lastUpdated: memoryStore.lastUpdated });
+        broadcastSync({ type: 'WORDS_DELETED', wordIds: [id], lastUpdated: memoryStore.lastUpdated, senderId });
       }
       res.json({ success: true, deleted, total: memoryStore.vocabulary.length });
     } catch (e: any) {
@@ -661,12 +747,14 @@ async function startServer() {
   app.post('/api/vocabulary/batch-delete', (req, res) => {
     try {
       const { ids } = req.body;
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
       if (!Array.isArray(ids)) return res.status(400).json({ error: 'Danh sách ID không hợp lệ' });
       const idSet = new Set(ids);
       if (!memoryStore.vocabulary) memoryStore.vocabulary = [];
       memoryStore.vocabulary = memoryStore.vocabulary.filter((w) => !idSet.has(w.word_id));
       memoryStore.lastUpdated = new Date().toISOString();
       saveMemoryStore();
+      broadcastSync({ type: 'WORDS_DELETED', wordIds: ids, lastUpdated: memoryStore.lastUpdated, senderId });
       res.json({ success: true, total: memoryStore.vocabulary.length });
     } catch (e: any) {
       res.status(500).json({ error: e?.message || 'Lỗi xóa hàng loạt từ vựng' });
@@ -690,6 +778,7 @@ async function startServer() {
   app.post('/api/grammar', (req, res) => {
     try {
       const item = req.body;
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
       if (!item || !item.cau_truc) return res.status(400).json({ error: 'Thiếu cấu trúc ngữ pháp' });
       if (!item.grammar_id) {
         item.grammar_id = `g_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -699,9 +788,29 @@ async function startServer() {
       memoryStore.grammar = cleanDeduplicateGrammar(memoryStore.grammar);
       memoryStore.lastUpdated = new Date().toISOString();
       saveMemoryStore();
+      broadcastSync({ type: 'GRAMMAR_UPDATED', item, lastUpdated: memoryStore.lastUpdated, senderId });
       res.json({ success: true, item });
     } catch (e: any) {
       res.status(500).json({ error: e?.message || 'Lỗi lưu ngữ pháp' });
+    }
+  });
+
+  app.post('/api/grammar/batch-add', (req, res) => {
+    try {
+      const { items } = req.body;
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.json({ success: true, count: 0 });
+      }
+      if (!memoryStore.grammar) memoryStore.grammar = [];
+      const cleaned = cleanDeduplicateGrammar([...items, ...memoryStore.grammar]);
+      memoryStore.grammar = cleaned;
+      memoryStore.lastUpdated = new Date().toISOString();
+      saveMemoryStore();
+      broadcastSync({ type: 'GRAMMAR_ADDED', items, lastUpdated: memoryStore.lastUpdated, senderId });
+      res.json({ success: true, count: items.length, total: memoryStore.grammar.length, lastUpdated: memoryStore.lastUpdated });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi thêm hàng loạt ngữ pháp' });
     }
   });
 
@@ -709,12 +818,14 @@ async function startServer() {
     try {
       const { id } = req.params;
       const updates = req.body;
+      const senderId = (req.headers['x-client-id'] || updates?.senderId) as string | undefined;
       if (!memoryStore.grammar) memoryStore.grammar = [];
       const idx = memoryStore.grammar.findIndex((g) => g.grammar_id === id);
       if (idx >= 0) {
         memoryStore.grammar[idx] = { ...memoryStore.grammar[idx], ...updates };
         memoryStore.lastUpdated = new Date().toISOString();
         saveMemoryStore();
+        broadcastSync({ type: 'GRAMMAR_UPDATED', item: memoryStore.grammar[idx], lastUpdated: memoryStore.lastUpdated, senderId });
         res.json({ success: true, item: memoryStore.grammar[idx] });
       } else {
         res.status(404).json({ error: 'Không tìm thấy mục ngữ pháp' });
@@ -727,13 +838,81 @@ async function startServer() {
   app.delete('/api/grammar/:id', (req, res) => {
     try {
       const { id } = req.params;
+      const senderId = (req.headers['x-client-id'] || req.query?.senderId) as string | undefined;
       if (!memoryStore.grammar) memoryStore.grammar = [];
       memoryStore.grammar = memoryStore.grammar.filter((g) => g.grammar_id !== id);
       memoryStore.lastUpdated = new Date().toISOString();
       saveMemoryStore();
+      broadcastSync({ type: 'GRAMMAR_DELETED', grammarIds: [id], lastUpdated: memoryStore.lastUpdated, senderId });
       res.json({ success: true, total: memoryStore.grammar.length });
     } catch (e: any) {
       res.status(500).json({ error: e?.message || 'Lỗi xóa ngữ pháp' });
+    }
+  });
+
+  // 11.5. Direct Server REST APIs for Decks (Flashcard Decks Real-Time Sync)
+  app.get('/api/decks', (req, res) => {
+    try {
+      res.json({ success: true, decks: memoryStore.decks || [] });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi đọc bộ từ' });
+    }
+  });
+
+  app.post('/api/decks', (req, res) => {
+    try {
+      const deck = req.body;
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
+      if (!deck || !deck.ten_bo) return res.status(400).json({ error: 'Thiếu tên bộ thẻ' });
+      if (!deck.deck_id) {
+        deck.deck_id = `deck_${Date.now()}`;
+      }
+      if (!memoryStore.decks) memoryStore.decks = [];
+      const idx = memoryStore.decks.findIndex((d: any) => d.deck_id === deck.deck_id);
+      if (idx >= 0) {
+        memoryStore.decks[idx] = { ...memoryStore.decks[idx], ...deck };
+      } else {
+        memoryStore.decks.unshift(deck);
+      }
+      memoryStore.lastUpdated = new Date().toISOString();
+      saveMemoryStore();
+      broadcastSync({ type: 'DECK_UPDATED', deck, lastUpdated: memoryStore.lastUpdated, senderId });
+      res.json({ success: true, deck });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi lưu bộ thẻ' });
+    }
+  });
+
+  app.delete('/api/decks/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const senderId = (req.headers['x-client-id'] || req.query?.senderId) as string | undefined;
+      if (!memoryStore.decks) memoryStore.decks = [];
+      memoryStore.decks = memoryStore.decks.filter((d: any) => d.deck_id !== id);
+      memoryStore.lastUpdated = new Date().toISOString();
+      saveMemoryStore();
+      broadcastSync({ type: 'DECK_DELETED', deckId: id, lastUpdated: memoryStore.lastUpdated, senderId });
+      res.json({ success: true, deckId: id });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi xóa bộ thẻ' });
+    }
+  });
+
+  // 11.6. User Profile REST API (Points, Streak, Level sync across devices)
+  app.put('/api/user', (req, res) => {
+    try {
+      const userUpdates = req.body || {};
+      const senderId = (req.headers['x-client-id'] || req.body?.senderId) as string | undefined;
+      memoryStore.currentUser = {
+        ...(memoryStore.currentUser || {}),
+        ...userUpdates,
+      };
+      memoryStore.lastUpdated = new Date().toISOString();
+      saveMemoryStore();
+      broadcastSync({ type: 'USER_UPDATED', user: memoryStore.currentUser, lastUpdated: memoryStore.lastUpdated, senderId });
+      res.json({ success: true, user: memoryStore.currentUser });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi cập nhật người dùng' });
     }
   });
 
