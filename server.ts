@@ -51,14 +51,18 @@ interface CloudStore {
 
 function loadMemoryStore(): CloudStore & { isCleared?: boolean } {
   let loaded: any = null;
-  if (fs.existsSync(STORE_FILE)) {
+  const targetFile = fs.existsSync(STORE_FILE)
+    ? STORE_FILE
+    : (fs.existsSync('/tmp/cloud_store.json') ? '/tmp/cloud_store.json' : STORE_FILE);
+
+  if (fs.existsSync(targetFile)) {
     try {
-      const content = fs.readFileSync(STORE_FILE, 'utf-8');
+      const content = fs.readFileSync(targetFile, 'utf-8');
       if (content && content.trim()) {
         loaded = JSON.parse(content);
       }
     } catch (e) {
-      console.error('Failed to parse cloud_store.json:', e);
+      console.error('Failed to parse cloud store:', e);
     }
   }
 
@@ -129,9 +133,17 @@ async function doSaveMemoryStore() {
   pendingSave = false;
   try {
     const data = JSON.stringify(memoryStore);
-    await fs.promises.writeFile(STORE_FILE, data, 'utf-8');
+    try {
+      await fs.promises.writeFile(STORE_FILE, data, 'utf-8');
+    } catch (fsErr) {
+      try {
+        await fs.promises.writeFile('/tmp/cloud_store.json', data, 'utf-8');
+      } catch (tmpErr) {
+        // Ignore read-only filesystem error in serverless environment
+      }
+    }
   } catch (e) {
-    console.error('Failed to save cloud_store.json:', e);
+    console.error('Failed to save cloud store:', e);
   } finally {
     isSavingStore = false;
     if (pendingSave) {
