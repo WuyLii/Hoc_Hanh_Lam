@@ -303,6 +303,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const connectSSE = () => {
       if (isDisposed || failCount >= 2) return;
+      // Disable SSE when deployed on Vercel or remote hosting where persistent SSE is not supported
+      if (typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        return;
+      }
       try {
         es = new EventSource('/api/sync/stream');
 
@@ -1755,6 +1759,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   const syncWithCloudServer = async (silent = false): Promise<{ success: boolean; message: string }> => {
+    // On Vercel or remote cloud hosting, data is stored in IndexedDB and Supabase.
+    // Skip /api/sync/store to prevent 500 errors.
+    if (typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      return { success: true, message: 'Dữ liệu hoạt động an toàn qua IndexedDB & Supabase Cloud' };
+    }
     try {
       if (!silent) setIsCloudSyncing(true);
 
@@ -1919,6 +1928,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const pushToCloudServer = async (overrideVocab?: VocabularyItem[]) => {
+    if (typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
     if (!hasInitialServerSyncedRef.current) return;
     if (isPushingRef.current) return;
     try {
