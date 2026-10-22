@@ -1511,11 +1511,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       idbSet('chat_history', next).catch(() => {});
       return next;
     });
-    // Sanitize payload for Supabase: Supabase table 'chat_conversations' has column 'cac_tin_nhan' and NOT 'messages'.
-    // Passing non-existent column 'messages' causes PostgREST error 400 Bad Request.
-    const { messages, ...supabasePayload } = conv as any;
-    supabasePayload.cac_tin_nhan = conv.cac_tin_nhan || conv.messages || [];
-    SupabaseService.saveChatConversation(supabasePayload).catch(() => {});
   };
 
   const deleteChatConversation = (chatId: string) => {
@@ -1660,13 +1655,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mockTests,
         progressRecords: progressLogs,
         journalEntries,
-        chatConversations: (chatHistory || []).map((c: any) => {
-          const { messages, ...rest } = c;
-          return {
-            ...rest,
-            cac_tin_nhan: c.cac_tin_nhan || messages || [],
-          };
-        }),
         notifications,
       });
       return res;
