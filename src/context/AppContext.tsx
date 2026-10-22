@@ -299,14 +299,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let es: EventSource | null = null;
     let reconnectTimer: NodeJS.Timeout | null = null;
     let isDisposed = false;
+    let failCount = 0;
 
     const connectSSE = () => {
-      if (isDisposed) return;
+      if (isDisposed || failCount >= 2) return;
       try {
         es = new EventSource('/api/sync/stream');
 
         es.onopen = () => {
           setIsRealtimeConnected(true);
+          failCount = 0;
         };
 
         es.onmessage = (event) => {
@@ -450,14 +452,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         es.onerror = () => {
           setIsRealtimeConnected(false);
+          failCount++;
           try {
             es?.close();
           } catch (e) {}
-          if (!isDisposed && !reconnectTimer) {
+          if (!isDisposed && failCount < 2) {
             reconnectTimer = setTimeout(() => {
               reconnectTimer = null;
               connectSSE();
-            }, 3000);
+            }, 6000);
           }
         };
       } catch (e) {
