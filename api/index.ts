@@ -153,6 +153,54 @@ app.post('/api/sync/delete-words', (req, res) => {
   }
 });
 
+app.post('/api/sync/delete-grammar', (req, res) => {
+  try {
+    const { grammarIds } = req.body;
+    if (Array.isArray(grammarIds) && grammarIds.length > 0) {
+      const idSet = new Set(grammarIds);
+      if (Array.isArray(memoryStore.grammar)) {
+        memoryStore.grammar = memoryStore.grammar.filter((g: any) => !idSet.has(g.grammar_id));
+      }
+      memoryStore.lastUpdated = new Date().toISOString();
+    }
+    res.json({ success: true, count: grammarIds?.length || 0, store: memoryStore });
+  } catch (err: any) {
+    console.error('Error in Vercel /api/sync/delete-grammar:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/sync/reset-all-retention', (req, res) => {
+  try {
+    const { lang } = req.body || {};
+    if (Array.isArray(memoryStore.vocabulary)) {
+      memoryStore.vocabulary = memoryStore.vocabulary.map((w: any) => {
+        if (!lang || w.ngon_ngu === lang) {
+          return {
+            ...w,
+            retention_level: 'chua_danh_gia',
+            srs_box: 0,
+            srs_interval: 0,
+            times_reviewed: 0,
+            times_correct: 0,
+            last_reviewed: null,
+          };
+        }
+        return w;
+      });
+      memoryStore.lastUpdated = new Date().toISOString();
+    }
+    res.json({
+      success: true,
+      message: 'Đã gán tất cả từ vựng về trạng thái Chưa đánh giá trên Cloud',
+      total: (memoryStore.vocabulary || []).length,
+      lastUpdated: memoryStore.lastUpdated,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'Lỗi đặt lại mức độ ghi nhớ' });
+  }
+});
+
 // 2. Google Sheets Fetch Public
 app.post('/api/sheets/fetch-public', async (req, res) => {
   try {

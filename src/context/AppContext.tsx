@@ -1776,7 +1776,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (res.status === 404) {
         return { success: false, message: 'Vercel static host (hãy đồng bộ bằng Supabase)' };
       }
-      if (!res.ok) throw new Error('Không thể kết nối máy chủ Cloud Sync');
+      if (!res.ok) {
+        return { success: false, message: 'Máy chủ Cloud tạm thời không phản hồi, đã tự động dùng bộ nhớ máy' };
+      }
       const json = await res.json();
       const serverStore = json.store || {};
       const serverUpdated = json.lastUpdated || '';
