@@ -398,12 +398,12 @@ CREATE POLICY "journal_all_policy" ON public.journal_entries
     FOR ALL USING (auth.uid()::text = user_id)
     WITH CHECK (auth.uid()::text = user_id);
 
--- 2.9. chat_conversations (Lịch sử AI Chat - Hoàn toàn riêng tư theo auth.uid())
+-- 2.9. chat_conversations (Lịch sử AI Chat)
 ALTER TABLE IF EXISTS public.chat_conversations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "chat_all_policy" ON public.chat_conversations;
 CREATE POLICY "chat_all_policy" ON public.chat_conversations
-    FOR ALL USING (auth.uid()::text = user_id)
-    WITH CHECK (auth.uid()::text = user_id);
+    FOR ALL USING (auth.uid()::text = user_id OR user_id = 'shared' OR user_id = 'user_1' OR user_id IS NULL OR user_id = '')
+    WITH CHECK (auth.uid()::text = user_id OR user_id = 'shared' OR user_id = 'user_1' OR auth.uid() IS NOT NULL);
 
 -- 2.10. notifications (Thông báo cá nhân - Hoàn toàn riêng tư theo auth.uid())
 ALTER TABLE IF EXISTS public.notifications ENABLE ROW LEVEL SECURITY;

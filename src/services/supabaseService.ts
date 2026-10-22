@@ -486,7 +486,18 @@ export class SupabaseService {
 
       // 9. Chat conversations
       if (payload.chatConversations && payload.chatConversations.length > 0) {
-        const res = await this.runBatchUpsertWithRetry(client, 'chat_conversations', payload.chatConversations, 'chat_id', 50, 3);
+        const cleanChats = payload.chatConversations.map((c: any) => ({
+          chat_id: c.chat_id,
+          user_id: c.user_id,
+          chu_de: c.chu_de || 'Giao tiếp',
+          tieu_de: c.tieu_de || c.chu_de || 'Hỏi đáp Gia sư AI',
+          ngon_ngu: c.ngon_ngu || 'ko',
+          cac_tin_nhan: c.cac_tin_nhan || c.messages || [],
+          tu_da_luu: c.tu_da_luu || [],
+          created_at: c.created_at || new Date().toISOString(),
+          updated_at: c.updated_at || new Date().toISOString(),
+        }));
+        const res = await this.runBatchUpsertWithRetry(client, 'chat_conversations', cleanChats, 'chat_id', 50, 3);
         if (!res.success) allFailedChunks.push(...res.failedChunks);
       }
 
@@ -1251,22 +1262,33 @@ export class SupabaseService {
    */
   public static async saveChatConversation(conv: ChatConversation): Promise<{ success: boolean; error?: string }> {
     const client = this.getClient();
+    const cleanConv = {
+      chat_id: conv.chat_id,
+      user_id: conv.user_id,
+      chu_de: conv.chu_de || 'Giao tiếp',
+      tieu_de: conv.tieu_de || conv.chu_de || 'Hỏi đáp Gia sư AI',
+      ngon_ngu: conv.ngon_ngu || 'ko',
+      cac_tin_nhan: conv.cac_tin_nhan || (conv as any).messages || [],
+      tu_da_luu: conv.tu_da_luu || [],
+      created_at: conv.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
     if (!client) {
       await enqueueSyncTask({
         type: 'upsert',
         table: 'chat_conversations',
-        data: conv,
+        data: cleanConv,
         onConflict: 'chat_id',
       });
       return { success: false, error: 'Chưa cấu hình Supabase' };
     }
     try {
-      const { error } = await client.from('chat_conversations').upsert([conv], { onConflict: 'chat_id' });
+      const { error } = await client.from('chat_conversations').upsert([cleanConv], { onConflict: 'chat_id' });
       if (error) {
         await enqueueSyncTask({
           type: 'upsert',
           table: 'chat_conversations',
-          data: conv,
+          data: cleanConv,
           onConflict: 'chat_id',
         });
         return { success: false, error: error.message };
@@ -1276,7 +1298,7 @@ export class SupabaseService {
       await enqueueSyncTask({
         type: 'upsert',
         table: 'chat_conversations',
-        data: conv,
+        data: cleanConv,
         onConflict: 'chat_id',
       });
       return { success: false, error: e?.message || String(e) };
