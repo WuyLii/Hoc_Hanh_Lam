@@ -1656,7 +1656,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mockTests,
         progressRecords: progressLogs,
         journalEntries,
-        chatConversations: chatHistory,
+        chatConversations: (chatHistory || []).map((c: any) => {
+          const { messages, ...rest } = c;
+          return {
+            ...rest,
+            cac_tin_nhan: c.cac_tin_nhan || messages || [],
+          };
+        }),
         notifications,
       });
       return res;
