@@ -299,6 +299,7 @@ export const AiChatboxView: React.FC = () => {
         tieu_de: userMsg.text.slice(0, 35) || 'Hỏi đáp Gia sư AI',
         ngon_ngu: currentLanguage,
         created_at: new Date().toISOString(),
+        cac_tin_nhan: finalMessages,
         messages: finalMessages,
       });
     } catch (err: any) {

@@ -10,18 +10,32 @@ import {
   handleFillMissingBilingual,
   handleDictionaryLookup,
   getKeysStatus,
-} from '../src/server/geminiHandlers.js';
-import { fetchPublicSpreadsheet } from '../src/server/sheetsHelper.js';
-import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from '../src/utils/deduplicate.js';
-import { handleTutorAgent } from '../src/server/tutorAgent.js';
+} from '../src/server/geminiHandlers.ts';
+import { fetchPublicSpreadsheet } from '../src/server/sheetsHelper.ts';
+import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from '../src/utils/deduplicate.ts';
+import { INITIAL_VOCABULARY, INITIAL_GRAMMAR } from '../src/data/seedData.ts';
+import { handleTutorAgent } from '../src/server/tutorAgent.ts';
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
 
-// In-memory store for Vercel serverless instance
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-id, x-gemini-key-1, x-gemini-key-2');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  if (!req.url.startsWith('/api') && req.url.startsWith('/')) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
+// In-memory store for Vercel serverless instance with initial seed data
 let memoryStore: Record<string, any> = {
-  vocabulary: [],
-  grammar: [],
+  vocabulary: Array.isArray(INITIAL_VOCABULARY) ? cleanDeduplicateVocab(INITIAL_VOCABULARY) : [],
+  grammar: Array.isArray(INITIAL_GRAMMAR) ? cleanDeduplicateGrammar(INITIAL_GRAMMAR) : [],
   decks: [],
   reviewSessions: [],
   mockTests: [],
@@ -43,7 +57,15 @@ app.get('/api/gemini/keys-status', (req, res) => {
   }
 });
 
-// 1. Cloud Store Sync
+// 1. Cloud Store Sync & Stream
+app.get('/api/sync/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'close');
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', lastUpdated: memoryStore.lastUpdated })}\n\n`);
+  res.end();
+});
+
 app.get('/api/sync/status', (req, res) => {
   res.json({
     success: true,

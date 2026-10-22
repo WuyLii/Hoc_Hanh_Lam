@@ -44,18 +44,7 @@ export const VocabularyManager: React.FC = () => {
     toggleTodayFlashcard,
     updateRetentionLevel,
     resetAllRetentionToUnrated,
-    pendingVocabFilters,
-    setPendingVocabFilters,
   } = useApp();
-
-  React.useEffect(() => {
-    if (pendingVocabFilters) {
-      if (pendingVocabFilters.level) setSelectedLevel(pendingVocabFilters.level);
-      if (pendingVocabFilters.topic) setSelectedTopic(pendingVocabFilters.topic);
-      if (pendingVocabFilters.search) setSearchQuery(pendingVocabFilters.search);
-      setPendingVocabFilters(null);
-    }
-  }, [pendingVocabFilters]);
 
   const currentLangInfo = LANGUAGES[currentLanguage];
   const fileInputRef = useRef<HTMLInputElement>(null);
