@@ -15,6 +15,9 @@ import {
   Play,
   ArrowRight,
   RotateCcw,
+  Shuffle,
+  Check,
+  Sparkles,
 } from 'lucide-react';
 import {
   filterWords,
@@ -113,15 +116,73 @@ export const GameReviewHub: React.FC = () => {
   const filteredPool = isFilteringActive
     ? reviewWords
     : (reviewWords.length > 0 ? reviewWords : currentLangVocabulary);
-  
+
+  const [shuffledOrder, setShuffledOrder] = useState<VocabularyItem[] | null>(null);
+  const [shuffleNotice, setShuffleNotice] = useState<string | null>(null);
+  const [isShuffling, setIsShuffling] = useState(false);
+
+  // Robust Fisher-Yates shuffle algorithm
+  const shuffleArray = <T,>(arr: T[]): T[] => {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  };
+
+  const handleShuffleFilteredWords = () => {
+    setIsShuffling(true);
+    const pool = isFilteringActive
+      ? reviewWords
+      : (reviewWords.length > 0 ? reviewWords : currentLangVocabulary);
+
+    if (pool.length === 0) {
+      setShuffleNotice('⚠️ Chưa có từ nào khớp với bộ lọc để xáo trộn!');
+      setIsShuffling(false);
+      setTimeout(() => setShuffleNotice(null), 3000);
+      return;
+    }
+
+    const randomized = shuffleArray(pool);
+    setShuffledOrder(randomized);
+    setSessionWords(randomized);
+    setShuffleKey((k) => k + 1);
+    setShuffleNotice(`🎲 Đã xáo trộn ngẫu nhiên ${randomized.length} từ vựng đã lọc!`);
+
+    setTimeout(() => setIsShuffling(false), 450);
+    setTimeout(() => setShuffleNotice(null), 4000);
+  };
+
+  const handleResetShuffleOrder = () => {
+    setShuffledOrder(null);
+    setSessionWords(null);
+    setShuffleKey((k) => k + 1);
+    setShuffleNotice('🔄 Đã trở về thứ tự mặc định');
+    setTimeout(() => setShuffleNotice(null), 2500);
+  };
+
+  // Reset custom shuffle when fundamental filters change
+  React.useEffect(() => {
+    setShuffledOrder(null);
+    setSessionWords(null);
+  }, [activeLessonFilter, activeTopicFilter, activePosFilter, activeDeckFilter, activeTodayFilter, activeRetentionFilter]);
+
   // Dynamic random shuffle every time filters change or user clicks shuffle
   const finalWordsToPlay = React.useMemo(() => {
-    const shuffled = [...filteredPool].sort(() => Math.random() - 0.5);
-    if (activeLimitFilter !== 'ALL') {
-      return shuffled.slice(0, parseInt(activeLimitFilter, 10));
+    let source = filteredPool;
+    if (shuffledOrder && shuffledOrder.length > 0) {
+      const filteredSet = new Set(filteredPool.map((w) => w.word_id));
+      const validShuffled = shuffledOrder.filter((w) => filteredSet.has(w.word_id));
+      if (validShuffled.length > 0) {
+        source = validShuffled;
+      }
     }
-    return shuffled;
-  }, [filteredPool, activeLimitFilter, shuffleKey]);
+    if (activeLimitFilter !== 'ALL') {
+      return source.slice(0, parseInt(activeLimitFilter, 10));
+    }
+    return source;
+  }, [filteredPool, activeLimitFilter, shuffleKey, shuffledOrder]);
 
   // Stable words for active game session: persists across navigation so words don't reshuffle mid-game
   const [sessionWords, setSessionWords] = React.useState<VocabularyItem[] | null>(null);
@@ -356,11 +417,12 @@ export const GameReviewHub: React.FC = () => {
           </span>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShuffleKey((k) => k + 1)}
-              className="px-2.5 py-1 bg-[#1A1A1A] text-white hover:bg-stone-800 text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition"
-              title="Tự động đảo vị trí từ vựng ngẫu nhiên liên tục"
+              onClick={handleShuffleFilteredWords}
+              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 border border-[#1A1A1A] text-xs font-mono font-black uppercase flex items-center gap-1.5 shadow-[1.5px_1.5px_0px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition cursor-pointer"
+              title="Xáo trộn ngẫu nhiên tất cả các từ vựng đã lọc"
             >
-              <span>🎲 XÁO TRỘN ĐỔI TỪ MỚI</span>
+              <Shuffle className={`w-3.5 h-3.5 ${isShuffling ? 'animate-spin' : ''}`} />
+              <span>🎲 XÁO TRỘN CÂU HỎI</span>
             </button>
             <span className="text-xs font-mono font-bold bg-white px-2 py-0.5 border border-[#1A1A1A] text-[#1A1A1A]">
               {finalWordsToPlay.length} TỪ HÀNG ĐỢI
@@ -554,6 +616,52 @@ export const GameReviewHub: React.FC = () => {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Shuffle & Ordering Controls Bar - Element 4 of filter container */}
+        <div className="p-3.5 sm:p-4 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-[#1A1A1A] flex items-center gap-1.5 uppercase tracking-wide">
+              <Shuffle className={`w-4 h-4 text-amber-700 ${isShuffling ? 'animate-spin' : ''}`} />
+              <span>Xáo trộn câu hỏi ngẫu nhiên:</span>
+            </span>
+            <span className="bg-amber-100 border border-amber-800 text-amber-950 px-2 py-0.5 text-[11px] font-bold">
+              {finalWordsToPlay.length} từ đã lọc
+            </span>
+            {shuffledOrder && (
+              <span className="bg-[#1A1A1A] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                ĐÃ ĐẢO THỨ TỰ
+              </span>
+            )}
+            {shuffleNotice && (
+              <span className="text-emerald-700 font-bold flex items-center gap-1 animate-in fade-in duration-200 bg-emerald-50 px-2.5 py-1 border border-emerald-300">
+                <Check className="w-3.5 h-3.5" />
+                <span>{shuffleNotice}</span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleShuffleFilteredWords}
+              className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-stone-950 border-2 border-[#1A1A1A] font-mono font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 transition cursor-pointer"
+              title="Xáo trộn ngẫu nhiên tất cả các từ vựng đã lọc với nhau"
+            >
+              <Shuffle className={`w-4 h-4 ${isShuffling ? 'animate-spin' : ''}`} />
+              <span>🎲 XÁO TRỘN CÂU HỎI NGAY</span>
+            </button>
+            {shuffledOrder && (
+              <button
+                type="button"
+                onClick={handleResetShuffleOrder}
+                className="px-3 py-2 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-stone-700 text-xs font-mono font-bold uppercase transition"
+                title="Khôi phục thứ tự ban đầu"
+              >
+                <span>↺ Thứ tự gốc</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {activeTodayFilter === 'today_only' && (

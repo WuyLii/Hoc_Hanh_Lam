@@ -544,6 +544,30 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
             <span>BỘ LỌC SRS & CHỌN TỪ ({activeWords.length})</span>
           </button>
 
+          {/* Quick Shuffle Flashcards Button */}
+          <button
+            onClick={() => {
+              if (activeWords.length <= 1) return;
+              setActiveWords((prev) => {
+                const copy = [...prev];
+                for (let i = copy.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+              });
+              setCurrentIndex(0);
+              setIsFlipped(false);
+              setReloadNotice(`🎲 Đã xáo trộn ngẫu nhiên ${activeWords.length} thẻ câu hỏi!`);
+              setTimeout(() => setReloadNotice(null), 3500);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#1A1A1A] bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-mono uppercase font-black transition editorial-shadow-sm cursor-pointer"
+            title="Xáo trộn ngẫu nhiên tất cả các thẻ câu hỏi hiện tại"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">XÁO TRỘN</span>
+          </button>
+
           <span className="text-xs font-mono font-bold text-[#1A1A1A]">
             THẺ {currentIndex + 1} / {activeWords.length}
           </span>
@@ -826,6 +850,28 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
               >
                 <Shuffle className="w-3 h-3 text-amber-700" />
                 <span>🎲 20 từ</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (candidateWords.length === 0) return;
+                  const shuffled = [...candidateWords];
+                  for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                  }
+                  setPendingWordIds(new Set(shuffled.map((w) => w.word_id)));
+                  setActiveWords(shuffled);
+                  setCurrentIndex(0);
+                  setIsFlipped(false);
+                  setReloadNotice(`🎲 Đã xáo trộn ngẫu nhiên ${shuffled.length} từ vựng đã lọc!`);
+                  setTimeout(() => setReloadNotice(null), 3500);
+                }}
+                className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 border-2 border-[#1A1A1A] text-[11px] font-black text-stone-950 flex items-center gap-1 shadow-sm transition cursor-pointer"
+                title="Xáo trộn ngẫu nhiên tất cả các từ vựng đã lọc"
+              >
+                <Shuffle className="w-3 h-3 text-stone-950" />
+                <span>🔀 Xáo trộn từ đã lọc</span>
               </button>
             </div>
           </div>
