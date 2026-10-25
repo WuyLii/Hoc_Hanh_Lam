@@ -158,6 +158,7 @@ export function cleanDeduplicateVocab(items: VocabularyItem[]): VocabularyItem[]
         phien_am_tieng_han: item.phien_am_tieng_han || existing.phien_am_tieng_han || '',
         chu_de: item.chu_de || existing.chu_de || 'Tổng hợp',
         cap_do: item.cap_do || existing.cap_do || 'Cơ bản',
+        bai_hoc: item.bai_hoc || existing.bai_hoc || 'Bài 1',
         retention_level: resolvedRetention,
         is_added_today_flashcard: resolvedTodayFlashcard,
         is_starred: resolvedStarred,

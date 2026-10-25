@@ -10,6 +10,7 @@ import {
 import koreanGrammar from './koreanGrammarData.json';
 import englishGrammar from './englishGrammarData.json';
 import englishVocab from './englishVocabData.json';
+import koreanTopikVocab from './koreanTopikVocabData.json';
 
 export const INITIAL_USERS: UserProfile[] = [
   {
@@ -38,6 +39,7 @@ export const INITIAL_USERS: UserProfile[] = [
 
 export const INITIAL_VOCABULARY: VocabularyItem[] = [
   ...(englishVocab as VocabularyItem[]),
+  ...(koreanTopikVocab as VocabularyItem[]),
 ];
 
 export const INITIAL_GRAMMAR: GrammarItem[] = [
@@ -45,7 +47,21 @@ export const INITIAL_GRAMMAR: GrammarItem[] = [
   ...(englishGrammar as GrammarItem[]),
 ];
 
-export const INITIAL_DECKS: Deck[] = [];
+export const INITIAL_DECKS: Deck[] = [
+  {
+    deck_id: 'deck_topik_1_400',
+    ten_bo: 'Ôn thi topik',
+    ten_deck: 'Ôn thi topik',
+    ngon_ngu: 'ko',
+    mo_ta: '400 từ vựng TOPIK I ưu tiên học hàng đầu (kèm đánh dấu Flashcard)',
+    nguoi_tao: 'user_1',
+    danh_sach_word_id: (koreanTopikVocab as VocabularyItem[]).map((w) => w.word_id),
+    che_do_chia_se: 'shared',
+    color: 'from-amber-500 to-orange-600',
+    icon: '🎯',
+    created_at: new Date().toISOString(),
+  },
+];
 
 export const INITIAL_LISTENING_EXERCISES: ListeningExercise[] = [];
 

@@ -503,15 +503,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (isMounted && !hasInitialServerSyncedRef.current) {
           if (cachedVocab && cachedVocab.length > 0) {
-            const cleaned = cleanDeduplicateVocab(cachedVocab);
-            setVocabulary(cleaned.map((v) => ({
+            const mergedVocab = cleanDeduplicateVocab([...INITIAL_VOCABULARY, ...cachedVocab]);
+            setVocabulary(mergedVocab.map((v) => ({
               ...v,
               retention_level: v.retention_level || 'chua_danh_gia',
             })));
           }
           const mergedGrammar = cleanDeduplicateGrammar([...INITIAL_GRAMMAR, ...(cachedGrammar || [])]);
           setGrammar(mergedGrammar);
-          if (cachedDecks && cachedDecks.length > 0) setDecks(cleanDeduplicateDecks(cachedDecks));
+          if (cachedDecks && cachedDecks.length > 0) {
+            setDecks(cleanDeduplicateDecks([...INITIAL_DECKS, ...cachedDecks]));
+          }
           if (cachedReviews && cachedReviews.length > 0) setReviewSessions(cachedReviews);
           if (cachedTests && cachedTests.length > 0) setMockTests(cachedTests);
           if (cachedListening && cachedListening.length > 0) setListeningExercises(cachedListening);
@@ -560,7 +562,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [vocabulary, setVocabulary] = useState<VocabularyItem[]>(() => {
     const loaded = loadFromStorage<VocabularyItem[]>('vocabulary', []);
-    const sourceList = loaded.length > 0 ? loaded : INITIAL_VOCABULARY;
+    const sourceList = [...INITIAL_VOCABULARY, ...loaded];
     const cleaned = cleanDeduplicateVocab(sourceList);
     return cleaned.map((v, idx) => ({
       ...v,
@@ -571,7 +573,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Keep vocabulary synced with CSDL database without wiping user retention ratings
   const [decks, setDecks] = useState<Deck[]>(() =>
-    cleanDeduplicateDecks(loadFromStorage('decks', []))
+    cleanDeduplicateDecks([...INITIAL_DECKS, ...loadFromStorage('decks', [])])
   );
   const [grammar, setGrammar] = useState<GrammarItem[]>(() => {
     const loaded = loadFromStorage<GrammarItem[]>('grammar', []);
