@@ -77,6 +77,28 @@ export function normalizeGrammarSyntax(syntax: string): string {
     .trim();
 }
 
+/**
+ * Detects whether a string contains Vietnamese diacritics / tone marks
+ * (e.g. "Bạn", "học", "cà phê" -> true; "ban", "hoc", "sarang" -> false)
+ */
+export function hasDiacritics(str: string): boolean {
+  if (!str) return false;
+  return /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđĐ]/.test(str);
+}
+
+/**
+ * Extracts distinct individual word tokens from text.
+ * Handles punctuation, spaces, commas, slashes, brackets, hyphens.
+ */
+export function extractWords(text: string): string[] {
+  if (!text) return [];
+  return text
+    .normalize('NFC')
+    .toLowerCase()
+    .split(/[^a-z0-9àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\u4E00-\u9FFF]+/)
+    .filter(Boolean);
+}
+
 export type VocabSearchScope = 'both' | 'word' | 'meaning';
 
 export interface SearchMatchResult {
@@ -86,10 +108,14 @@ export interface SearchMatchResult {
 }
 
 /**
- * Ultra-intelligent multi-tier scoring matcher for vocabulary.
- * Solves the false-substring bug (e.g. searching "đi" matching "điều kiện" or "điện thoại")
- * by prioritizing exact words, exact tokens, word prefixes, Romaja/Phonetic,
- * Hangul Chosung, and word stems above broad substrings.
+ * Ultra-intelligent matcher for vocabulary strictly searching ONLY word (`tu`) and meaning (`nghia`).
+ *
+ * Rules:
+ * 1. Dấu (Diacritics): If query has diacritics (e.g. "Bạn"), match MUST strictly respect accents!
+ *    "bạn" will NEVER match "bàn", "bán", "bản", "bảng", "ban".
+ * 2. Thứ tự xuất hiện: Multi-word queries match in ANY order (e.g. "thân bạn" matches "người bạn thân").
+ * 3. Viết hoa / thường: Case-insensitive everywhere ("Bạn" === "bạn" === "BẠN").
+ * 4. Phạm vi: CHỈ tìm từ (`tu`) hoặc nghĩa của từ (`nghia`). Không tìm chủ đề hay ví dụ.
  */
 export function matchVocabulary(
   item: VocabularyItem,
@@ -100,191 +126,204 @@ export function matchVocabulary(
     return { matches: true, score: 0 };
   }
 
-  const qRaw = query.trim().toLowerCase();
-  const qTone = removeVietnameseTones(qRaw).toLowerCase();
-  const qNoSpace = qRaw.replace(/\s+/g, '');
-  const qNoSpaceTone = qTone.replace(/\s+/g, '');
+  // Normalize Unicode NFC and lowercase
+  const qClean = query.trim().normalize('NFC').toLowerCase();
+  const qHasAccents = hasDiacritics(qClean);
+  const qWords = extractWords(qClean);
 
-  const wordRaw = (item.tu || '').trim().toLowerCase();
-  const wordTone = removeVietnameseTones(wordRaw).toLowerCase();
-  const wordNoSpace = wordRaw.replace(/\s+/g, '');
-  const wordNoSpaceTone = wordTone.replace(/\s+/g, '');
+  if (qWords.length === 0 && qClean.length === 0) {
+    return { matches: true, score: 0 };
+  }
 
-  const meaningRaw = (item.nghia || '').trim().toLowerCase();
-  const meaningTone = removeVietnameseTones(meaningRaw).toLowerCase();
-  const meaningTokens = tokenizeMeaning(item.nghia || '');
-  const meaningTokensTone = meaningTokens.map((t) => removeVietnameseTones(t).toLowerCase());
+  const wordRaw = (item.tu || '').trim().normalize('NFC').toLowerCase();
+  const wordWords = extractWords(wordRaw);
 
-  const phoneticRaw = cleanPhonetic(item.phien_am || '');
-  const phoneticNoSpace = phoneticRaw.replace(/\s+/g, '');
-
-  const chosungWord = getHangulChosung(wordRaw);
+  const meaningRaw = (item.nghia || '').trim().normalize('NFC').toLowerCase();
+  const meaningTokens = tokenizeMeaning(item.nghia || '').map((t) => t.normalize('NFC'));
+  const meaningWords = extractWords(meaningRaw);
 
   let wordScore = 0;
   let meaningScore = 0;
   let detectedType: SearchMatchResult['matchType'] = undefined;
 
   // ==========================================
-  // 1. EVALUATE WORD MATCH (Hangul / English / Chinese / Romaja)
+  // 1. MATCH ON WORD (item.tu) - ONLY if scope is 'word' or 'both'
   // ==========================================
-  if (wordRaw) {
-    // 1.1. Exact Match on Word (Hangul / Word itself)
-    if (wordRaw === qRaw) {
+  if (scope !== 'meaning' && wordRaw) {
+    // 1.1. Exact Match on word
+    if (wordRaw === qClean) {
       wordScore = 2000;
       detectedType = 'exact_word';
-    } else if (wordTone === qTone && wordTone.length > 0) {
-      wordScore = 1900;
-      detectedType = 'exact_word';
-    } else if (wordNoSpace === qNoSpace) {
-      wordScore = 1850;
-      detectedType = 'exact_word';
     }
-    // 1.2. Korean Verb Stem Match: e.g. query is "가" and word is "가다", or "먹" -> "먹다", "공부" -> "공부하다"
+    // 1.2. Verb stem (Korean e.g. "가" -> "가다", "먹" -> "먹다", "공부" -> "공부하다")
     else if (
-      (wordRaw.endsWith('다') && wordRaw.slice(0, -1) === qRaw) ||
-      (wordRaw.endsWith('하다') && wordRaw.slice(0, -2) === qRaw)
+      (wordRaw.endsWith('다') && wordRaw.slice(0, -1) === qClean) ||
+      (wordRaw.endsWith('하다') && wordRaw.slice(0, -2) === qClean)
     ) {
       wordScore = 1750;
       detectedType = 'word_stem';
     }
-    // 1.3. Word Starts With Query
-    else if (wordRaw.startsWith(qRaw)) {
+    // 1.3. Multi-word any-order match on word (e.g. "out go" matches "go out")
+    else if (
+      qWords.length > 1 &&
+      qWords.every((qw) => wordWords.some((ww) => ww === qw || ww.startsWith(qw)))
+    ) {
+      wordScore = 1700;
+      detectedType = 'multi_token';
+    }
+    // 1.4. Word starts with query
+    else if (wordRaw.startsWith(qClean)) {
       wordScore = 1500;
       detectedType = 'word_prefix';
-    } else if (wordTone.startsWith(qTone) && qTone.length >= 2) {
-      wordScore = 1400;
-      detectedType = 'word_prefix';
     }
-    // 1.4. Phonetic / Romaja / Pinyin Match (e.g. query "hakgyo" -> [hak-gyo], "sarang" -> [sa-rang])
-    else if (phoneticRaw && (phoneticRaw === qRaw || phoneticNoSpace === qNoSpace)) {
-      wordScore = 1350;
-      detectedType = 'phonetic';
-    } else if (phoneticRaw && (phoneticRaw.startsWith(qRaw) || phoneticNoSpace.startsWith(qNoSpace))) {
-      wordScore = 1250;
-      detectedType = 'phonetic';
-    }
-    // 1.5. Hangul Chosung (Initial Consonants) Match (e.g. query "ㅎㄱ" -> "한국")
-    else if (chosungWord && (chosungWord === qRaw || chosungWord.startsWith(qRaw))) {
-      wordScore = 1200;
+    // 1.5. Hangul Chosung match (e.g. "ㅎㄱ" -> "한국")
+    else if (getHangulChosung(wordRaw).startsWith(qClean)) {
+      wordScore = 1300;
       detectedType = 'chosung';
     }
-    // 1.6. Word Contains Query as Substring
-    else if (wordRaw.includes(qRaw)) {
-      wordScore = 1000;
+    // 1.6. Romaja / Phonetic match on word (e.g. query "chingu" -> phien_am "chin-gu")
+    else if (item.phien_am) {
+      const phoneticClean = cleanPhonetic(item.phien_am);
+      const phoneticWords = extractWords(phoneticClean);
+      if (phoneticClean === qClean || phoneticWords.includes(qClean)) {
+        wordScore = 1350;
+        detectedType = 'phonetic';
+      } else if (phoneticClean.startsWith(qClean)) {
+        wordScore = 1200;
+        detectedType = 'phonetic';
+      }
+    }
+    // 1.7. Word contains query as whole token or substring
+    else if (wordWords.includes(qClean)) {
+      wordScore = 1200;
       detectedType = 'word_contains';
-    } else if (wordTone.includes(qTone) && qTone.length >= 2) {
-      wordScore = 950;
+    } else if (qClean.length >= 2 && wordRaw.includes(qClean)) {
+      wordScore = 900;
       detectedType = 'word_contains';
-    } else if (phoneticRaw && phoneticRaw.includes(qRaw) && qRaw.length >= 3) {
-      wordScore = 800;
-      detectedType = 'phonetic';
     }
   }
 
   // ==========================================
-  // 2. EVALUATE MEANING MATCH (Vietnamese)
+  // 2. MATCH ON MEANING (item.nghia) - ONLY if scope is 'meaning' or 'both'
   // ==========================================
-  if (meaningRaw) {
-    // 2.1. Exact Full Meaning
-    if (meaningRaw === qRaw) {
-      meaningScore = 1800;
-      if (!detectedType) detectedType = 'exact_meaning';
-    } else if (meaningTone === qTone) {
-      meaningScore = 1700;
-      if (!detectedType) detectedType = 'exact_meaning';
-    }
-    // 2.2. Exact Meaning Token Match (e.g. query "đi", meaning "đi, bước đi" -> token "đi" matches perfectly!)
-    else if (meaningTokens.includes(qRaw)) {
-      meaningScore = 1600;
-      if (!detectedType) detectedType = 'meaning_token';
-    } else if (meaningTokensTone.includes(qTone)) {
-      meaningScore = 1550;
-      if (!detectedType) detectedType = 'meaning_token';
-    }
-    // 2.3. Meaning Token Starts With Query
-    else if (meaningTokens.some((t) => t.startsWith(qRaw))) {
-      meaningScore = qRaw.length <= 3 ? 850 : 1300;
-      if (!detectedType) detectedType = 'meaning_starts';
-    } else if (meaningTokensTone.some((t) => t.startsWith(qTone))) {
-      meaningScore = qTone.length <= 3 ? 800 : 1200;
-      if (!detectedType) detectedType = 'meaning_starts';
-    }
-    // 2.4. Whole Word Regex Match in Meaning (boundary-aware \b so "đi" won't match "điều kiện")
-    else {
-      try {
-        const escapedTone = qTone.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const boundaryRegex = new RegExp(`(^|[^a-z0-9à-ỹ])${escapedTone}([^a-z0-9à-ỹ]|$)`, 'i');
-        if (boundaryRegex.test(meaningTone)) {
-          meaningScore = 1000;
-          if (!detectedType) detectedType = 'meaning_contains';
-        }
-      } catch (_) {}
-    }
+  if (scope !== 'word' && meaningRaw) {
+    if (qHasAccents) {
+      // -------------------------------------------------------------------
+      // 2A. ACCENT-SENSITIVE MODE (User typed "Bạn", "học", "cà phê", "đi")
+      // Strictly respect diacritics! NEVER match against stripped tones!
+      // -------------------------------------------------------------------
 
-    // 2.5. Broad Substring match in meaning (only for queries with length >= 2 to avoid single-letter noise)
-    if (meaningScore === 0 && qRaw.length >= 2) {
-      if (meaningRaw.includes(qRaw)) {
-        meaningScore = 400;
-        if (!detectedType) detectedType = 'meaning_contains';
-      } else if (meaningTone.includes(qTone)) {
-        meaningScore = 350;
-        if (!detectedType) detectedType = 'meaning_contains';
-      } else if (qNoSpaceTone && meaningTone.replace(/\s+/g, '').includes(qNoSpaceTone)) {
-        meaningScore = 300;
-        if (!detectedType) detectedType = 'meaning_contains';
+      // 2A.1. Exact Full Meaning Match
+      if (meaningRaw === qClean) {
+        meaningScore = 2000;
+        if (!detectedType) detectedType = 'exact_meaning';
+      }
+      // 2A.2. Exact Meaning Token Match (e.g. "đi, bước đi" -> token "đi" matches)
+      else if (meaningTokens.includes(qClean)) {
+        meaningScore = 1800;
+        if (!detectedType) detectedType = 'meaning_token';
+      }
+      // 2A.3. Multi-word Order-Invariant Match
+      // User typed multiple words with accents, e.g. "thân bạn" or "bạn thân"
+      // Every query word must exist in meaningWords, in ANY order!
+      else if (
+        qWords.length > 1 &&
+        qWords.every((qw) => meaningWords.includes(qw))
+      ) {
+        const isContiguous = meaningRaw.includes(qClean);
+        meaningScore = isContiguous ? 1800 : 1650;
+        if (!detectedType) detectedType = 'multi_token';
+      }
+      // 2A.4. Single word exact word token in meaning
+      // (e.g. query "bạn" -> meaning "người bạn thân", word "bạn" is an exact word token)
+      else if (qWords.length === 1 && meaningWords.includes(qWords[0])) {
+        meaningScore = 1600;
+        if (!detectedType) detectedType = 'meaning_token';
+      }
+      // 2A.5. Meaning Token Starts With query at word boundary
+      // (e.g. query "bạn" -> meaning token "bạn bè" starts with "bạn ")
+      else if (meaningTokens.some((t) => t.startsWith(qClean + ' '))) {
+        meaningScore = 1500;
+        if (!detectedType) detectedType = 'meaning_starts';
+      }
+      // 2A.6. Whole-word boundary regex match with exact accents
+      else {
+        try {
+          const escaped = qClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const boundaryRegex = new RegExp(`(^|[^a-z0-9àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ])${escaped}([^a-z0-9àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]|$)`, 'i');
+          if (boundaryRegex.test(meaningRaw)) {
+            meaningScore = 1200;
+            if (!detectedType) detectedType = 'meaning_contains';
+          }
+        } catch (_) {}
+      }
+    } else {
+      // -------------------------------------------------------------------
+      // 2B. UNACCENTED MODE (User typed "ban", "di", "hoc" without diacritics)
+      // -------------------------------------------------------------------
+      const qTone = removeVietnameseTones(qClean).toLowerCase();
+      const meaningTone = removeVietnameseTones(meaningRaw).toLowerCase();
+      const meaningToneWords = extractWords(meaningTone);
+      const meaningTokensTone = meaningTokens.map((t) => removeVietnameseTones(t).toLowerCase());
+
+      // 2B.1. Exact Unaccented Full Meaning Match
+      if (meaningRaw === qClean) {
+        meaningScore = 1900;
+        if (!detectedType) detectedType = 'exact_meaning';
+      } else if (meaningTone === qTone) {
+        meaningScore = 1700;
+        if (!detectedType) detectedType = 'exact_meaning';
+      }
+      // 2B.2. Exact Meaning Token Match (e.g. "ban đêm" for query "ban")
+      else if (meaningTokens.includes(qClean)) {
+        meaningScore = 1650;
+        if (!detectedType) detectedType = 'meaning_token';
+      } else if (meaningTokensTone.includes(qTone)) {
+        meaningScore = 1500;
+        if (!detectedType) detectedType = 'meaning_token';
+      }
+      // 2B.3. Multi-word Order-Invariant Match (unaccented)
+      // e.g. "than ban" matches "nguoi ban than"
+      else if (
+        qWords.length > 1 &&
+        qWords.every((qw) => meaningToneWords.includes(qw))
+      ) {
+        const isContiguous = meaningTone.includes(qTone);
+        meaningScore = isContiguous ? 1550 : 1400;
+        if (!detectedType) detectedType = 'multi_token';
+      }
+      // 2B.4. Single unaccented word token match
+      else if (qWords.length === 1 && meaningToneWords.includes(qWords[0])) {
+        meaningScore = 1350;
+        if (!detectedType) detectedType = 'meaning_token';
+      }
+      // 2B.5. Token starts with unaccented query at word boundary
+      else if (meaningTokensTone.some((t) => t.startsWith(qTone + ' '))) {
+        meaningScore = 1200;
+        if (!detectedType) detectedType = 'meaning_starts';
+      }
+      // 2B.6. Whole word boundary match unaccented
+      else {
+        try {
+          const escapedTone = qTone.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const boundaryRegex = new RegExp(`(^|[^a-z0-9])${escapedTone}([^a-z0-9]|$)`, 'i');
+          if (boundaryRegex.test(meaningTone)) {
+            meaningScore = 900;
+            if (!detectedType) detectedType = 'meaning_contains';
+          }
+        } catch (_) {}
       }
     }
   }
 
-  // ==========================================
-  // 3. CROSS-SCRIPT & SECONDARY FIELDS BOOST
-  // ==========================================
-  // Han-Viet / English / Korean equivalent fields
-  if (item.nghia_tieng_han || item.nghia_tieng_anh || item.phien_am_tieng_han) {
-    const hanRaw = (item.nghia_tieng_han || '').toLowerCase();
-    const hanTone = removeVietnameseTones(hanRaw);
-    const engRaw = (item.nghia_tieng_anh || '').toLowerCase();
-    const phienHanRaw = (item.phien_am_tieng_han || '').toLowerCase();
-    const phienHanTone = removeVietnameseTones(phienHanRaw);
-
-    if (
-      hanRaw === qRaw ||
-      hanTone === qTone ||
-      engRaw === qRaw ||
-      phienHanRaw === qRaw ||
-      phienHanTone === qTone
-    ) {
-      wordScore = Math.max(wordScore, 1400);
-      if (!detectedType) detectedType = 'exact_word';
-    } else if (
-      hanRaw.includes(qRaw) ||
-      hanTone.includes(qTone) ||
-      engRaw.includes(qRaw) ||
-      phienHanTone.includes(qTone)
-    ) {
-      wordScore = Math.max(wordScore, 700);
-    }
-  }
-
-  // Multi-token match across all fields (e.g. "bai 1 di dao")
-  const tokens = qTone.split(/\s+/).filter(Boolean);
-  if (wordScore === 0 && meaningScore === 0 && tokens.length > 1) {
-    const combined = `${wordTone} ${meaningTone} ${phoneticRaw} ${removeVietnameseTones(item.bai_hoc || '')} ${removeVietnameseTones(item.chu_de || '')}`.toLowerCase();
-    const allMatch = tokens.every((token) => combined.includes(token));
-    if (allMatch) {
-      meaningScore = 450;
-      detectedType = 'multi_token';
-    }
-  }
-
-  // Scope Filtering
+  // Final score based on requested scope
   let finalScore = 0;
   if (scope === 'word') {
     finalScore = wordScore;
   } else if (scope === 'meaning') {
     finalScore = meaningScore;
   } else {
-    // Both: Take the maximum score
+    // Both: take max
     finalScore = Math.max(wordScore, meaningScore);
   }
 

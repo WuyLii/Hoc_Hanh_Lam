@@ -1,6 +1,6 @@
 {
   "src/services/dictionaryService.ts": "b8457e53b6d7bdff560fdcb15e5db7ee079888c1686bc0bce88e4979c318367c",
-  "src/components/DictionaryView.tsx": "9065a4be4dd7a342ee372f9c5b96a9accc0c4c72566adfc146fb09d51fdc21ab",
+  "src/components/DictionaryView.tsx": "77fcb3952e9df38faeb7e65ea65e7afc1c2b1c20d9f9c73caa4843e60e67a204",
   "src/components/OcrScannerModal.tsx": "bfd9f25f1fb6733b68bf373af0e355631d841903a5d5585e6cb1fe3e38fd5249",
   "src/components/TextbookExtractorModal.tsx": "a16fa435c1549ec8fda44f122f2dfe91d51be69f9b05b26682c3a572767a1a8c",
   "src/components/VocabularyManager.tsx": "095355a9daba14c603b0336481eae5e23e4215fb70554f94e3b4982a33b767f2",

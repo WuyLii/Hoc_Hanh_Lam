@@ -127,30 +127,14 @@ export const DictionaryView: React.FC = () => {
     const activeTerm = (result.word || query || '').trim().toLowerCase();
     if (!activeTerm) return [];
 
-    // Tìm các từ trong kho có liên quan đến từ vừa tra cứu
+    // Tìm các từ trong kho thực sự khớp với từ vừa tra cứu (chỉ từ hoặc nghĩa, không lấy bù từ khác)
     const matched = currentLangVocabulary
       .map((item) => ({ item, match: matchVocabulary(item, activeTerm, 'both') }))
-      .filter(({ match }) => match.matches)
+      .filter(({ match }) => match.matches && match.score >= 500)
       .sort((a, b) => b.match.score - a.match.score)
       .map(({ item }) => item);
 
-    // Bổ sung các từ cùng chủ đề hoặc bài học nếu có
-    const matchedIds = new Set(matched.map((m) => m.word_id));
-    const currentTopic = matched[0]?.chu_de;
-    const topicComplements = currentLangVocabulary.filter(
-      (v) => !matchedIds.has(v.word_id) && currentTopic && v.chu_de === currentTopic
-    );
-
-    // Các từ nổi bật khác trong kho (được đánh dấu sao hoặc flashcard)
-    const otherComplements = [...currentLangVocabulary]
-      .filter((v) => !matchedIds.has(v.word_id) && !topicComplements.some((t) => t.word_id === v.word_id))
-      .sort((a, b) => {
-        const aPri = (a.is_starred ? 5 : 0) + (a.is_added_today_flashcard ? 4 : 0);
-        const bPri = (b.is_starred ? 5 : 0) + (b.is_added_today_flashcard ? 4 : 0);
-        return bPri - aPri;
-      });
-
-    return [...matched, ...topicComplements, ...otherComplements].slice(0, 6);
+    return matched.slice(0, 6);
   }, [result, query, currentLangVocabulary]);
 
   // Check if the current result word is already in vocabulary bank
