@@ -19,6 +19,7 @@ import {
 } from './src/server/geminiHandlers.ts';
 import { fetchPublicSpreadsheet } from './src/server/sheetsHelper.ts';
 import { cleanDeduplicateVocab, cleanDeduplicateGrammar } from './src/utils/deduplicate.ts';
+import { matchVocabulary } from './src/utils/searchHelper.ts';
 import { INITIAL_VOCABULARY, INITIAL_GRAMMAR } from './src/data/seedData.ts';
 import { handleTutorAgent } from './src/server/tutorAgent.ts';
 
@@ -595,14 +596,16 @@ async function startServer() {
         list = list.filter((item) => item.cap_do === level || (item.cap_do && item.cap_do.includes(String(level))));
       }
       if (search) {
-        const q = String(search).toLowerCase().trim();
-        list = list.filter((item) =>
-          (item.tu && item.tu.toLowerCase().includes(q)) ||
-          (item.nghia && item.nghia.toLowerCase().includes(q)) ||
-          (item.phien_am && item.phien_am.toLowerCase().includes(q)) ||
-          (item.nghia_tieng_han && item.nghia_tieng_han.toLowerCase().includes(q)) ||
-          (item.nghia_tieng_anh && item.nghia_tieng_anh.toLowerCase().includes(q))
-        );
+        const q = String(search).trim();
+        const scoredList: { item: any; score: number }[] = [];
+        for (const item of list) {
+          const matchRes = matchVocabulary(item, q, 'both');
+          if (matchRes.matches) {
+            scoredList.push({ item, score: matchRes.score });
+          }
+        }
+        scoredList.sort((a, b) => b.score - a.score);
+        list = scoredList.map((entry) => entry.item);
       }
 
       const total = list.length;

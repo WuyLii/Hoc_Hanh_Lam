@@ -422,8 +422,8 @@ export const VocabularyManager: React.FC = () => {
   const sortedWords = useMemo(() => {
     return [...scoredWords]
       .sort((a, b) => {
-        // If user typed a search query and sort is 'recent', rank by match relevance first
-        if (searchQuery.trim() && sortBy === 'recent' && b.score !== a.score) {
+        // Khi người dùng nhập từ khóa tìm kiếm, LUÔN ưu tiên độ khớp chính xác cao nhất lên đầu
+        if (searchQuery.trim() && b.score !== a.score) {
           return b.score - a.score;
         }
         if (sortBy === 'alphabetical') return a.word.tu.localeCompare(b.word.tu);

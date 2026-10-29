@@ -1,5 +1,6 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import dotenv from 'dotenv';
+import { findBestVocabularyMatch } from '../utils/searchHelper.ts';
 dotenv.config();
 
 // =========================================================================
@@ -245,23 +246,23 @@ export interface DedicatedModelConfig {
 export const DEDICATED_TUTOR_MODELS: DedicatedModelConfig[] = [
   {
     id: 'tutor-1',
-    name: 'Gia sư AI 1 (Gemini 3.8 Flash Flagship)',
-    model: 'gemini-3.8-flash',
-    fallbackModel: 'gemini-flash-latest',
+    name: 'Gia sư AI 1 (Gemini 3.1 Flash Lite Siêu Tốc)',
+    model: 'gemini-3.1-flash-lite',
+    fallbackModel: 'gemini-3.8-flash',
     description: 'Chuyên gia Phân tích Sư phạm Ngôn ngữ Chuyên sâu & Phản hồi Tốc độ cao',
   },
   {
     id: 'tutor-2',
-    name: 'Gia sư AI 2 (Gemini Flash Latest)',
-    model: 'gemini-flash-latest',
-    fallbackModel: 'gemini-3.8-flash',
+    name: 'Gia sư AI 2 (Gemini 3.8 Flash Flagship)',
+    model: 'gemini-3.8-flash',
+    fallbackModel: 'gemini-flash-latest',
     description: 'Chuyên gia Logic Ngữ nghĩa Sâu sắc & Đối chiếu Đa Ngữ Tốc độ cao',
   },
   {
     id: 'tutor-backup',
-    name: 'Gia sư AI Dự phòng (Gemini 3.1 Flash Lite)',
-    model: 'gemini-3.1-flash-lite',
-    fallbackModel: 'gemini-flash-latest',
+    name: 'Gia sư AI Dự phòng (Gemini Flash Latest)',
+    model: 'gemini-flash-latest',
+    fallbackModel: 'gemini-3.1-flash-lite',
     description: 'Dự phòng siêu tốc độ cao và ổn định',
   },
 ];
@@ -488,9 +489,9 @@ export async function callGeminiDictionaryAlternating(
 // Dùng nhóm mô hình độc lập: gemini-3.8-flash, gemini-flash-latest, gemini-3.1-flash-lite
 // =========================================================================
 export const NON_TUTOR_MODELS = [
+  'gemini-3.1-flash-lite',
   'gemini-3.8-flash',
   'gemini-flash-latest',
-  'gemini-3.1-flash-lite',
 ];
 
 export async function callNonTutorGeminiWithRetry(options: any, contents: any, config?: any) {
@@ -675,7 +676,7 @@ Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markd
       systemInstruction,
       temperature: 0.6,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     },
     body.turn
@@ -725,16 +726,8 @@ export async function handleDictionaryLookup(body: any, headers?: any, localVoca
   // Khi tìm những từ đã có sẵn trong kho từ vựng và không phải làm mới:
   // "kh cần AI phải biên soạn lại quá chi tiết, có thể bê nguyên cái đã có trong kho và đưa ra. Chỉ cần cho thêm 1 ví dụ kèm."
   if (!forceRefresh && localVocabs && localVocabs.length > 0) {
-    const qLower = qClean.toLowerCase();
-    const matched = localVocabs.find(
-      (v: any) =>
-        (v.tu && v.tu.trim().toLowerCase() === qLower && (!v.ngon_ngu || v.ngon_ngu === language)) ||
-        (v.nghia && v.nghia.trim().toLowerCase() === qLower && (!v.ngon_ngu || v.ngon_ngu === language))
-    ) || localVocabs.find(
-      (v: any) =>
-        (v.tu && v.tu.trim().toLowerCase() === qLower) ||
-        (v.nghia && v.nghia.trim().toLowerCase() === qLower)
-    );
+    const matchRes = findBestVocabularyMatch(localVocabs, qClean, 900);
+    const matched = matchRes ? (matchRes.item as any) : null;
 
     if (matched) {
       const example = matched.vi_du
@@ -858,6 +851,9 @@ Trả về duy nhất định dạng JSON chuẩn:
       {
         responseMimeType: 'application/json',
         temperature: 0.2,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
       }
     );
   } catch (aiErr: any) {
@@ -865,14 +861,8 @@ Trả về duy nhất định dạng JSON chuẩn:
     
     // Nếu AI gặp sự cố (ví dụ 503 spike từ Google), thử đối chiếu trong kho từ vựng nội bộ của app
     if (localVocabs && localVocabs.length > 0) {
-      const qLower = qClean.toLowerCase();
-      const matched = localVocabs.find(
-        (v: any) =>
-          (v.tu && v.tu.trim().toLowerCase() === qLower) ||
-          (v.nghia && v.nghia.trim().toLowerCase() === qLower) ||
-          (v.tu && v.tu.toLowerCase().includes(qLower) && v.ngon_ngu === language) ||
-          (v.nghia && v.nghia.toLowerCase().includes(qLower) && v.ngon_ngu === language)
-      );
+      const matchRes = findBestVocabularyMatch(localVocabs, qClean, 800);
+      const matched = matchRes ? (matchRes.item as any) : null;
 
       if (matched) {
         return {
@@ -977,7 +967,7 @@ Yêu cầu trả về định dạng JSON hợp lệ duy nhất với cấu trú
       responseMimeType: 'application/json',
       temperature: 0.3,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     }
   );
@@ -1033,7 +1023,7 @@ Guidelines:
       systemInstruction,
       temperature: 0.7,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     }
   );
@@ -1081,7 +1071,7 @@ Hãy đánh giá chi tiết và trả về kết quả định dạng JSON thu�
       responseMimeType: 'application/json',
       temperature: 0.3,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     }
   );
@@ -1136,7 +1126,7 @@ Trả về định dạng JSON thuần tuý với cấu trúc:
       responseMimeType: 'application/json',
       temperature: 0.3,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     }
   );
@@ -1253,7 +1243,7 @@ Cấu trúc JSON đầu ra bắt buộc:
       responseMimeType: 'application/json',
       temperature: 0.1,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     }
   );
@@ -1406,7 +1396,7 @@ Cấu trúc JSON phản hồi bắt buộc:
       responseMimeType: 'application/json',
       temperature: 0.1,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     }
   );
@@ -1476,7 +1466,7 @@ Trả về kết quả chuẩn JSON duy nhất với cấu trúc:
       responseMimeType: 'application/json',
       temperature: 0.1,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     }
   );

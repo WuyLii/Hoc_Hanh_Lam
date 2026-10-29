@@ -260,7 +260,7 @@ Trả lời bằng tiếng Việt thân thiện, rõ ràng, định dạng Markd
       systemInstruction,
       temperature: 0.5,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW,
+        thinkingBudget: 0,
       },
     },
     turn

@@ -1,4 +1,5 @@
 import { VocabularyItem } from '../types';
+import { matchVocabulary } from './searchHelper';
 
 export interface NormalizedLesson {
   key: string;
@@ -349,29 +350,20 @@ export function filterWords(words: VocabularyItem[], criteria: FilterCriteria = 
 
     // Search Keyword
     if (cleanSearch) {
-      const fields = [
-        w.tu,
-        w.nghia,
-        w.phien_am,
-        w.nghia_tieng_han,
-        w.nghia_tieng_anh,
-        w.vi_du,
-        w.vi_du_dich,
-        w.loai_tu,
-        w.chu_de,
-        w.cap_do,
-      ];
-      const match = fields.some((f) => f && f.toLowerCase().includes(cleanSearch));
-      if (!match) return false;
+      const match = matchVocabulary(w, cleanSearch, 'both');
+      if (!match.matches) return false;
+      (w as any)._searchScore = match.score;
     }
 
     return true;
   });
 
-  // 2. Shuffle (if requested)
+  // 2. Sort by relevance if search query is active, or Shuffle (if requested)
   let result = filtered;
   if (shuffle) {
     result = [...filtered].sort(() => Math.random() - 0.5);
+  } else if (cleanSearch) {
+    result = [...filtered].sort((a, b) => ((b as any)._searchScore || 0) - ((a as any)._searchScore || 0));
   }
 
   // 3. Limit (if specified)

@@ -11,7 +11,7 @@ import {
   clearDictionaryHistory,
 } from '../services/dictionaryService';
 import { ttsService } from '../services/ttsService';
-import { matchVocabulary } from '../utils/searchHelper';
+import { matchVocabulary, findBestVocabularyMatch } from '../utils/searchHelper';
 import {
   Search,
   Volume2,
@@ -110,7 +110,7 @@ export const DictionaryView: React.FC = () => {
     if (!query.trim()) return [];
     return currentLangVocabulary
       .map((item) => ({ item, match: matchVocabulary(item, query, 'both') }))
-      .filter(({ match }) => match.matches)
+      .filter(({ match }) => match.matches && match.score >= 500)
       .sort((a, b) => b.match.score - a.match.score)
       .map(({ item }) => item)
       .slice(0, 6);
@@ -187,20 +187,9 @@ export const DictionaryView: React.FC = () => {
     // Khi tìm những từ đã có sẵn trong kho từ vựng:
     // "kh cần AI phải biên soạn lại quá chi tiết, có thể bê nguyên cái đã có trong kho và đưa ra. Chỉ cần cho thêm 1 ví dụ kèm."
     if (!forceRefresh) {
-      const termLower = term.toLowerCase();
-      // Khớp chính xác từ hoặc nghĩa
-      const exactMatch = currentLangVocabulary.find(
-        (v) =>
-          (v.tu && v.tu.trim().toLowerCase() === termLower) ||
-          (v.nghia && v.nghia.trim().toLowerCase() === termLower)
-      );
-
-      // Nếu không khớp chính xác, tìm khớp bắt đầu bằng
-      const matchedVocab = exactMatch || currentLangVocabulary.find(
-        (v) =>
-          (v.tu && v.tu.trim().toLowerCase().startsWith(termLower)) ||
-          (v.nghia && v.nghia.trim().toLowerCase().includes(termLower))
-      );
+      // Tìm từ khớp tối ưu và chuẩn xác nhất trong kho từ vựng (chống nhầm lẫn chuỗi con)
+      const matchRes = findBestVocabularyMatch(currentLangVocabulary, term, 900);
+      const matchedVocab = matchRes ? matchRes.item : null;
 
       if (matchedVocab) {
         setLoading(false);
