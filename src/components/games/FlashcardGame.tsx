@@ -74,6 +74,10 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
   const [showFilterBar, setShowFilterBar] = useState<boolean>(false);
   const [reloadNotice, setReloadNotice] = useState<string | null>(null);
 
+  // Random word selection state
+  const [customRandomInput, setCustomRandomInput] = useState<string>('15');
+  const [randomSourceMode, setRandomSourceMode] = useState<'filtered' | 'selected'>('filtered');
+
   // Available options derived from full input words
   const availablePos = useMemo(() => Array.from(new Set(words.map((w) => w.loai_tu || 'Khác'))).filter(Boolean), [words]);
   const availableContexts = useMemo(() => Array.from(new Set(words.map((w) => w.chu_de || 'Tổng hợp'))).filter(Boolean), [words]);
@@ -285,11 +289,53 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
     setPendingWordIds(new Set());
   };
 
-  const handleSelectRandomCandidates = (count: number) => {
-    const shuffled = [...candidateWords].sort(() => Math.random() - 0.5);
-    const chosen = shuffled.slice(0, count).map((w) => w.word_id);
+  const handleSelectRandomCandidates = (count: number, source: 'filtered' | 'selected' = randomSourceMode) => {
+    let pool: VocabularyItem[] = [];
+    if (source === 'selected' && pendingWordIds.size > 0) {
+      pool = candidateWords.filter((w) => pendingWordIds.has(w.word_id));
+      if (pool.length === 0) pool = candidateWords;
+    } else {
+      pool = candidateWords;
+    }
+    if (pool.length === 0) return;
+
+    const clampedCount = Math.max(1, Math.min(count, pool.length));
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const chosen = shuffled.slice(0, clampedCount).map((w) => w.word_id);
     setPendingWordIds(new Set(chosen));
+    setReloadNotice(`🎲 Đã chọn ngẫu nhiên ${chosen.length} từ trong danh sách ${source === 'selected' ? 'đã chọn' : 'đã lọc'}!`);
+    setTimeout(() => setReloadNotice(null), 3500);
   };
+
+  const handleApplyRandomCandidatesAndPlay = (count: number, source: 'filtered' | 'selected' = randomSourceMode) => {
+    let pool: VocabularyItem[] = [];
+    if (source === 'selected' && pendingWordIds.size > 0) {
+      pool = candidateWords.filter((w) => pendingWordIds.has(w.word_id));
+      if (pool.length === 0) pool = candidateWords;
+    } else {
+      pool = candidateWords;
+    }
+    if (pool.length === 0) {
+      setReloadNotice('⚠️ Không có từ vựng nào trong danh sách để chọn!');
+      setTimeout(() => setReloadNotice(null), 3000);
+      return;
+    }
+
+    const clampedCount = Math.max(1, Math.min(count, pool.length));
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const chosenWords = shuffled.slice(0, clampedCount);
+
+    setPendingWordIds(new Set(chosenWords.map((w) => w.word_id)));
+    setActiveWords(chosenWords);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setSessionResults([]);
+    setIsCompleted(false);
+    setShowFilterBar(false);
+    setReloadNotice(`⚡ Đã rút trích ngẫu nhiên ${chosenWords.length} từ và bắt đầu luyện flashcard!`);
+    setTimeout(() => setReloadNotice(null), 4000);
+  };
+
 
   // CONFIRMATION & RELOAD HANDLER: Apply filter selection and reload cards!
   const handleApplySelectionAndReload = () => {
@@ -809,70 +855,151 @@ export const FlashcardGame: React.FC<FlashcardGameProps> = ({
             </div>
           </div>
 
-          {/* Quick Word Selection Toolbar */}
-          <div className="pt-2 border-t border-[#1A1A1A]/20 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-[#1A1A1A] uppercase">
-                DANH SÁCH TỪ PHÙ HỢP ({candidateWords.length}):
-              </span>
-              <span className="bg-[#1A1A1A] text-[#F9F7F2] px-2 py-0.5 font-bold">
-                ĐÃ CHỌN {pendingWordIds.size} TỪ
-              </span>
+          {/* Quick Word Selection Toolbar & Random Subset Picker */}
+          <div className="pt-3 border-t border-[#1A1A1A]/20 space-y-3 text-xs font-mono">
+            {/* Top status & Select/Deselect all */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[#1A1A1A] uppercase tracking-wide">
+                  DANH SÁCH TỪ PHÙ HỢP ({candidateWords.length}):
+                </span>
+                <span className="bg-[#1A1A1A] text-[#F9F7F2] px-2 py-0.5 font-bold text-[11px]">
+                  ĐÃ CHỌN {pendingWordIds.size} TỪ
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSelectAllCandidates}
+                  className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-[11px] font-bold text-[#1A1A1A] transition cursor-pointer"
+                >
+                  ✓ Chọn tất cả ({candidateWords.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeselectAllCandidates}
+                  className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-[11px] font-bold text-[#1A1A1A] transition cursor-pointer"
+                >
+                  ✗ Bỏ chọn tất cả
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (candidateWords.length === 0) return;
+                    const shuffled = [...candidateWords];
+                    for (let i = shuffled.length - 1; i > 0; i--) {
+                      const j = Math.floor(Math.random() * (i + 1));
+                      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                    }
+                    setPendingWordIds(new Set(shuffled.map((w) => w.word_id)));
+                    setActiveWords(shuffled);
+                    setCurrentIndex(0);
+                    setIsFlipped(false);
+                    setReloadNotice(`🎲 Đã xáo trộn ngẫu nhiên ${shuffled.length} từ vựng đã lọc!`);
+                    setTimeout(() => setReloadNotice(null), 3500);
+                  }}
+                  className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 border border-[#1A1A1A] text-[11px] font-black text-stone-950 flex items-center gap-1 shadow-sm transition cursor-pointer"
+                  title="Xáo trộn ngẫu nhiên tất cả các từ vựng đã lọc"
+                >
+                  <Shuffle className="w-3 h-3 text-stone-950" />
+                  <span>🔀 Xáo trộn thứ tự</span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleSelectAllCandidates}
-                className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-[11px] font-bold text-[#1A1A1A]"
-              >
-                ✓ Chọn tất cả ({candidateWords.length})
-              </button>
-              <button
-                type="button"
-                onClick={handleDeselectAllCandidates}
-                className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-[11px] font-bold text-[#1A1A1A]"
-              >
-                ✗ Bỏ chọn tất cả
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectRandomCandidates(10)}
-                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-800 text-[11px] font-bold text-amber-950 flex items-center gap-1"
-              >
-                <Shuffle className="w-3 h-3 text-amber-700" />
-                <span>🎲 Ngẫu nhiên 10 từ</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectRandomCandidates(20)}
-                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-800 text-[11px] font-bold text-amber-950 flex items-center gap-1"
-              >
-                <Shuffle className="w-3 h-3 text-amber-700" />
-                <span>🎲 20 từ</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (candidateWords.length === 0) return;
-                  const shuffled = [...candidateWords];
-                  for (let i = shuffled.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                  }
-                  setPendingWordIds(new Set(shuffled.map((w) => w.word_id)));
-                  setActiveWords(shuffled);
-                  setCurrentIndex(0);
-                  setIsFlipped(false);
-                  setReloadNotice(`🎲 Đã xáo trộn ngẫu nhiên ${shuffled.length} từ vựng đã lọc!`);
-                  setTimeout(() => setReloadNotice(null), 3500);
-                }}
-                className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 border-2 border-[#1A1A1A] text-[11px] font-black text-stone-950 flex items-center gap-1 shadow-sm transition cursor-pointer"
-                title="Xáo trộn ngẫu nhiên tất cả các từ vựng đã lọc"
-              >
-                <Shuffle className="w-3 h-3 text-stone-950" />
-                <span>🔀 Xáo trộn từ đã lọc</span>
-              </button>
+            {/* Dedicated Random Selection Panel */}
+            <div className="p-3 bg-amber-50/70 border-2 border-amber-900/30 rounded-none space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-bold text-amber-950 flex items-center gap-1.5 uppercase text-[11px] tracking-wide">
+                  <Shuffle className="w-3.5 h-3.5 text-amber-800" />
+                  <span>🎲 CHỌN NGẪU NHIÊN 1 SỐ LƯỢNG TỪ:</span>
+                </span>
+
+                {/* Scope selector: Filtered candidates vs Manually selected */}
+                <div className="flex items-center gap-3 text-[11px]">
+                  <label className="inline-flex items-center gap-1 cursor-pointer font-medium text-stone-800">
+                    <input
+                      type="radio"
+                      name="randomSourceMode"
+                      value="filtered"
+                      checked={randomSourceMode === 'filtered'}
+                      onChange={() => setRandomSourceMode('filtered')}
+                      className="accent-amber-600"
+                    />
+                    <span>Từ tất cả từ đã lọc ({candidateWords.length})</span>
+                  </label>
+                  <label className={`inline-flex items-center gap-1 cursor-pointer font-medium ${
+                    pendingWordIds.size === 0 ? 'opacity-50 cursor-not-allowed text-stone-400' : 'text-stone-800'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="randomSourceMode"
+                      value="selected"
+                      disabled={pendingWordIds.size === 0}
+                      checked={randomSourceMode === 'selected'}
+                      onChange={() => setRandomSourceMode('selected')}
+                      className="accent-amber-600"
+                    />
+                    <span>Từ các từ đang tích chọn ({pendingWordIds.size})</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Presets and Custom Input */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] uppercase font-bold text-stone-500 mr-1">Rút nhanh:</span>
+                {[5, 10, 15, 20, 25, 30, 50].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => handleSelectRandomCandidates(preset, randomSourceMode)}
+                    className="px-2 py-0.5 bg-white hover:bg-amber-100 border border-amber-800/40 text-[11px] font-bold text-amber-950 transition cursor-pointer"
+                    title={`Chọn ngẫu nhiên ${preset} từ trong danh sách ${randomSourceMode === 'selected' ? 'đã chọn' : 'đã lọc'}`}
+                  >
+                    {preset} từ
+                  </button>
+                ))}
+
+                {/* Custom count input & action buttons */}
+                <div className="flex items-center gap-1 ml-auto">
+                  <span className="text-[10px] uppercase font-bold text-stone-600">Số lượng:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={randomSourceMode === 'selected' && pendingWordIds.size > 0 ? pendingWordIds.size : candidateWords.length}
+                    value={customRandomInput}
+                    onChange={(e) => setCustomRandomInput(e.target.value)}
+                    placeholder="15"
+                    className="w-14 px-1.5 py-0.5 bg-white border border-[#1A1A1A] text-xs font-mono font-bold text-center text-[#1A1A1A] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const count = parseInt(customRandomInput, 10);
+                      if (!isNaN(count) && count > 0) {
+                        handleSelectRandomCandidates(count, randomSourceMode);
+                      }
+                    }}
+                    className="px-2.5 py-0.5 bg-amber-700 hover:bg-amber-800 text-white border border-[#1A1A1A] text-[11px] font-bold transition cursor-pointer"
+                  >
+                    🎲 Lấy từ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const count = parseInt(customRandomInput, 10);
+                      if (!isNaN(count) && count > 0) {
+                        handleApplyRandomCandidatesAndPlay(count, randomSourceMode);
+                      }
+                    }}
+                    className="px-2.5 py-0.5 bg-emerald-700 hover:bg-emerald-800 text-white border border-[#1A1A1A] text-[11px] font-bold transition cursor-pointer shadow-sm"
+                    title="Lấy ngẫu nhiên số lượng này và bắt đầu luyện flashcard ngay lập tức"
+                  >
+                    ⚡ Lấy & Luyện ngay
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 

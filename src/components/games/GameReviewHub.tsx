@@ -102,6 +102,9 @@ export const GameReviewHub: React.FC = () => {
     });
   }, [currentLangVocabulary, activeLessonFilter, activeTodayFilter, activeRetentionFilter, activePosFilter, activeTopicFilter, activeDeckFilter, targetDeck]);
 
+  const [randomSubsetCount, setRandomSubsetCount] = useState<number | null>(null);
+  const [customRandomCountInput, setCustomRandomCountInput] = useState<string>('15');
+
   const handleResetAllFilters = () => {
     setActiveDeckFilter('ALL');
     setActiveTopicFilter('ALL');
@@ -110,6 +113,7 @@ export const GameReviewHub: React.FC = () => {
     setActiveLimitFilter('ALL');
     setActiveTodayFilter('ALL');
     setActiveRetentionFilter('ALL');
+    setRandomSubsetCount(null);
   };
 
   const isFilteringActive = activeTodayFilter === 'today_only' || activeRetentionFilter !== 'ALL' || activeLessonFilter !== 'ALL' || activeTopicFilter !== 'ALL' || activePosFilter !== 'ALL' || activeDeckFilter !== 'ALL';
@@ -147,6 +151,7 @@ export const GameReviewHub: React.FC = () => {
     const randomized = shuffleArray(pool);
     setShuffledOrder(randomized);
     setSessionWords(randomized);
+    setRandomSubsetCount(null);
     setShuffleKey((k) => k + 1);
     setShuffleNotice(`🎲 Đã xáo trộn ngẫu nhiên ${randomized.length} từ vựng đã lọc!`);
 
@@ -154,9 +159,42 @@ export const GameReviewHub: React.FC = () => {
     setTimeout(() => setShuffleNotice(null), 4000);
   };
 
+  const handlePickRandomSubsetHub = (count: number) => {
+    const pool = isFilteringActive
+      ? reviewWords
+      : (reviewWords.length > 0 ? reviewWords : currentLangVocabulary);
+
+    if (pool.length === 0) {
+      setShuffleNotice('⚠️ Chưa có từ nào khớp với bộ lọc để chọn ngẫu nhiên!');
+      setTimeout(() => setShuffleNotice(null), 3000);
+      return;
+    }
+
+    const clampedCount = Math.max(1, Math.min(count, pool.length));
+    const randomized = shuffleArray(pool);
+    const chosen = randomized.slice(0, clampedCount);
+
+    setShuffledOrder(chosen);
+    setSessionWords(chosen);
+    setRandomSubsetCount(chosen.length);
+    setShuffleKey((k) => k + 1);
+    setShuffleNotice(`🎲 Đã chọn ngẫu nhiên ${chosen.length} từ trong tổng số ${pool.length} từ đã lọc!`);
+    setTimeout(() => setShuffleNotice(null), 4000);
+  };
+
+  const handleResetRandomSubsetHub = () => {
+    setRandomSubsetCount(null);
+    setShuffledOrder(null);
+    setSessionWords(null);
+    setShuffleKey((k) => k + 1);
+    setShuffleNotice('🔄 Đã hủy chọn ngẫu nhiên, khôi phục toàn bộ danh sách');
+    setTimeout(() => setShuffleNotice(null), 2500);
+  };
+
   const handleResetShuffleOrder = () => {
     setShuffledOrder(null);
     setSessionWords(null);
+    setRandomSubsetCount(null);
     setShuffleKey((k) => k + 1);
     setShuffleNotice('🔄 Đã trở về thứ tự mặc định');
     setTimeout(() => setShuffleNotice(null), 2500);
@@ -166,6 +204,7 @@ export const GameReviewHub: React.FC = () => {
   React.useEffect(() => {
     setShuffledOrder(null);
     setSessionWords(null);
+    setRandomSubsetCount(null);
   }, [activeLessonFilter, activeTopicFilter, activePosFilter, activeDeckFilter, activeTodayFilter, activeRetentionFilter]);
 
   // Dynamic random shuffle every time filters change or user clicks shuffle
@@ -415,7 +454,7 @@ export const GameReviewHub: React.FC = () => {
             <Filter className="w-3.5 h-3.5" />
             <span>Bộ lọc nguồn từ vựng & xáo trộn:</span>
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleShuffleFilteredWords}
               className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 border border-[#1A1A1A] text-xs font-mono font-black uppercase flex items-center gap-1.5 shadow-[1.5px_1.5px_0px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition cursor-pointer"
@@ -423,6 +462,13 @@ export const GameReviewHub: React.FC = () => {
             >
               <Shuffle className={`w-3.5 h-3.5 ${isShuffling ? 'animate-spin' : ''}`} />
               <span>🎲 XÁO TRỘN CÂU HỎI</span>
+            </button>
+            <button
+              onClick={() => handlePickRandomSubsetHub(parseInt(customRandomCountInput, 10) || 15)}
+              className="px-3 py-1.5 bg-white hover:bg-stone-100 text-stone-900 border border-[#1A1A1A] text-xs font-mono font-bold uppercase flex items-center gap-1.5 shadow-[1.5px_1.5px_0px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition cursor-pointer"
+              title="Chọn ngẫu nhiên 1 số lượng từ trong danh sách đã lọc"
+            >
+              <span>🎲 RÚT NGẪU NHIÊN TỪ</span>
             </button>
             <span className="text-xs font-mono font-bold bg-white px-2 py-0.5 border border-[#1A1A1A] text-[#1A1A1A]">
               {finalWordsToPlay.length} TỪ HÀNG ĐỢI
@@ -618,49 +664,120 @@ export const GameReviewHub: React.FC = () => {
           )}
         </div>
 
-        {/* Shuffle & Ordering Controls Bar - Element 4 of filter container */}
-        <div className="p-3.5 sm:p-4 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-[#1A1A1A] flex items-center gap-1.5 uppercase tracking-wide">
-              <Shuffle className={`w-4 h-4 text-amber-700 ${isShuffling ? 'animate-spin' : ''}`} />
-              <span>Xáo trộn câu hỏi ngẫu nhiên:</span>
-            </span>
-            <span className="bg-amber-100 border border-amber-800 text-amber-950 px-2 py-0.5 text-[11px] font-bold">
-              {finalWordsToPlay.length} từ đã lọc
-            </span>
-            {shuffledOrder && (
-              <span className="bg-[#1A1A1A] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                ĐÃ ĐẢO THỨ TỰ
+        {/* Shuffle & Random Subset Controls Bar - Element 4 of filter container */}
+        <div className="p-4 bg-white border-2 border-[#1A1A1A] editorial-shadow-sm space-y-3 text-xs font-mono">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A1A1A]/10 pb-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-[#1A1A1A] flex items-center gap-1.5 uppercase tracking-wide">
+                <Shuffle className={`w-4 h-4 text-amber-700 ${isShuffling ? 'animate-spin' : ''}`} />
+                <span>XÁO TRỘN & RÚT TỪ NGẪU NHIÊN:</span>
               </span>
-            )}
-            {shuffleNotice && (
-              <span className="text-emerald-700 font-bold flex items-center gap-1 animate-in fade-in duration-200 bg-emerald-50 px-2.5 py-1 border border-emerald-300">
-                <Check className="w-3.5 h-3.5" />
-                <span>{shuffleNotice}</span>
+              <span className="bg-amber-100 border border-amber-800 text-amber-950 px-2 py-0.5 text-[11px] font-bold">
+                {finalWordsToPlay.length} từ sẵn sàng chơi
               </span>
-            )}
-          </div>
+              {randomSubsetCount !== null && (
+                <span className="bg-emerald-700 text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <span>✓ Đang rút ngẫu nhiên {randomSubsetCount} / {filteredPool.length} từ</span>
+                </span>
+              )}
+              {shuffledOrder && randomSubsetCount === null && (
+                <span className="bg-[#1A1A1A] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                  ĐÃ ĐẢO THỨ TỰ
+                </span>
+              )}
+              {shuffleNotice && (
+                <span className="text-emerald-700 font-bold flex items-center gap-1 animate-in fade-in duration-200 bg-emerald-50 px-2.5 py-1 border border-emerald-300">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{shuffleNotice}</span>
+                </span>
+              )}
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleShuffleFilteredWords}
-              className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-stone-950 border-2 border-[#1A1A1A] font-mono font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 transition cursor-pointer"
-              title="Xáo trộn ngẫu nhiên tất cả các từ vựng đã lọc với nhau"
-            >
-              <Shuffle className={`w-4 h-4 ${isShuffling ? 'animate-spin' : ''}`} />
-              <span>🎲 XÁO TRỘN CÂU HỎI NGAY</span>
-            </button>
-            {shuffledOrder && (
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={handleResetShuffleOrder}
-                className="px-3 py-2 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-stone-700 text-xs font-mono font-bold uppercase transition"
-                title="Khôi phục thứ tự ban đầu"
+                onClick={handleShuffleFilteredWords}
+                className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 border-2 border-[#1A1A1A] font-mono font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-[1.5px_1.5px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 transition cursor-pointer"
+                title="Xáo trộn ngẫu nhiên tất cả các từ vựng đã lọc với nhau"
               >
-                <span>↺ Thứ tự gốc</span>
+                <Shuffle className={`w-3.5 h-3.5 ${isShuffling ? 'animate-spin' : ''}`} />
+                <span>🎲 XÁO TRỘN CÂU HỎI NGAY</span>
               </button>
-            )}
+              {(shuffledOrder || randomSubsetCount !== null) && (
+                <button
+                  type="button"
+                  onClick={handleResetRandomSubsetHub}
+                  className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 border border-[#1A1A1A] text-stone-700 text-xs font-mono font-bold uppercase transition cursor-pointer"
+                  title="Khôi phục danh sách đầy đủ ban đầu"
+                >
+                  <span>↺ Khôi phục danh sách đầy đủ</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Random Subset Selector Panel */}
+          <div className="p-3 bg-amber-50/70 border border-amber-900/30 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-amber-950 flex items-center gap-1 uppercase text-[11px] tracking-wide">
+                <span>🎲 CHỌN NGẪU NHIÊN 1 SỐ LƯỢNG TỪ (TRONG {filteredPool.length} TỪ ĐÃ LỌC):</span>
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-stone-500 mr-1">Rút nhanh:</span>
+              {[5, 10, 15, 20, 25, 30, 50].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => handlePickRandomSubsetHub(preset)}
+                  className={`px-2 py-0.5 border text-[11px] font-bold transition cursor-pointer ${
+                    randomSubsetCount === preset
+                      ? 'bg-amber-700 text-white border-amber-900'
+                      : 'bg-white hover:bg-amber-100 border-amber-800/40 text-amber-950'
+                  }`}
+                  title={`Rút ngẫu nhiên ${preset} từ trong danh sách ${filteredPool.length} từ đã lọc`}
+                >
+                  {preset} từ
+                </button>
+              ))}
+
+              <div className="flex items-center gap-1 ml-2">
+                <span className="text-[10px] uppercase font-bold text-stone-600">Tùy chọn:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={filteredPool.length}
+                  value={customRandomCountInput}
+                  onChange={(e) => setCustomRandomCountInput(e.target.value)}
+                  placeholder="15"
+                  className="w-14 px-1.5 py-0.5 bg-white border border-[#1A1A1A] text-xs font-mono font-bold text-center text-[#1A1A1A] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const count = parseInt(customRandomCountInput, 10);
+                    if (!isNaN(count) && count > 0) {
+                      handlePickRandomSubsetHub(count);
+                    }
+                  }}
+                  className="px-2.5 py-0.5 bg-amber-700 hover:bg-amber-800 text-white border border-[#1A1A1A] text-[11px] font-bold transition cursor-pointer shadow-sm"
+                  title="Rút ngẫu nhiên số lượng từ đã nhập và áp dụng cho tất cả trò chơi"
+                >
+                  🎲 Rút từ
+                </button>
+                {randomSubsetCount !== null && (
+                  <button
+                    type="button"
+                    onClick={handleResetRandomSubsetHub}
+                    className="px-2 py-0.5 bg-stone-200 hover:bg-stone-300 text-stone-800 border border-stone-400 text-[10px] font-bold transition cursor-pointer"
+                    title="Bỏ chế độ rút ngẫu nhiên"
+                  >
+                    ✕ Hủy
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
